@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grand Kavala Hotel</title>
+
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- Tabler Icons -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
+  />
+</head>
+<body>
+
+<h2 class="sr-only">Grand Kavala Hotel — Ιστοσελίδα κρατήσεων πελατών</h2>
+
+<div class="site">
+
+  <nav>
+    <div class="logo">
+      Grand Kavala
+      <span>Hotel & Suites</span>
+    </div>
+
+    <div class="nav-links">
+      <a href="#">Δωμάτια</a>
+      <a href="#">Παροχές</a>
+      <a href="#">Τοποθεσία</a>
+      <a href="#">Επικοινωνία</a>
+    </div>
+
+    <button class="nav-cta" onclick="window.location.href='pages/login.html'">
+      Portal
+    </button>
+  </nav>
+
+  <div class="hero">
+    <div class="hero-eyebrow">Καβάλα, Βόρεια Ελλάδα</div>
+
+    <div class="hero-title">
+      Πολυτέλεια δίπλα<br />
+      στο Αιγαίο
+    </div>
+
+    <div class="hero-sub">
+      510 δωμάτια · Εστιατόριο · Πισίνα · Γυμναστήριο · Spa
+    </div>
+
+    <div class="hero-badges">
+      <span class="hb"><i class="ti ti-star"></i> 5 Αστέρων</span>
+      <span class="hb"><i class="ti ti-wifi"></i> Δωρεάν WiFi</span>
+      <span class="hb"><i class="ti ti-car"></i> Transfer αεροδρομίου</span>
+      <span class="hb"><i class="ti ti-swimming"></i> Πισίνα</span>
+    </div>
+  </div>
+
+  <div class="search-bar">
+    <div class="sb-title">
+      <i class="ti ti-search"></i>
+      Διαθεσιμότητα & Τιμές
+    </div>
+
+    <div class="sb-grid">
+
+      <div class="sb-field">
+        <label>Άφιξη</label>
+        <input type="date" id="s-in" value="2026-05-16">
+      </div>
+
+      <div class="sb-field">
+        <label>Αναχώρηση</label>
+        <input type="date" id="s-out" value="2026-05-19">
+      </div>
+
+      <div class="sb-field">
+        <label>Τύπος Δωματίου</label>
+
+        <select id="s-type">
+          <option value="">Όλοι οι τύποι</option>
+          <option value="mono">Μονόκλινο</option>
+          <option value="dik">Δίκλινο</option>
+          <option value="far">Φαρδύκλινο</option>
+          <option value="suite">Σουίτα</option>
+        </select>
+      </div>
+
+      <div class="sb-field">
+        <label>Άτομα</label>
+
+        <select id="s-pax">
+          <option>1 άτομο</option>
+          <option selected>2 άτομα</option>
+          <option>3 άτομα</option>
+          <option>4 άτομα</option>
+        </select>
+      </div>
+
+    </div>
+
+    <button class="btn-search" onclick="filterRooms()">
+      <i class="ti ti-search"></i>
+      Εύρεση Δωματίων
+    </button>
+  </div>
+
+  <!-- Rooms -->
+  <div class="section-title">Διαθέσιμα Δωμάτια</div>
+
+  <div class="rooms-list">
+
+    <!-- ROOM -->
+    <div class="room-card">
+
+      <div class="room-img">
+        <i class="ti ti-bed room-img-icon"></i>
+        <span class="room-tag tag-avail">Διαθέσιμο</span>
+      </div>
+
+      <div class="room-body">
+
+        <div class="room-name">Μονόκλινο Standard</div>
+
+        <div class="room-desc">
+          Άνετο δωμάτιο με θέα την πόλη.
+        </div>
+
+        <div class="room-footer">
+          <div class="room-price">
+            <strong>€85</strong> / βράδυ
+          </div>
+
+          <button
+            class="btn-book"
+            onclick="openModal('Μονόκλινο Standard',85)"
+          >
+            Κράτηση
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+
+  <div class="modal">
+
+    <div class="modal-head">
+      <div class="modal-head-title" id="modal-title">
+        Κράτηση Δωματίου
+      </div>
+
+      <button class="modal-close" onclick="closeModal()">
+        ✕
+      </button>
+    </div>
+
+    <div class="modal-body" id="modal-body"></div>
+
+    <div class="modal-footer" id="modal-footer"></div>
+
+  </div>
+
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

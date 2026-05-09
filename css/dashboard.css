@@ -1,0 +1,37 @@
+body{
+    margin:0;
+    display:flex;
+    font-family:Arial;
+}
+
+.sidebar{
+    width:220px;
+    height:100vh;
+    background:#222;
+    color:white;
+    padding:20px;
+}
+
+.main-content{
+    flex:1;
+    padding:20px;
+}
+
+.room{
+    padding:15px;
+    margin:10px 0;
+    border-radius:8px;
+    color:white;
+}
+
+.available{
+    background:green;
+}
+
+.occupied{
+    background:red;
+}
+
+.cleaning{
+    background:orange;
+}
