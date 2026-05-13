@@ -1,27 +1,35 @@
-function login(){
+function login() {
+    // 1. Παίρνουμε τις τιμές που έγραψε ο χρήστης
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
+    
+    // 2. Εντοπίζουμε το κουτί του μηνύματος λάθους
+    const error = document.getElementById("error-message");
 
-  const username =
-    document.getElementById("username").value.trim();
+    // 3. Έλεγχος στοιχείων για Admin
+    if (username === "admin" && password === "1234") {
+        error.classList.remove("show"); // Κρύβουμε τυχόν παλιό σφάλμα
+        alert("Επιτυχής σύνδεση ως Admin!");
+        
+        // Ανακατεύθυνση στη σελίδα του Admin (άλλαξε το path αν χρειάζεται)
+        window.location.href = "../pages/admin.html"; 
 
-  const password =
-    document.getElementById("password").value.trim();
+    // 4. Έλεγχος στοιχείων για Receptionist
+    } else if (username === "receptionist" && password === "5678") {
+        error.classList.remove("show"); // Κρύβουμε τυχόν παλιό σφάλμα
+        alert("Επιτυχής σύνδεση ως Receptionist!");
+        
+        // Ανακατεύθυνση στη σελίδα του Ρεσεψιονίστ (άλλαξε το path αν χρειάζεται)
+        window.location.href = "../pages/receptionist.html"; 
 
-  const error =
-    document.getElementById("error-message");
-
-  if(username === "admin" && password === "1234"){
-
-    error.classList.remove("show");
-
-    alert("Επιτυχής σύνδεση!");
-
-    // redirect example
-     window.location.href = "dashboard.html";
-
-  } else {
-
-    error.classList.add("show");
-
-  }
-
+    // 5. Λάθος στοιχεία (Ούτε Admin, ούτε Receptionist)
+    } else {
+        // Εμφάνιση του αναδυόμενου μηνύματος λάθους
+        error.classList.add("show");
+        
+        // Κρύβουμε το μήνυμα αυτόματα μετά από 3 δευτερόλεπτα (3000ms)
+        setTimeout(() => {
+            error.classList.remove("show");
+        }, 3000);
+    }
 }

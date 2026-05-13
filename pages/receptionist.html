@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Σελίδα Ρεσεψιονίστ - Grand Kavala</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="../css/receptionist.css">
+</head>
+<body>
+
+<h2 class="sr-only">Σελίδα ρεσεψιονίστ — Διαχείριση αφίξεων, αναχωρήσεων και κρατήσεων</h2>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-brand-title">Grand Kavala</div>
+      <div class="sb-brand-role"><span class="sb-role-dot"></span>Ρεσεψιονίστ</div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-sec">Κύριο</div>
+      <div class="sb-item active" data-view="overview"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Επισκόπηση</div>
+      <div class="sb-item" data-view="arrivals"><i class="ti ti-door-enter" aria-hidden="true"></i>Αφίξεις<span class="sb-badge">8</span></div>
+      <div class="sb-item" data-view="departures"><i class="ti ti-door-exit" aria-hidden="true"></i>Αναχωρήσεις<span class="sb-badge">5</span></div>
+      <div class="sb-item" data-view="rooms"><i class="ti ti-building" aria-hidden="true"></i>Δωμάτια</div>
+      <div class="sb-sec">Κρατήσεις</div>
+      <div class="sb-item" data-view="new-booking"><i class="ti ti-plus" aria-hidden="true"></i>Νέα Κράτηση</div>
+      <div class="sb-item" data-view="search"><i class="ti ti-search" aria-hidden="true"></i>Αναζήτηση</div>
+      <div class="sb-sec">Άλλα</div>
+      <div class="sb-item" data-view="minibar"><i class="ti ti-fridge" aria-hidden="true"></i>Mini-bar</div>
+      <div class="sb-item" data-view="log"><i class="ti ti-list" aria-hidden="true"></i>Ημερολόγιο</div>
+    </nav>
+    <div class="sb-footer">
+      <div class="sb-user">
+        <div class="sb-avatar">ΑΚ</div>
+        <div style="flex:1"><div class="sb-uname">Αναστασίου Κ.</div><div class="sb-ushift">07:00–15:00</div></div>
+        <i class="ti ti-logout" style="cursor:pointer; color:rgba(200,192,176,0.7); font-size:18px;" title="Αποσύνδεση" onclick="alert('Αποσύνδεση χρήστη...'); window.location.href='../pages/login.html'"></i>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div>
+          <div class="topbar-title" id="view-title">Επισκόπηση</div>
+          <div class="topbar-time" id="live-time"></div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span class="tbadge tbadge-amber"><i class="ti ti-sun" aria-hidden="true"></i> Καλοκαίρι — Υψηλή</span>
+        <span class="tbadge tbadge-teal" id="live-occupancy">Πληρ. --%</span>
+        <span class="tbadge tbadge-red" id="notif-badge"><i class="ti ti-bell" aria-hidden="true"></i> <span id="notif-count">3</span></span>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <div class="view active" id="view-overview">
+        <div class="stats-row">
+          <div class="sc"><div class="sc-lbl">Αφίξεις σήμερα</div><div class="sc-val">23</div><div class="sc-sub">8 εκκρεμούν</div></div>
+          <div class="sc"><div class="sc-lbl">Αναχωρήσεις</div><div class="sc-val">17</div><div class="sc-sub">5 ολοκλ.</div></div>
+          <div class="sc"><div class="sc-lbl">Ελεύθερα δωμ.</div><div class="sc-val" id="stat-free-overview">--</div><div class="sc-sub">από 510 [cite: 5, 42, 134]</div></div>
+          <div class="sc"><div class="sc-lbl">Έσοδα σήμερα</div><div class="sc-val">€12.840</div><div class="sc-sub">+8% vs χθες</div></div>
+        </div>
+        
+        <div id="notifications-container">
+          <div class="notif-strip ns-warn" onclick="dismissNotif(this)" title="Κλικ για απόκρυψη"><i class="ti ti-alert-triangle ns-icon" aria-hidden="true"></i><div>Mini-bar δωμάτιο <strong>Μ-205</strong>: ο πελάτης Müller αναχωρεί — χρέωση εκκρεμεί [cite: 12, 54] (Κλικ για απόκρυψη)</div></div>
+          <div class="notif-strip ns-ok" onclick="dismissNotif(this)" title="Κλικ για απόκρυψη"><i class="ti ti-circle-check ns-icon" aria-hidden="true"></i><div>Δωμάτιο <strong>Δ-108</strong> έτοιμο — check-out Αναστασίου ολοκληρώθηκε (Κλικ για απόκρυψη)</div></div>
+          <div class="notif-strip ns-err" onclick="dismissNotif(this)" title="Κλικ για απόκρυψη"><i class="ti ti-clock ns-icon" aria-hidden="true"></i><div>Γκρουπ <strong>"Tour Elite" (24 άτ.)</strong> αναμένεται 14:00 — εκχώρηση δωματίων εκκρεμεί (Κλικ για απόκρυψη)</div></div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-hd"><div class="card-hd-left"><i class="ti ti-door-enter" aria-hidden="true"></i>Επόμενες αφίξεις</div><button class="btn btn-sm" onclick="navTo('arrivals')">Όλες →</button></div>
+            <table>
+              <thead><tr><th style="width:32%">Πελάτης</th><th style="width:20%">Δωμάτιο [cite: 11, 52]</th><th style="width:22%">Ώρα</th><th style="width:26%">Κατάσταση</th></tr></thead>
+              <tbody>
+                <tr><td>Παπαδόπουλος Γ.</td><td>—</td><td>10:00</td><td><span class="pill p-amber">Εκκρ.</span></td></tr>
+                <tr><td>Smith A.</td><td>—</td><td>11:30</td><td><span class="pill p-amber">Εκκρ.</span></td></tr>
+                <tr><td>Müller B.</td><td>Μ-205</td><td>16:00</td><td><span class="pill p-green">Έτοιμο</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-hd"><div class="card-hd-left"><i class="ti ti-door-exit" aria-hidden="true"></i>Επόμενες αναχωρήσεις</div><button class="btn btn-sm" onclick="navTo('departures')">Όλες →</button></div>
+            <table>
+              <thead><tr><th style="width:35%">Πελάτης</th><th style="width:20%">Δωμ.</th><th style="width:22%">Σύνολο</th><th style="width:23%">Mini-bar</th></tr></thead>
+              <tbody>
+                <tr><td>Αναστασίου Κ.</td><td>Δ-108</td><td>€340</td><td><span class="pill p-green">OK</span></td></tr>
+                <tr><td>Müller B.</td><td>Μ-205</td><td>€285</td><td><span class="pill p-red">Εκκρ.</span></td></tr>
+                <tr><td>Γκρουπ Blue Sea</td><td>×12</td><td>€2.640</td><td><span class="pill p-amber">Μερικό</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="view" id="view-arrivals">
+        <div class="toast" id="ci-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Check-in ολοκληρώθηκε επιτυχώς!</div>
+        <div class="tab-row">
+          <div class="tab active" onclick="filterArrivals('all',this)">Όλες (23)</div>
+          <div class="tab" onclick="filterArrivals('pending',this)">Εκκρεμούν (8)</div>
+          <div class="tab" onclick="filterArrivals('done',this)">Ολοκλ. (15)</div>
+        </div>
+        <table id="arrivals-table">
+          <thead><tr><th style="width:22%">Πελάτης</th><th style="width:14%">Δωμάτιο [cite: 11]</th><th style="width:14%">Τύπος</th><th style="width:12%">Άφιξη</th><th style="width:14%">Προκαταβολή</th><th style="width:12%">Κατάσταση</th><th style="width:12%">Ενέργεια</th></tr></thead>
+          <tbody id="arrivals-body"></tbody>
+        </table>
+      </div>
+
+      <div class="view" id="view-departures">
+        <div class="toast" id="co-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Check-out & απόδειξη εκδόθηκε!</div>
+        <div class="card" id="checkout-card">
+          <div class="card-hd"><div class="card-hd-left"><i class="ti ti-door-exit" aria-hidden="true"></i>Ταχύ Check-out — Müller Bernhard · Μ-205</div></div>
+          <div class="two-col" style="margin-bottom:8px">
+            <div style="font-size:12px;color:var(--color-text-secondary)">Παραμονή: <span style="color:var(--color-text-primary);font-weight:500">3 νύχτες (6–9 Μαΐ.)</span></div>
+            <div style="font-size:12px;color:var(--color-text-secondary)">Τύπος: <span style="color:var(--color-text-primary);font-weight:500">Μονόκλινο Standard</span></div>
+          </div>
+          <div class="sum-box">
+            <div class="sum-row"><span>Διαμονή 3 × €85</span><span>€255</span></div>
+            <div class="sum-row"><span>Mini-bar <span class="pill p-red" style="font-size:10px">Νέο</span> [cite: 12, 54]</span><span>€18</span></div>
+            <div class="sum-row"><span>Λοιπά</span><span>€12</span></div>
+            <div class="sum-row"><span>ΦΠΑ 13%</span><span>€37</span></div>
+            <div class="sum-row tot"><span>Σύνολο</span><span>€322</span></div>
+          </div>
+          <div class="notif-strip ns-warn" style="margin-bottom:8px"><i class="ti ti-fridge ns-icon" aria-hidden="true"></i><div>Mini-bar: καταχωρήθηκε από υπηρεσία καθαριότητας [cite: 54, 83] πριν 8 λεπτά (€18)</div></div>
+          <div style="display:flex;gap:7px">
+            <button class="btn btn-navy" onclick="doCheckout()"><i class="ti ti-credit-card" aria-hidden="true"></i> Πληρωμή & Check-out [cite: 48]</button>
+            <button class="btn btn-teal"><i class="ti ti-printer" aria-hidden="true"></i> Απόδειξη [cite: 57]</button>
+            <button class="btn"><i class="ti ti-cash" aria-hidden="true"></i> Μετρητά [cite: 48]</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><div class="card-hd-left"><i class="ti ti-list" aria-hidden="true"></i>Αναχωρήσεις ημέρας</div></div>
+          <table>
+            <thead><tr><th style="width:25%">Πελάτης</th><th style="width:14%">Δωμ.</th><th style="width:16%">Σύνολο</th><th style="width:14%">Mini-bar [cite: 12]</th><th style="width:16%">Κατάσταση</th><th style="width:15%">Ενέργεια</th></tr></thead>
+            <tbody>
+              <tr><td>Αναστασίου Κ.</td><td>Δ-108</td><td>€340</td><td><span class="pill p-green">OK</span></td><td><span class="pill p-green">Ολοκλ.</span></td><td><button class="btn btn-sm"><i class="ti ti-receipt" aria-hidden="true"></i></button></td></tr>
+              <tr class="highlight-row"><td>Müller B.</td><td>Μ-205</td><td>€322</td><td><span class="pill p-red">Εκκρ.</span></td><td><span class="pill p-amber">Εκκρεμεί</span></td><td><button class="btn btn-sm btn-navy" onclick="doCheckout()">C/O</button></td></tr>
+              <tr><td>Johnson T.</td><td>Φ-302</td><td>€520</td><td><span class="pill p-green">OK</span></td><td><span class="pill p-green">Ολοκλ.</span></td><td><button class="btn btn-sm"><i class="ti ti-receipt" aria-hidden="true"></i></button></td></tr>
+              <tr><td>Γκρουπ Blue Sea ×12</td><td>—</td><td>€2.640</td><td><span class="pill p-amber">Μερικό</span></td><td><span class="pill p-amber">Εκκρεμεί</span></td><td><button class="btn btn-sm">Άνοιγμα</button></td></tr>
+              <tr><td>Κωνσταντίνου Μ.</td><td>Μ-114</td><td>€170</td><td><span class="pill p-green">OK</span></td><td><span class="pill p-green">Ολοκλ.</span></td><td><button class="btn btn-sm"><i class="ti ti-receipt" aria-hidden="true"></i></button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="view" id="view-rooms">
+        <div class="stats-row">
+          <div class="sc"><div class="sc-lbl">Κατειλημμένα [cite: 118]</div><div class="sc-val" id="stat-occ" style="color:#D85A30">--</div></div>
+          <div class="sc"><div class="sc-lbl">Ελεύθερα [cite: 118]</div><div class="sc-val" id="stat-free" style="color:#1D9E75">--</div></div>
+          <div class="sc"><div class="sc-lbl">Υπό καθαρισμό [cite: 118]</div><div class="sc-val" id="stat-dirty" style="color:#EF9F27">--</div></div>
+          <div class="sc"><div class="sc-lbl">Έτοιμα [cite: 118]</div><div class="sc-val" id="stat-clean" style="color:#378ADD">--</div></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><div class="card-hd-left"><i class="ti ti-grid-dots" aria-hidden="true"></i>Χάρτης 510 δωματίων [cite: 5, 42]</div>
+            <div style="display:flex;gap:5px">
+              <button class="btn btn-sm active-filter" data-filter="all" onclick="filterRooms('all',this)">Όλα</button>
+              <button class="btn btn-sm" data-filter="free" onclick="filterRooms('free',this)">Ελεύθερα</button>
+              <button class="btn btn-sm" data-filter="dirty" onclick="filterRooms('dirty',this)">Υπό καθ.</button>
+            </div>
+          </div>
+          <div class="room-grid" id="room-grid"></div>
+          <div class="legend">
+            <div class="leg"><div class="leg-dot" style="background:#D85A30"></div>Κατειλημμένο 🔴 [cite: 118]</div>
+            <div class="leg"><div class="leg-dot" style="background:#1D9E75"></div>Ελεύθερο 🟡 [cite: 118]</div>
+            <div class="leg"><div class="leg-dot" style="background:#EF9F27"></div>Υπό καθαρισμό 🟠 [cite: 118]</div>
+            <div class="leg"><div class="leg-dot" style="background:#378ADD"></div>Έτοιμο 🟢 [cite: 118]</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><div class="card-hd-left"><i class="ti ti-list" aria-hidden="true"></i>Διαθέσιμα δωμάτια</div></div>
+          <table>
+            <thead><tr><th style="width:16%">Αρ.</th><th style="width:22%">Τύπος</th><th style="width:12%">Όροφος</th><th style="width:20%">Τιμή</th><th style="width:16%">Κατάσταση</th><th style="width:14%">Εκχώρηση</th></tr></thead>
+            <tbody>
+              <tr><td>M-102</td><td>Μονόκλινο [cite: 42]</td><td>1ος</td><td>€85/βρ.</td><td><span class="pill p-green">Έτοιμο</span></td><td><button class="btn btn-sm btn-teal">Εκχώρηση</button></td></tr>
+              <tr><td>Δ-218</td><td>Δίκλινο [cite: 42]</td><td>2ος</td><td>€140/βρ.</td><td><span class="pill p-green">Έτοιμο</span></td><td><button class="btn btn-sm btn-teal">Εκχώρηση</button></td></tr>
+              <tr><td>Φ-315</td><td>Φαρδύκλινο [cite: 42]</td><td>3ος</td><td>€175/βρ.</td><td><span class="pill p-blue">Έτοιμο 13:00</span></td><td><button class="btn btn-sm">Εκχώρηση</button></td></tr>
+              <tr><td>Σ-01</td><td>Σουίτα [cite: 42]</td><td>5ος</td><td>€380/βρ.</td><td><span class="pill p-green">Έτοιμο</span></td><td><button class="btn btn-sm btn-teal">Εκχώρηση</button></td></tr>
+              <tr><td>Δ-409</td><td>Δίκλινο [cite: 42]</td><td>4ος</td><td>€140/βρ.</td><td><span class="pill p-amber">Υπό καθ.</span></td><td><button class="btn btn-sm" disabled style="opacity:0.4">Αναμ.</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="view" id="view-new-booking">
+        <div class="toast" id="nb-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Κράτηση καταχωρήθηκε! Κωδικός: <strong id="nb-code"></strong></div>
+        <div class="card">
+          <div class="card-hd"><div class="card-hd-left"><i class="ti ti-plus" aria-hidden="true"></i>Νέα Κράτηση / Walk-in</div></div>
+          <div class="form-grid">
+            <div class="fg"><label>Επώνυμο *</label><input type="text" id="nb-last" placeholder="Παπαδόπουλος"></div>
+            <div class="fg"><label>Όνομα *</label><input type="text" id="nb-first" placeholder="Γεώργιος"></div>
+            <div class="fg"><label>Email</label><input type="email" id="nb-email" placeholder="email@example.com"></div>
+            <div class="fg"><label>Τηλέφωνο</label><input type="tel" id="nb-phone" placeholder="+30 69..."></div>
+            <div class="fg"><label>Τύπος Κράτησης</label>
+              <select id="nb-btype" onchange="updatePrepay()">
+                <option value="prepaid">Προπληρωμένη (&gt;90 ημ.) [cite: 46]</option>
+                <option value="phone" selected>Τηλεφωνική [cite: 47]</option>
+                <option value="group">Γκρουπ (&gt;20 άτ.) [cite: 49]</option>
+                <option value="walkin">Walk-in</option>
+              </select>
+            </div>
+            <div class="fg"><label>Τύπος Δωματίου [cite: 42]</label>
+              <select id="nb-rtype" onchange="updatePrice()">
+                <option value="85">Μονόκλινο — €85/βρ.</option>
+                <option value="140" selected>Δίκλινο — €140/βρ.</option>
+                <option value="175">Φαρδύκλινο — €175/βρ.</option>
+                <option value="380">Σουίτα — €380/βρ.</option>
+              </select>
+            </div>
+            <div class="fg"><label>Άφιξη</label><input type="date" id="nb-in" value="2026-05-13" oninput="updatePrice()"></div>
+            <div class="fg"><label>Αναχώρηση</label><input type="date" id="nb-out" value="2026-05-16" oninput="updatePrice()"></div>
+            <div class="fg fg-full"><label>Ειδικές Απαιτήσεις</label><input type="text" placeholder="π.χ. ψηλός όροφος, κοιλάδα, αλλεργία..."></div>
+          </div>
+          <div class="prepay-box" id="prepay-box"><i class="ti ti-info-circle" aria-hidden="true"></i> Προκαταβολή 20% [cite: 14, 47] — <strong id="prepay-amt">€84</strong></div>
+          <div class="sum-box">
+            <div class="sum-row"><span>Δωμάτιο</span><span id="sp-room">Δίκλινο</span></div>
+            <div class="sum-row"><span>Νύχτες</span><span id="sp-nights">3</span></div>
+            <div class="sum-row"><span>Τιμή <span id="dyn-price-notice" style="color:#d35400; font-size:10px; font-weight:bold;"></span></span><span id="sp-sub">€140 × 3</span></div>
+            <div class="sum-row tot"><span>Σύνολο</span><span id="sp-total">€420</span></div>
+          </div>
+          <div style="display:flex;gap:7px">
+            <button class="btn btn-navy" onclick="submitBooking()"><i class="ti ti-check" aria-hidden="true"></i> Καταχώρηση</button>
+            <button class="btn btn-teal"><i class="ti ti-printer" aria-hidden="true"></i> Εκτύπωση Επιβεβαίωσης</button>
+            <button class="btn"><i class="ti ti-x" aria-hidden="true"></i> Ακύρωση</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="view" id="view-search">
+        <div class="card">
+          <div class="card-hd"><div class="card-hd-left"><i class="ti ti-search" aria-hidden="true"></i>Αναζήτηση Κράτησης</div></div>
+          <div style="display:flex;gap:7px;margin-bottom:12px">
+            <input type="text" id="search-input" placeholder="Επώνυμο, κωδικός κράτησης ή αρ. δωματίου..." style="flex:1;padding:7px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:12px;font-family:inherit;background:var(--color-background-primary);color:var(--color-text-primary)" oninput="doSearch(this.value)">
+            <button class="btn btn-navy" onclick="doSearch(document.getElementById('search-input').value)"><i class="ti ti-search" aria-hidden="true"></i> Αναζήτηση</button>
+          </div>
+          <table id="search-table">
+            <thead><tr><th style="width:22%">Πελάτης</th><th style="width:16%">Κωδικός</th><th style="width:14%">Δωμάτιο</th><th style="width:14%">Check-in</th><th style="width:14%">Check-out</th><th style="width:12%">Κατάσταση</th><th style="width:8%">Άνοιγμα</th></tr></thead>
+            <tbody id="search-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="view" id="view-minibar">
+        <div class="toast" id="mb-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Χρέωση mini-bar καταχωρήθηκε στον λογαριασμό!</div>
+        <div class="card">
+          <div class="card-hd"><div class="card-hd-left"><i class="ti ti-fridge" aria-hidden="true"></i>Χρεώσεις Mini-bar — Εκκρεμείς [cite: 12, 54]</div></div>
+          <table>
+            <thead><tr><th style="width:18%">Δωμάτιο</th><th style="width:22%">Πελάτης</th><th style="width:26%">Καταναλώσεις [cite: 83]</th><th style="width:12%">Ποσό</th><th style="width:12%">Ενέργεια</th><th style="width:10%">Κατ.</th></tr></thead>
+            <tbody>
+              <tr class="highlight-row"><td>Μ-205</td><td>Müller B.</td><td>2× νερό, 1× μπύρα, 1× σοκολάτα</td><td>€18</td><td><button class="btn btn-sm btn-navy" onclick="chargeMinibar(this)">Χρέωση</button></td><td><span class="pill p-red">Εκκρ.</span></td></tr>
+              <tr><td>Φ-302</td><td>Johnson T.</td><td>3× αναψυκτικό, 2× snack</td><td>€14</td><td><button class="btn btn-sm btn-navy" onclick="chargeMinibar(this)">Χρέωση</button></td><td><span class="pill p-red">Εκκρ.</span></td></tr>
+              <tr><td>Δ-415</td><td>Γεωργίου Α.</td><td>1× κρασί, 1× nuts</td><td>€22</td><td><button class="btn btn-sm btn-navy" onclick="chargeMinibar(this)">Χρέωση</button></td><td><span class="pill p-red">Εκκρ.</span></td></tr>
+              <tr><td>Δ-108</td><td>Αναστασίου Κ.</td><td>—</td><td>€0</td><td>—</td><td><span class="pill p-green">OK</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-hd"><div class="card-hd-left"><i class="ti ti-plus" aria-hidden="true"></i>Νέα Χρέωση Mini-bar</div></div>
+          <div class="form-grid">
+            <div class="fg"><label>Αρ. Δωματίου</label><input type="text" placeholder="π.χ. Δ-218"></div>
+            <div class="fg"><label>Πελάτης</label><input type="text" placeholder="Αυτόματη συμπλήρωση..."></div>
+            <div class="fg fg-full"><label>Καταναλώσεις</label><input type="text" placeholder="π.χ. 2× νερό €2, 1× μπύρα €4..."></div>
+          </div>
+          <button class="btn btn-navy"><i class="ti ti-check" aria-hidden="true"></i> Καταχώρηση Χρέωσης</button>
+        </div>
+      </div>
+
+      <div class="view" id="view-log">
+        <div class="card">
+          <div class="card-hd"><div class="card-hd-left"><i class="ti ti-list" aria-hidden="true"></i>Ημερολόγιο Βάρδιας — 13/5/2026</div></div>
+          <div id="log-list">
+            <div class="log-item"><div class="log-time">09:20</div><div class="log-dot ld-green"></div><div>Check-out <strong>Αναστασίου Κ.</strong> — Δ-108 · €340 · απόδειξη εκδόθηκε</div></div>
+            <div class="log-item"><div class="log-time">09:15</div><div class="log-dot ld-blue"></div><div>Νέα κράτηση <strong>GKH-48291</strong> — Παπαδόπουλος Γ. · 16–19 Μαΐ.</div></div>
+            <div class="log-item"><div class="log-time">09:08</div><div class="log-dot ld-amber"></div><div>Mini-bar Μ-205 ενημερώθηκε από καμαριέρα [cite: 25] — €18 εκκρεμεί</div></div>
+            <div class="log-item"><div class="log-time">08:55</div><div class="log-dot ld-green"></div><div>Check-out <strong>Johnson T.</strong> — Φ-302 · €520</div></div>
+            <div class="log-item"><div class="log-time">08:30</div><div class="log-dot ld-blue"></div><div>Εκχώρηση δωματίου <strong>Σ-01</strong> → κράτηση Smith A.</div></div>
+            <div class="log-item"><div class="log-time">08:10</div><div class="log-dot ld-green"></div><div>Δωμάτια Δ-108, Φ-302 σημειώθηκαν ελεύθερα (χωρίς καθαριότητα) [cite: 124]</div></div>
+            <div class="log-item"><div class="log-time">07:45</div><div class="log-dot ld-red"></div><div>Ειδοποίηση: mini-bar Φ-302 εκκρεμεί πριν check-out [cite: 83]</div></div>
+            <div class="log-item"><div class="log-time">07:00</div><div class="log-dot ld-blue"></div><div>Έναρξη βάρδιας — Αναστασίου Κ. [cite: 8, 60]</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="../js/receptionist.js"></script>
+</body>
+</html>

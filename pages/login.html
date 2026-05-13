@@ -1,75 +1,60 @@
 <!DOCTYPE html>
 <html lang="el">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Grand Kavala • Staff Portal</title>
-
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-
-  <!-- Tabler Icons -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-
-  <!-- CSS -->
-  <link rel="stylesheet" href="../css/login.css">
-</head>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Σύνδεση - Grand Kavala</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/login.css"> </head>
 <body>
 
-<div class="login-page">
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Grand Kavala</h1>
+            <p>Σύστημα Διαχείρισης Ξενοδοχείου</p>
+        </div>
 
-  <div class="login-card">
+        <form onsubmit="event.preventDefault(); login();">
+            <div class="form-group">
+                <label for="username">Όνομα Χρήστη</label>
+                <input type="text" id="username" placeholder="π.χ. admin" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Κωδικός Πρόσβασης</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
 
-    <div class="brand">
-      Grand Kavala
+            <button type="submit" class="btn-login">Είσοδος</button>
+        </form>
     </div>
 
-    <div class="subtitle">
-      Staff Portal
-    </div>
+    <div id="error-message">Λάθος όνομα χρήστη ή κωδικός!</div>
 
-    <div class="form-group">
-      <label>Username</label>
-      <input
-        type="text"
-        id="username"
-        placeholder="manager@gkhotel.gr"
-      >
-    </div>
+    <script>
+        // Εδώ βάζεις την JS συνάρτηση login() που έφτιαξες
+        function login() {
+            const username = document.getElementById("username").value.trim();
+            const password = document.getElementById("password").value.trim();
+            const error = document.getElementById("error-message");
 
-    <div class="form-group">
-      <label>Password</label>
-      <input
-        type="password"
-        id="password"
-        placeholder="••••••••"
-      >
-    </div>
-
-    <button class="login-btn" onclick="login()">
-      <i class="ti ti-lock"></i>
-      Σύνδεση
-    </button>
-
-    <div class="error-message" id="error-message">
-      Λάθος στοιχεία σύνδεσης.
-    </div>
-
-    <div class="demo-box">
-      Demo Login<br>
-      user: <strong>admin</strong><br>
-      pass: <strong>1234</strong>
-    </div>
-
-  </div>
-
-</div>
-
-<script src="../js/login.js"></script>
-
+            if (username === "admin" && password === "1234") {
+                error.classList.remove("show");
+                alert("Επιτυχής σύνδεση ως Admin!");
+                window.location.href = "../pages/admin.html";
+            } else if (username === "receptionist" && password === "5678") {
+                error.classList.remove("show");
+                alert("Επιτυχής σύνδεση ως Receptionist!");
+                window.location.href = "../pages/receptionist.html"; // Βεβαιώσου ότι το path είναι σωστό
+            } else {
+                error.classList.add("show");
+                
+                // Προαιρετικό: Κρύβει το μήνυμα αυτόματα μετά από 3 δευτερόλεπτα
+                setTimeout(() => {
+                    error.classList.remove("show");
+                }, 3000);
+            }
+        }
+    </script>
 </body>
 </html>
