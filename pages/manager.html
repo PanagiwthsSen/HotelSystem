@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Διαχειριστής εξωτερικού προσωπικού</title>
+  <link rel="stylesheet" href="../css/manager.css">
+</head>
+<body>
+
+<h2 class="sr-only">Διαχειριστής εξωτερικού προσωπικού — Οχήματα, οδηγοί, κήποι και υλικά</h2>
+
+<div class="app">
+<aside class="sb">
+  <div class="sb-top">
+    <div class="sb-logo">Grand Kavala</div>
+    <div class="sb-role"><span class="sb-dot"></span>Διαχ. Εξωτερικών</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-sec">Επισκόπηση</div>
+    <div class="sb-item active" data-v="overview"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Πίνακας Ελέγχου</div>
+    <div class="sb-sec">Οχήματα</div>
+    <div class="sb-item" data-v="fleet"><i class="ti ti-bus" aria-hidden="true"></i>Στόλος Οχημάτων</div>
+    <div class="sb-item" data-v="routes"><i class="ti ti-route" aria-hidden="true"></i>Δρομολόγια<span class="sb-badge">6</span></div>
+    <div class="sb-item" data-v="drivers"><i class="ti ti-steering-wheel" aria-hidden="true"></i>Οδηγοί</div>
+    <div class="sb-item" data-v="maintenance"><i class="ti ti-tool" aria-hidden="true"></i>Συντήρηση<span class="sb-badge">2</span></div>
+    <div class="sb-item" data-v="costs"><i class="ti ti-coin" aria-hidden="true"></i>Κόστη & Πληρωμές</div>
+    <div class="sb-sec">Εξωτερικοί Χώροι</div>
+    <div class="sb-item" data-v="gardens"><i class="ti ti-plant" aria-hidden="true"></i>Κήποι & Πρόγραμμα</div>
+    <div class="sb-item" data-v="materials"><i class="ti ti-package" aria-hidden="true"></i>Υλικά & Ελλείψεις</div>
+  </nav>
+  <div class="sb-foot">
+    <div class="av">
+      <div class="av-c">ΝΠ</div>
+      <div><div class="av-n">Νικολάου Π.</div><div class="av-r">Διαχ. Εξωτερικών</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="tb-title" id="tb-title">Πίνακας Ελέγχου</div>
+      <div class="tb-meta">Σάββατο 9 Μαΐου 2026 · 09:30</div>
+    </div>
+    <div class="tb-r">
+      <span class="badge b-r"><i class="ti ti-tool" aria-hidden="true"></i> 2 επείγουσες συντ.</span>
+      <span class="badge b-a"><i class="ti ti-package" aria-hidden="true"></i> 3 ελλείψεις υλ.</span>
+      <span class="badge b-g">6 δρομολόγια σήμερα</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+  <!-- OVERVIEW -->
+  <div class="view active" id="v-overview">
+    <div class="g4">
+      <div class="sc"><div class="sc-lbl">Οχήματα σε δρομολόγιο</div><div class="sc-val">2</div><div class="sc-sub">από 6 σύνολο</div></div>
+      <div class="sc"><div class="sc-lbl">Διαθέσιμοι οδηγοί</div><div class="sc-val sc-g">3</div><div class="sc-sub">2 σε δρομολόγιο</div></div>
+      <div class="sc"><div class="sc-lbl">Επείγουσα συντήρηση</div><div class="sc-val sc-r">2</div><div class="sc-sub">ΚΤΕΟ & ΕΞΕΤ.</div></div>
+      <div class="sc"><div class="sc-lbl">Κόστος λειτ. Απρ.</div><div class="sc-val">€1.840</div><div class="sc-sub">+€210 vs Μάρτιος</div></div>
+    </div>
+
+    <div class="ns ns-e"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>ΚΑΒ-1234:</strong> ΚΤΕΟ λήγει σε 5 ημέρες (14/05). Προγραμματίστε άμεσα — το όχημα χρησιμοποιείται για μεταφορά πελατών.</div></div>
+    <div class="ns ns-w"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>ΚΑΒ-3456:</strong> Εκκρεμεί service 2 εβδομάδες. Τελευταία συντήρηση: 10/03/2026.</div></div>
+    <div class="ns ns-w"><i class="ti ti-package" aria-hidden="true"></i><div><strong>Κήποι:</strong> Σπόροι γκαζόν κάτω από ελάχ. απόθεμα (5 kg / ελάχ. 10 kg). Φυτοφάρμακο: 12 lt / ελάχ. 10 lt — κοντά.</div></div>
+    <div class="ns ns-ok"><i class="ti ti-circle-check" aria-hidden="true"></i><div><strong>Σαββίδης Κ.:</strong> Ολοκλήρωσε δρομολόγιο αεροδρομίου 08:45 — ΚΑΒ-1234 επέστρεψε στη βάση.</div></div>
+
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-route" aria-hidden="true"></i>Δρομολόγια σήμερα</div><button class="btn btn-sm" onclick="navTo('routes')">Όλα →</button></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+            <div><div style="font-size:12px;font-weight:500">Αεροδρόμιο → Ξενοδοχείο</div><div style="font-size:11px;color:var(--color-text-secondary)">10:00 · ΚΑΒ-5678 · Κωσταράς</div></div>
+            <span class="pill p-a">Αναμένει</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+            <div><div style="font-size:12px;font-weight:500">Αγορές Προμηθειών</div><div style="font-size:11px;color:var(--color-text-secondary)">12:00 · ΚΑΒ-5678 · Κωσταράς</div></div>
+            <span class="pill p-b">Προγρ.</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+            <div><div style="font-size:12px;font-weight:500">VIP Transfer → Θεσσαλονίκη</div><div style="font-size:11px;color:var(--color-text-secondary)">15:00 · ΚΑΒ-9012 · Αντωνίου</div></div>
+            <span class="pill p-b">Προγρ.</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-steering-wheel" aria-hidden="true"></i>Κατάσταση Οδηγών</div><button class="btn btn-sm" onclick="navTo('drivers')">Όλοι →</button></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><div style="font-size:12px">Παπαδάκης Ν.</div><span class="pill p-b">Σε δρομολ.</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><div style="font-size:12px">Κωσταράς Γ.</div><span class="pill p-g">Διαθέσιμος</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><div style="font-size:12px">Αντωνίου Σ.</div><span class="pill p-g">Διαθέσιμος</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><div style="font-size:12px">Σαββίδης Κ.</div><span class="pill p-g">Διαθέσιμος</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0"><div style="font-size:12px">Μανώλης Π.</div><span class="pill p-a">Άδεια</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLEET -->
+  <div class="view" id="v-fleet">
+    <div class="g3">
+      <div class="sc"><div class="sc-lbl">Σύνολο οχημάτων</div><div class="sc-val">6</div></div>
+      <div class="sc"><div class="sc-lbl">Σε δρομολόγιο</div><div class="sc-val sc-a">2</div></div>
+      <div class="sc"><div class="sc-lbl">Επείγ. συντήρηση</div><div class="sc-val sc-r">2</div></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-bus" aria-hidden="true"></i>Στόλος Οχημάτων</div><button class="btn btn-sm btn-dark" onclick="navTo('maintenance')"><i class="ti ti-tool" aria-hidden="true"></i> Συντήρηση</button></div>
+      <table>
+        <thead><tr><th style="width:16%">Πινακίδα</th><th style="width:20%">Τύπος</th><th style="width:16%">Χιλ/τρα</th><th style="width:20%">ΚΤΕΟ / Service</th><th style="width:14%">Κόστος/μήνα</th><th style="width:14%">Κατάσταση</th></tr></thead>
+        <tbody>
+          <tr style="background:#FFF6F6"><td style="font-weight:500">ΚΑΒ-1234</td><td>Λεωφ. 20θ.</td><td>142.800</td><td><span class="pill p-r">ΚΤΕΟ σε 5 ημ.</span></td><td>€340</td><td><span class="pill p-b">Δρομολ.</span></td></tr>
+          <tr><td style="font-weight:500">ΚΑΒ-5678</td><td>Van 8θ.</td><td>98.400</td><td><span class="pill p-g">OK — 12/08</span></td><td>€180</td><td><span class="pill p-b">Δρομολ.</span></td></tr>
+          <tr><td style="font-weight:500">ΚΑΒ-9012</td><td>Sedan VIP</td><td>67.200</td><td><span class="pill p-g">OK — 03/11</span></td><td>€220</td><td><span class="pill p-g">Διαθέσ.</span></td></tr>
+          <tr style="background:#FFFBF2"><td style="font-weight:500">ΚΑΒ-3456</td><td>Λεωφ. 30θ.</td><td>210.500</td><td><span class="pill p-a">Service εκκρ. 2εβδ.</span></td><td>€410</td><td><span class="pill p-g">Διαθέσ.</span></td></tr>
+          <tr><td style="font-weight:500">ΚΑΒ-7890</td><td>Pickup</td><td>55.100</td><td><span class="pill p-g">OK — 07/09</span></td><td>€150</td><td><span class="pill p-g">Διαθέσ.</span></td></tr>
+          <tr><td style="font-weight:500">ΚΑΒ-2345</td><td>Minibus 15θ.</td><td>88.600</td><td><span class="pill p-g">OK — 19/10</span></td><td>€290</td><td><span class="pill p-g">Διαθέσ.</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ROUTES -->
+  <div class="view" id="v-routes">
+    <div class="toast" id="route-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Δρομολόγιο καταχωρήθηκε!</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-route" aria-hidden="true"></i>Δρομολόγια Σήμερα — 9/5/2026</div><button class="btn btn-sm btn-dark" onclick="showNewRoute()"><i class="ti ti-plus" aria-hidden="true"></i> Νέο</button></div>
+      <table>
+        <thead><tr><th style="width:12%">Ώρα</th><th style="width:26%">Διαδρομή</th><th style="width:16%">Όχημα</th><th style="width:16%">Οδηγός</th><th style="width:14%">Τύπος</th><th style="width:8%">Κόστος</th><th style="width:8%">Κατ.</th></tr></thead>
+        <tbody>
+          <tr style="opacity:.55"><td>08:00</td><td>Αεροδρόμιο → Ξεν.</td><td>ΚΑΒ-1234</td><td>Παπαδάκης</td><td><span class="pill p-b">Πελάτες</span></td><td>€25</td><td><span class="pill p-g">Ολοκλ.</span></td></tr>
+          <tr><td>10:00</td><td>Αεροδρόμιο → Ξεν.</td><td>ΚΑΒ-5678</td><td>Κωσταράς</td><td><span class="pill p-b">Πελάτες</span></td><td>€25</td><td><span class="pill p-a">Αναμ.</span></td></tr>
+          <tr><td>12:00</td><td>Αγορά Προμηθειών</td><td>ΚΑΒ-5678</td><td>Κωσταράς</td><td><span class="pill p-gr">Προμήθειες</span></td><td>€40</td><td><span class="pill p-b">Προγρ.</span></td></tr>
+          <tr><td>14:00</td><td>Ξεν. → Αεροδρόμιο</td><td>ΚΑΒ-7890</td><td>Σαββίδης</td><td><span class="pill p-b">Πελάτες</span></td><td>€25</td><td><span class="pill p-b">Προγρ.</span></td></tr>
+          <tr><td>15:00</td><td>VIP → Θεσσαλονίκη</td><td>ΚΑΒ-9012</td><td>Αντωνίου</td><td><span class="pill p-a">VIP</span></td><td>€120</td><td><span class="pill p-b">Προγρ.</span></td></tr>
+          <tr><td>18:00</td><td>Εστιατόριο Προμηθ.</td><td>ΚΑΒ-7890</td><td>Σαββίδης</td><td><span class="pill p-gr">Προμήθειες</span></td><td>€30</td><td><span class="pill p-b">Προγρ.</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card" id="new-route-form" style="display:none">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-plus" aria-hidden="true"></i>Νέο Δρομολόγιο</div></div>
+      <div class="fg-row">
+        <div class="fg"><label>Ώρα Αναχώρησης</label><input type="time" value="10:00"></div>
+        <div class="fg"><label>Τύπος</label><select><option>Μεταφορά Πελατών</option><option>Αγορά Προμηθειών</option><option>VIP Transfer</option><option>Εσωτερικό</option></select></div>
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>Αφετηρία</label><input type="text" placeholder="π.χ. Ξενοδοχείο"></div>
+        <div class="fg"><label>Προορισμός</label><input type="text" placeholder="π.χ. Αεροδρόμιο Καβάλας"></div>
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>Όχημα</label><select><option>ΚΑΒ-1234 — Λεωφ. 20θ.</option><option>ΚΑΒ-5678 — Van 8θ.</option><option>ΚΑΒ-9012 — Sedan VIP</option><option>ΚΑΒ-3456 — Λεωφ. 30θ.</option><option>ΚΑΒ-7890 — Pickup</option><option>ΚΑΒ-2345 — Minibus 15θ.</option></select></div>
+        <div class="fg"><label>Οδηγός</label><select><option>Παπαδάκης Ν.</option><option>Κωσταράς Γ.</option><option>Αντωνίου Σ.</option><option>Σαββίδης Κ.</option></select></div>
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>Κόστος μεταφοράς (€)</label><input type="number" placeholder="0" min="0" step="5"></div>
+        <div class="fg"><label>Σχόλια</label><input type="text" placeholder="Αριθμός ατόμων, αποσκευές..."></div>
+      </div>
+      <div style="display:flex;gap:7px">
+        <button class="btn btn-dark" onclick="submitRoute()"><i class="ti ti-check" aria-hidden="true"></i> Καταχώρηση</button>
+        <button class="btn" onclick="document.getElementById('new-route-form').style.display='none'"><i class="ti ti-x" aria-hidden="true"></i> Ακύρωση</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRIVERS -->
+  <div class="view" id="v-drivers">
+    <div class="toast" id="drv-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Διαθεσιμότητα οδηγού ενημερώθηκε!</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-steering-wheel" aria-hidden="true"></i>Οδηγοί & Διαθεσιμότητα</div></div>
+      <div id="driver-list">
+        <div class="driver-card">
+          <div class="driver-av">ΝΠ</div>
+          <div class="driver-info">
+            <div class="driver-name">Παπαδάκης Νίκος</div>
+            <div class="driver-sub">ΚΑΒ-1234 · Αεροδρόμιο 08:00 → Ξεν. — Επέστρεψε 09:10</div>
+          </div>
+          <div class="driver-right">
+            <span class="pill p-g">Διαθέσιμος</span>
+            <div style="font-size:11px;color:var(--color-text-secondary)">Βάρδια 07:00–15:00</div>
+            <div style="font-size:11px;color:var(--color-text-secondary)">Μισθός: €850/μήνα</div>
+          </div>
+        </div>
+        <div class="driver-card">
+          <div class="driver-av">ΓΚ</div>
+          <div class="driver-info">
+            <div class="driver-name">Κωσταράς Γιώργης</div>
+            <div class="driver-sub">ΚΑΒ-5678 · Αεροδρόμιο 10:00 → (σε αναμονή)</div>
+          </div>
+          <div class="driver-right">
+            <span class="pill p-b">Σε δρομολ.</span>
+            <div style="font-size:11px;color:var(--color-text-secondary)">Βάρδια 08:00–16:00</div>
+            <div style="font-size:11px;color:var(--color-text-secondary)">Μισθός: €820/μήνα</div>
+          </div>
+        </div>
+        <div class="driver-card">
+          <div class="driver-av">ΣΑ</div>
+          <div class="driver-info">
+            <div class="driver-name">Αντωνίου Σταύρος</div>
+            <div class="driver-sub">ΚΑΒ-9012 · VIP Transfer 15:00 → Θεσσαλονίκη</div>
+          </div>
+          <div class="driver-right">
+            <span class="pill p-g">Διαθέσιμος</span>
+            <div style="font-size:11px;color:var(--color-text-secondary)">Βάρδια 10:00–20:00</div>
+            <div style="font-size:11px;color:var(--color-text-secondary)">Μισθός: €800/μήνα</div>
+          </div>
+        </div>
+        <div class="driver-card">
+          <div class="driver-av">ΚΣ</div>
+          <div class="driver-info">
+            <div class="driver-name">Σαββίδης Κώστας</div>
+            <div class="driver-sub">ΚΑΒ-7890 · Ξεν. → Αεροδρόμιο 14:00 / Εστ. Προμ. 18:00</div>
+          </div>
+          <div class="driver-right">
+            <span class="pill p-g">Διαθέσιμος</span>
+            <div style="font-size:11px;color:var(--color-text-secondary)">Βάρδια 12:00–20:00</div>
+            <div style="font-size:11px;color:var(--color-text-secondary)">Μισθός: €780/μήνα</div>
+          </div>
+        </div>
+        <div class="driver-card" style="opacity:.55">
+          <div class="driver-av" style="background:#FAEEDA;color:#633806">ΜΠ</div>
+          <div class="driver-info">
+            <div class="driver-name">Μανώλης Παπάς</div>
+            <div class="driver-sub">Άδεια — Επιστροφή 15/05/2026</div>
+          </div>
+          <div class="driver-right">
+            <span class="pill p-a">Άδεια</span>
+            <div style="font-size:11px;color:var(--color-text-secondary)">Μισθός: €760/μήνα</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:10px;border-top:0.5px solid var(--color-border-tertiary);padding-top:10px">
+        <div style="font-size:12px;font-weight:500;margin-bottom:8px;color:var(--color-text-secondary)">Ενημέρωση διαθεσιμότητας</div>
+        <div class="fg-row">
+          <div class="fg"><label>Οδηγός</label><select id="drv-sel"><option>Παπαδάκης Ν.</option><option>Κωσταράς Γ.</option><option>Αντωνίου Σ.</option><option>Σαββίδης Κ.</option></select></div>
+          <div class="fg"><label>Κατάσταση</label><select id="drv-status"><option>Διαθέσιμος</option><option>Σε δρομολόγιο</option><option>Άδεια</option><option>Άρρωστος</option></select></div>
+        </div>
+        <button class="btn btn-dark" onclick="updateDriver()"><i class="ti ti-refresh" aria-hidden="true"></i> Ενημέρωση</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAINTENANCE -->
+  <div class="view" id="v-maintenance">
+    <div class="toast" id="maint-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Συντήρηση καταχωρήθηκε!</div>
+    <div class="ns ns-e"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>ΚΑΒ-1234:</strong> ΚΤΕΟ λήγει 14/05/2026 — 5 ημέρες. Κλείστε ραντεβού αμέσως.</div></div>
+    <div class="ns ns-w"><i class="ti ti-tool" aria-hidden="true"></i><div><strong>ΚΑΒ-3456:</strong> Εκκρεμεί service από 25/04. Τελ. συντήρηση: 10/03/2026 (210.500 χλμ).</div></div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-calendar-event" aria-hidden="true"></i>Πρόγραμμα Συντήρησης</div></div>
+      <table>
+        <thead><tr><th style="width:16%">Όχημα</th><th style="width:20%">Τύπος</th><th style="width:14%">Ημερ. Εκτέλ.</th><th style="width:14%">Επόμενη</th><th style="width:12%">Κόστος</th><th style="width:24%">Κατάσταση</th></tr></thead>
+        <tbody>
+          <tr style="background:#FFF6F6"><td>ΚΑΒ-1234</td><td>ΚΤΕΟ</td><td>14/05/2025</td><td><strong style="color:#A32D2D">14/05/2026</strong></td><td>€80</td><td><span class="pill p-r">Επείγον — 5 ημ.</span></td></tr>
+          <tr style="background:#FFFBF2"><td>ΚΑΒ-3456</td><td>Γενικό service</td><td>10/03/2026</td><td><strong style="color:#854F0B">Εκκρεμεί</strong></td><td>€320</td><td><span class="pill p-a">Καθυστερημένο</span></td></tr>
+          <tr><td>ΚΑΒ-5678</td><td>Αλλαγή λαδιών</td><td>12/02/2026</td><td>12/08/2026</td><td>€95</td><td><span class="pill p-g">OK</span></td></tr>
+          <tr><td>ΚΑΒ-9012</td><td>Έλεγχος φρένων</td><td>03/05/2026</td><td>03/11/2026</td><td>€140</td><td><span class="pill p-g">OK</span></td></tr>
+          <tr><td>ΚΑΒ-7890</td><td>Αλλαγή λαδιών</td><td>07/03/2026</td><td>07/09/2026</td><td>€75</td><td><span class="pill p-g">OK</span></td></tr>
+          <tr><td>ΚΑΒ-2345</td><td>Γενικό service</td><td>19/04/2026</td><td>19/10/2026</td><td>€280</td><td><span class="pill p-g">OK</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-plus" aria-hidden="true"></i>Καταχώρηση Συντήρησης</div></div>
+      <div class="fg-row">
+        <div class="fg"><label>Όχημα</label><select><option>ΚΑΒ-1234</option><option>ΚΑΒ-3456</option><option>ΚΑΒ-5678</option><option>ΚΑΒ-9012</option><option>ΚΑΒ-7890</option><option>ΚΑΒ-2345</option></select></div>
+        <div class="fg"><label>Τύπος Συντήρησης</label><select><option>ΚΤΕΟ</option><option>Γενικό service</option><option>Αλλαγή λαδιών</option><option>Φρένα</option><option>Ελαστικά</option><option>Άλλο</option></select></div>
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>Ημερομηνία</label><input type="date" value="2026-05-14"></div>
+        <div class="fg"><label>Κόστος (€)</label><input type="number" placeholder="0" min="0" step="10"></div>
+      </div>
+      <div class="fg"><label>Συνεργείο / Σχόλια</label><input type="text" placeholder="π.χ. Συνεργείο Καβάλας, τηλ. 2510-..."></div>
+      <button class="btn btn-dark" onclick="submitMaint()"><i class="ti ti-device-floppy" aria-hidden="true"></i> Αποθήκευση</button>
+    </div>
+  </div>
+
+  <!-- COSTS -->
+  <div class="view" id="v-costs">
+    <div class="g3">
+      <div class="sc"><div class="sc-lbl">Κόστος λειτ. Απρ.</div><div class="sc-val">€1.840</div><div class="sc-sub">Σύνολο στόλου</div></div>
+      <div class="sc"><div class="sc-lbl">Πληρωμές οδηγών</div><div class="sc-val">€4.010</div><div class="sc-sub">5 οδηγοί · Απρίλιος</div></div>
+      <div class="sc"><div class="sc-lbl">Έσοδα μεταφορών</div><div class="sc-val sc-g">€1.240</div><div class="sc-sub">Χρεώσεις πελατών</div></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-coin" aria-hidden="true"></i>Κόστος Λειτουργίας ανά Όχημα — Απρίλιος 2026</div><button class="btn btn-sm btn-dark"><i class="ti ti-download" aria-hidden="true"></i> Εξαγωγή</button></div>
+      <table>
+        <thead><tr><th style="width:18%">Όχημα</th><th style="width:16%">Καύσιμα</th><th style="width:16%">Συντήρηση</th><th style="width:16%">Ασφάλεια</th><th style="width:14%">Λοιπά</th><th style="width:20%">Σύνολο / μήνα</th></tr></thead>
+        <tbody>
+          <tr><td>ΚΑΒ-1234</td><td>€180</td><td>€80</td><td>€55</td><td>€25</td><td><strong>€340</strong></td></tr>
+          <tr><td>ΚΑΒ-5678</td><td>€90</td><td>€40</td><td>€35</td><td>€15</td><td><strong>€180</strong></td></tr>
+          <tr><td>ΚΑΒ-9012</td><td>€110</td><td>€55</td><td>€40</td><td>€15</td><td><strong>€220</strong></td></tr>
+          <tr><td>ΚΑΒ-3456</td><td>€210</td><td>€120</td><td>€55</td><td>€25</td><td><strong>€410</strong></td></tr>
+          <tr><td>ΚΑΒ-7890</td><td>€75</td><td>€40</td><td>€25</td><td>€10</td><td><strong>€150</strong></td></tr>
+          <tr><td>ΚΑΒ-2345</td><td>€140</td><td>€95</td><td>€40</td><td>€15</td><td><strong>€290</strong></td></tr>
+          <tr style="background:var(--color-background-secondary);font-weight:500"><td>Σύνολο</td><td>€805</td><td>€430</td><td>€250</td><td>€105</td><td>€1.840</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-cash" aria-hidden="true"></i>Πληρωμές Οδηγών — Απρίλιος 2026</div></div>
+      <table>
+        <thead><tr><th style="width:25%">Οδηγός</th><th style="width:16%">Βασικός</th><th style="width:18%">Δρομολόγια</th><th style="width:16%">Υπερωρίες</th><th style="width:25%">Σύνολο</th></tr></thead>
+        <tbody>
+          <tr><td>Παπαδάκης Ν.</td><td>€750</td><td>+€80</td><td>+€20</td><td><strong>€850</strong></td></tr>
+          <tr><td>Κωσταράς Γ.</td><td>€720</td><td>+€80</td><td>+€20</td><td><strong>€820</strong></td></tr>
+          <tr><td>Αντωνίου Σ.</td><td>€700</td><td>+€80</td><td>+€20</td><td><strong>€800</strong></td></tr>
+          <tr><td>Σαββίδης Κ.</td><td>€680</td><td>+€80</td><td>+€20</td><td><strong>€780</strong></td></tr>
+          <tr><td>Μανώλης Π.</td><td>€660</td><td>+€80</td><td>+€20</td><td><strong>€760</strong></td></tr>
+          <tr style="background:var(--color-background-secondary);font-weight:500"><td>Σύνολο</td><td>€3.510</td><td>€400</td><td>€100</td><td>€4.010</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- GARDENS -->
+  <div class="view" id="v-gardens">
+    <div class="toast" id="grd-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Πρόγραμμα ενημερώθηκε!</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-calendar" aria-hidden="true"></i>Πρόγραμμα Κηπουρών Σήμερα</div><button class="btn btn-sm btn-dark" onclick="document.getElementById('grd-toast').classList.add('show');setTimeout(()=>document.getElementById('grd-toast').classList.remove('show'),3000)"><i class="ti ti-device-floppy" aria-hidden="true"></i> Αποθήκευση</button></div>
+      <table>
+        <thead><tr><th style="width:22%">Κηπουρός</th><th style="width:24%">Περιοχή</th><th style="width:22%">Εργασία</th><th style="width:16%">Ώρες</th><th style="width:16%">Κατάσταση</th></tr></thead>
+        <tbody id="garden-body">
+          <tr><td>Σαββίδης Κ.</td><td>Κεντρικός Κήπος</td><td>Κλάδεμα τριανταφ.</td><td>06:00–10:00</td><td><span class="pill p-g">Εξέλιξη</span></td></tr>
+          <tr><td>Τριανταφύλλου Α.</td><td>Περιοχή Πισίνας</td><td>Φύτευση εποχιακών</td><td>06:00–12:00</td><td><span class="pill p-g">Εξέλιξη</span></td></tr>
+          <tr><td>Παπάς Δ.</td><td>Χώρος Πάρκινγκ</td><td>Πότισμα & καθαρισμός</td><td>07:00–11:00</td><td><span class="pill p-a">Αναμένει</span></td></tr>
+          <tr><td>Νάκος Σ.</td><td>Είσοδος Ξεν/ου</td><td>Διακόσμηση εισόδου</td><td>08:00–14:00</td><td><span class="pill p-a">Αναμένει</span></td></tr>
+          <tr><td>Γιαννόπουλος Π.</td><td>Αυλή εστιατορίου</td><td>Συντήρηση ξύλινων</td><td>09:00–13:00</td><td><span class="pill p-b">Προγρ.</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-plus" aria-hidden="true"></i>Νέα Εργασία Κηπουρού</div></div>
+      <div class="fg-row">
+        <div class="fg"><label>Κηπουρός</label><select><option>Σαββίδης Κ.</option><option>Τριανταφύλλου Α.</option><option>Παπάς Δ.</option><option>Νάκος Σ.</option><option>Γιαννόπουλος Π.</option></select></div>
+        <div class="fg"><label>Περιοχή</label><input type="text" placeholder="π.χ. Κεντρικός Κήπος"></div>
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>Εργασία</label><input type="text" placeholder="π.χ. Κλάδεμα, πότισμα..."></div>
+        <div class="fg"><label>Ώρες</label><input type="text" placeholder="π.χ. 09:00–13:00"></div>
+      </div>
+      <button class="btn btn-dark" onclick="addGardenTask()"><i class="ti ti-plus" aria-hidden="true"></i> Προσθήκη</button>
+    </div>
+  </div>
+
+  <!-- MATERIALS -->
+  <div class="view" id="v-materials">
+    <div class="toast" id="mat-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Αναφορά ελλείψεων εστάλη στη διοίκηση!</div>
+    <div class="ns ns-e"><i class="ti ti-package" aria-hidden="true"></i><div><strong>Σπόροι γκαζόν:</strong> 5 kg διαθέσιμα — ελάχ. απόθεμα 10 kg. Άμεση παραγγελία απαραίτητη.</div></div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-package" aria-hidden="true"></i>Υλικά Κήπων & Εξωτερικών Χώρων</div><button class="btn btn-sm btn-dark" onclick="showToast2('mat-toast')"><i class="ti ti-send" aria-hidden="true"></i> Αναφορά Ελλείψεων</button></div>
+      <table>
+        <thead><tr><th style="width:28%">Υλικό</th><th style="width:16%">Ποσότητα</th><th style="width:14%">Ελάχ.</th><th style="width:20%">Κατάσταση</th><th style="width:10%">Τιμή/μον.</th><th style="width:12%">Ενέργεια</th></tr></thead>
+        <tbody>
+          <tr style="background:#FFF6F6"><td>Σπόροι γκαζόν</td><td>5 kg</td><td>10 kg</td><td><span class="pill p-r">Κάτω ελαχ.</span></td><td>€8/kg</td><td><button class="btn btn-sm btn-warn">Παρ/γελία</button></td></tr>
+          <tr style="background:#FFFBF2"><td>Φυτοφάρμακο</td><td>12 lt</td><td>10 lt</td><td><span class="pill p-a">Κοντά ελαχ.</span></td><td>€12/lt</td><td><button class="btn btn-sm">Παρ/γελία</button></td></tr>
+          <tr><td>Λίπασμα</td><td>80 kg</td><td>30 kg</td><td><span class="pill p-g">OK</span></td><td>€3/kg</td><td>—</td></tr>
+          <tr><td>Εδαφ. βελτιωτικό</td><td>45 lt</td><td>20 lt</td><td><span class="pill p-g">OK</span></td><td>€6/lt</td><td>—</td></tr>
+          <tr><td>Γλάστρες / Φυτά</td><td>32 τεμ.</td><td>15</td><td><span class="pill p-g">OK</span></td><td>€5/τεμ.</td><td>—</td></tr>
+          <tr><td>Ψαλίδι κλαδέματος</td><td>8 τεμ.</td><td>5</td><td><span class="pill p-g">OK</span></td><td>—</td><td>—</td></tr>
+          <tr><td>Λάστιχο ποτίσματος</td><td>3 τεμ.</td><td>3</td><td><span class="pill p-a">Ακριβώς ελαχ.</span></td><td>€25/τεμ.</td><td><button class="btn btn-sm">Παρ/γελία</button></td></tr>
+          <tr><td>Χώμα (σάκοι)</td><td>24 σάκοι</td><td>10</td><td><span class="pill p-g">OK</span></td><td>€4/σάκος</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-plus" aria-hidden="true"></i>Καταχώρηση Νέας Παραγγελίας</div></div>
+      <div class="fg-row">
+        <div class="fg"><label>Υλικό</label><input type="text" placeholder="π.χ. Σπόροι γκαζόν"></div>
+        <div class="fg"><label>Ποσότητα</label><input type="text" placeholder="π.χ. 20 kg"></div>
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>Προμηθευτής</label><input type="text" placeholder="π.χ. Αγροτικός Σύλλογος Καβάλας"></div>
+        <div class="fg"><label>Εκτιμ. Κόστος (€)</label><input type="number" placeholder="0" min="0"></div>
+      </div>
+      <button class="btn btn-dark" onclick="showToast2('mat-toast')"><i class="ti ti-send" aria-hidden="true"></i> Υποβολή Παραγγελίας</button>
+    </div>
+  </div>
+
+  </div>
+</div>
+</div>
+
+<script src="../js/manager.js"></script>
+</body>
+</html>
