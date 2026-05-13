@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Σελίδα Καμαριέρας — Διαχείριση δωματίων, ιματισμού και mini-bar</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="../css/maid.css">
+</head>
+<body>
+
+<h2 class="sr-only">Σελίδα καμαριέρας — Διαχείριση δωματίων, ιματισμού και mini-bar</h2>
+
+<div class="app">
+<aside class="sb">
+  <div class="sb-top">
+    <div class="sb-logo">Grand Kavala</div>
+    <div class="sb-role"><span class="sb-dot"></span>Καμαριέρα</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-sec">Κύριο</div>
+    <div class="sb-item active" data-v="overview"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Επισκόπηση</div>
+    <div class="sb-item" data-v="rooms"><i class="ti ti-door" aria-hidden="true"></i>Δωμάτια Βάρδιας<span class="sb-badge" id="badge-rooms">12</span></div>
+    <div class="sb-item" data-v="minibar"><i class="ti ti-fridge" aria-hidden="true"></i>Mini-bar<span class="sb-badge" id="badge-mb">4</span></div>
+    <div class="sb-sec">Ιματισμός</div>
+    <div class="sb-item" data-v="linen"><i class="ti ti-shirt" aria-hidden="true"></i>Αποστολή & Παραλαβή</div>
+    <div class="sb-item" data-v="stock"><i class="ti ti-package" aria-hidden="true"></i>Αποθεματικό</div>
+    <div class="sb-sec">Άλλα</div>
+    <div class="sb-item" data-v="report"><i class="ti ti-notes" aria-hidden="true"></i>Αναφορά Βάρδιας</div>
+  </nav>
+  <div class="sb-foot">
+    <div class="av">
+      <div class="av-circle">ΜΚ</div>
+      <div><div class="av-name">Μαρία Κ.</div><div class="av-shift">09:00 – 17:00</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="tb-l">
+      <div>
+        <div class="tb-title" id="tb-title">Επισκόπηση Βάρδιας</div>
+        <div class="tb-meta">Σάββατο 9 Μαΐου 2026 · 10:14 · Βάρδια 09:00–17:00</div>
+      </div>
+    </div>
+    <div class="tb-r">
+      <span class="badge b-teal">Ολοκλ. <span id="done-count">3</span>/15</span>
+      <span class="badge b-amber">Εκκρεμή <span id="pend-count">12</span></span>
+      <span class="badge b-red">Mini-bar <span id="mb-count">4</span> εκκρ.</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+  <div class="view active" id="v-overview">
+    <div class="g4">
+      <div class="sc"><div class="sc-lbl">Δωμάτιά μου σήμερα</div><div class="sc-val">15</div><div class="sc-sub">Βάρδια 09:00–17:00</div></div>
+      <div class="sc"><div class="sc-lbl">Ολοκληρωμένα</div><div class="sc-val" style="color:#1D9E75">3</div><div class="sc-sub">Πρόοδος 20%</div><div class="prog"><div class="prog-fill" style="width:20%;background:#1D9E75"></div></div></div>
+      <div class="sc"><div class="sc-lbl">Σε εξέλιξη</div><div class="sc-val" style="color:#378ADD">2</div><div class="sc-sub">Αναμένεται</div></div>
+      <div class="sc"><div class="sc-lbl">Επείγουσα αναχώρηση</div><div class="sc-val" style="color:#D85A30">3</div><div class="sc-sub">Check-out σήμερα</div></div>
+    </div>
+
+    <div class="ns ns-e"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>Μ-205 — Müller B.:</strong> Αναχώρηση 12:00 · Έλεγχος mini-bar ΑΜΕΣΑ — χρέωση εκκρεμεί στην υποδοχή</div></div>
+    <div class="ns ns-w"><i class="ti ti-clock" aria-hidden="true"></i><div><strong>S-02 — Σουίτα:</strong> Νέος πελάτης άφιξη 14:00 · Πρέπει να είναι έτοιμο έως 13:30</div></div>
+    <div class="ns ns-ok"><i class="ti ti-circle-check" aria-hidden="true"></i><div><strong>Δ-108, Φ-302:</strong> Καθαρίστηκαν · Ειδοποίηση εστάλη στην υποδοχή αυτόματα</div></div>
+
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door" aria-hidden="true"></i>Επόμενα δωμάτια</div><button class="btn btn-sm" onclick="navTo('rooms')">Όλα →</button></div>
+        <div style="display:flex;flex-direction:column;gap:6px" id="ov-room-list">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+            <div><div style="font-weight:500;font-size:12px">Μ-205</div><div style="font-size:11px;color:var(--color-text-secondary)">Αναχώρηση · Müller</div></div>
+            <span class="pill p-r">Επείγον</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+            <div><div style="font-weight:500;font-size:12px">S-02</div><div style="font-size:11px;color:var(--color-text-secondary)">Άφιξη 14:00 · Νέος πελάτης</div></div>
+            <span class="pill p-a">Προτεραιότητα</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+            <div><div style="font-weight:500;font-size:12px">Δ-312</div><div style="font-size:11px;color:var(--color-text-secondary)">Κανονικός καθαρισμός</div></div>
+            <span class="pill p-b">Εκκρεμεί</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-shirt" aria-hidden="true"></i>Ιματισμός σήμερα</div><button class="btn btn-sm" onclick="navTo('linen')">Λεπτομ. →</button></div>
+        <div style="font-size:12px">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><span style="color:var(--color-text-secondary)">Σεντόνια — απεστάλησαν</span><span style="font-weight:500">120 τεμ.</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><span style="color:var(--color-text-secondary)">Σεντόνια — παρελήφθησαν</span><span style="font-weight:500;color:#1D9E75">95 τεμ.</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><span style="color:var(--color-text-secondary)">Πετσέτες — εκκρεμείς</span><span style="font-weight:500;color:#EF9F27">25 τεμ.</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--color-text-secondary)">Μπουρνούζια — OK</span><span style="font-weight:500">85 τεμ.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="v-rooms">
+    <div class="toast" id="room-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i><span id="room-toast-msg">Κατάσταση δωματίου ενημερώθηκε!</span></div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('all',this)">Όλα (15)</button>
+      <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('urgent',this)">Επείγον (3)</button>
+      <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('pending',this)">Εκκρεμή (9)</button>
+      <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('done',this)">Ολοκλ. (3)</button>
+    </div>
+    <div class="room-list" id="room-list"></div>
+  </div>
+
+  <div class="view" id="v-minibar">
+    <div class="toast" id="mb-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Mini-bar καταχωρήθηκε — υποδοχή ενημερώθηκε αυτόματα!</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-fridge" aria-hidden="true"></i>Εκκρεμείς Ελέγχοι Mini-bar</div></div>
+      <div id="mb-list">
+        <div class="minibar-row" id="mb-205">
+          <div class="mb-room">Μ-205</div>
+          <div class="mb-items">2× Νερό €2 · 1× Μπύρα €4 · 1× Σοκολάτα €2</div>
+          <div class="mb-total">€18</div>
+          <span class="pill p-r" style="margin-left:4px">Εκκρ.</span>
+          <button class="btn btn-sm btn-teal" onclick="chargeMb('mb-205','Μ-205','€18')">Καταχώρηση</button>
+        </div>
+        <div class="minibar-row" id="mb-302">
+          <div class="mb-room">Φ-302</div>
+          <div class="mb-items">3× Αναψυκτικό €1.5 · 2× Snack €2</div>
+          <div class="mb-total">€14</div>
+          <span class="pill p-r" style="margin-left:4px">Εκκρ.</span>
+          <button class="btn btn-sm btn-teal" onclick="chargeMb('mb-302','Φ-302','€14')">Καταχώρηση</button>
+        </div>
+        <div class="minibar-row" id="mb-415">
+          <div class="mb-room">Δ-415</div>
+          <div class="mb-items">1× Κρασί €10 · 1× Nuts €2</div>
+          <div class="mb-total">€22</div>
+          <span class="pill p-r" style="margin-left:4px">Εκκρ.</span>
+          <button class="btn btn-sm btn-teal" onclick="chargeMb('mb-415','Δ-415','€22')">Καταχώρηση</button>
+        </div>
+        <div class="minibar-row" id="mb-s02">
+          <div class="mb-room">S-02</div>
+          <div class="mb-items">2× Σαμπάνια €18 · 3× Χυμός €3</div>
+          <div class="mb-total">€45</div>
+          <span class="pill p-r" style="margin-left:4px">Εκκρ.</span>
+          <button class="btn btn-sm btn-teal" onclick="chargeMb('mb-s02','S-02','€45')">Καταχώρηση</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-plus" aria-hidden="true"></i>Νέα καταχώρηση mini-bar</div></div>
+      <div class="fg-row">
+        <div class="fg"><label>Αρ. Δωματίου</label><input type="text" id="mb-room-inp" placeholder="π.χ. Δ-218"></div>
+        <div class="fg"><label>Πελάτης (αυτόματο)</label><input type="text" placeholder="Αναζήτηση..." readonly style="opacity:.6"></div>
+      </div>
+      <div class="fg"><label>Καταναλώσεις</label><input type="text" id="mb-items-inp" placeholder="π.χ. 2× νερό €2, 1× μπύρα €4"></div>
+      <div class="fg-row">
+        <div class="fg"><label>Σύνολο (€)</label><input type="number" id="mb-total-inp" placeholder="0.00" min="0" step="0.50"></div>
+        <div class="fg"><label>Κατάσταση δωματίου μετά</label>
+          <select id="mb-status-sel"><option>Προς καθαρισμό</option><option>Ήδη καθαρό</option></select>
+        </div>
+      </div>
+      <button class="btn btn-dark" onclick="submitNewMb()"><i class="ti ti-send" aria-hidden="true"></i> Αποστολή στην Υποδοχή</button>
+    </div>
+  </div>
+
+  <div class="view" id="v-linen">
+    <div class="toast" id="linen-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Αποστολή καταχωρήθηκε!</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-truck-delivery" aria-hidden="true"></i>Αποστολή στο Καθαριστήριο</div><button class="btn btn-sm btn-dark" onclick="submitLinen()"><i class="ti ti-check" aria-hidden="true"></i> Καταχώρηση</button></div>
+      <div style="margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--color-text-secondary)">
+          <span>Είδος</span><span style="text-align:center">Λερωμένα</span><span style="text-align:center">Ελάχ. Απόθ.</span>
+        </div>
+        <div class="linen-row"><div class="linen-name"><i class="ti ti-bed" aria-hidden="true" style="font-size:14px;margin-right:5px"></i>Σεντόνια μονά</div><div class="linen-qty"><input type="number" value="85" min="0" style="width:50px;padding:3px 5px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)"></div><div class="linen-min" style="color:var(--color-text-secondary)">60</div></div>
+        <div class="linen-row"><div class="linen-name"><i class="ti ti-bed" aria-hidden="true" style="font-size:14px;margin-right:5px"></i>Σεντόνια διπλά</div><div class="linen-qty"><input type="number" value="35" min="0" style="width:50px;padding:3px 5px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)"></div><div class="linen-min">40</div></div>
+        <div class="linen-row"><div class="linen-name"><i class="ti ti-droplet" aria-hidden="true" style="font-size:14px;margin-right:5px"></i>Πετσέτες μπάνιου</div><div class="linen-qty"><input type="number" value="140" min="0" style="width:50px;padding:3px 5px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)"></div><div class="linen-min">80</div></div>
+        <div class="linen-row"><div class="linen-name"><i class="ti ti-droplet" aria-hidden="true" style="font-size:14px;margin-right:5px"></i>Πετσέτες χεριών</div><div class="linen-qty"><input type="number" value="90" min="0" style="width:50px;padding:3px 5px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)"></div><div class="linen-min">50</div></div>
+        <div class="linen-row"><div class="linen-name"><i class="ti ti-hanger" aria-hidden="true" style="font-size:14px;margin-right:5px"></i>Μπουρνούζια</div><div class="linen-qty"><input type="number" value="20" min="0" style="width:50px;padding:3px 5px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)"></div><div class="linen-min">25</div></div>
+        <div class="linen-row"><div class="linen-name"><i class="ti ti-pilcrow" aria-hidden="true" style="font-size:14px;margin-right:5px"></i>Μαξιλαροθήκες</div><div class="linen-qty"><input type="number" value="60" min="0" style="width:50px;padding:3px 5px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)"></div><div class="linen-min">40</div></div>
+      </div>
+      <div class="ns ns-w" style="margin-bottom:0"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Σεντόνια διπλά (35) κάτω από ελάχ. απόθεμα (40) — ειδοποίηση εστάλη στον διαχ. αποθήκης</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-package-import" aria-hidden="true"></i>Παραλαβή Καθαρού Ιματισμού</div></div>
+      <table>
+        <thead><tr><th style="width:34%">Είδος</th><th style="width:18%">Εστάλησαν</th><th style="width:18%">Παρελήφθ.</th><th style="width:16%">Κατάσταση</th><th style="width:14%">Επαλ.</th></tr></thead>
+        <tbody>
+          <tr><td>Σεντόνια μονά</td><td>80</td><td>80</td><td><span class="pill p-g">OK</span></td><td><button class="btn btn-sm"><i class="ti ti-check" aria-hidden="true"></i></button></td></tr>
+          <tr><td>Πετσέτες μπάνιου</td><td>120</td><td>115</td><td><span class="pill p-a">Διαφορά 5</span></td><td><button class="btn btn-sm btn-warn">Αναφορά</button></td></tr>
+          <tr><td>Μπουρνούζια</td><td>18</td><td>18</td><td><span class="pill p-g">OK</span></td><td><button class="btn btn-sm"><i class="ti ti-check" aria-hidden="true"></i></button></td></tr>
+          <tr><td>Μαξιλαροθήκες</td><td>55</td><td>55</td><td><span class="pill p-g">OK</span></td><td><button class="btn btn-sm"><i class="ti ti-check" aria-hidden="true"></i></button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-stock">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-package" aria-hidden="true"></i>Αποθεματικό Ιματισμού & Υλικών</div></div>
+      <table>
+        <thead><tr><th style="width:30%">Είδος</th><th style="width:18%">Απόθεμα</th><th style="width:14%">Ελάχ.</th><th style="width:20%">Κατάσταση</th><th style="width:18%">Ενέργεια</th></tr></thead>
+        <tbody>
+          <tr><td>Σεντόνια μονά</td><td>340</td><td>100</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
+          <tr><td>Σεντόνια διπλά</td><td>38</td><td>40</td><td><span class="pill p-r">Κάτω ελαχ.</span></td><td><button class="btn btn-sm btn-warn">Αναφορά</button></td></tr>
+          <tr><td>Πετσέτες μπάνιου</td><td>520</td><td>150</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
+          <tr><td>Πετσέτες χεριών</td><td>280</td><td>80</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
+          <tr><td>Μπουρνούζια</td><td>85</td><td>30</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
+          <tr><td>Σαπούνι / Shampoo (set)</td><td>420</td><td>200</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
+          <tr><td>Χαρτί υγείας (ρολά)</td><td>380</td><td>150</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
+          <tr><td>Σκονί / Υλικά καθ.</td><td>24 lt</td><td>10</td><td><span class="pill p-a">Κοντά</span></td><td><button class="btn btn-sm">Παρ/γελία</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-report">
+    <div class="toast" id="rep-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Αναφορά βάρδιας εστάλη στη διοίκηση!</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-notes" aria-hidden="true"></i>Αναφορά Βάρδιας — 9/5/2026</div></div>
+      <div class="g3" style="margin-bottom:12px">
+        <div class="sc"><div class="sc-lbl">Δωμάτια ολοκλ.</div><div class="sc-val" id="rpt-done">3</div></div>
+        <div class="sc"><div class="sc-lbl">Mini-bar χρεώσεις</div><div class="sc-val">2</div></div>
+        <div class="sc"><div class="sc-lbl">Ιματισμός στάλθηκε</div><div class="sc-val">430 τεμ.</div></div>
+      </div>
+      <div class="fg"><label>Προβλήματα / Σχόλια</label>
+        <textarea id="rep-notes" placeholder="π.χ. Δωμάτιο Δ-415: λείπει ένα προσκέφαλο. Πετσέτες παρελήφθησαν 5 λιγότερες..."></textarea>
+      </div>
+      <div class="fg"><label>Ειδικά αιτήματα επόμενης βάρδιας</label>
+        <textarea placeholder="π.χ. S-02 χρειάζεται επιπλέον στρώμα..."></textarea>
+      </div>
+      <div style="display:flex;gap:7px;margin-top:4px">
+        <button class="btn btn-dark" onclick="submitReport()"><i class="ti ti-send" aria-hidden="true"></i> Αποστολή Αναφοράς</button>
+        <button class="btn"><i class="ti ti-printer" aria-hidden="true"></i> Εκτύπωση</button>
+      </div>
+
+      <div style="margin-top:14px;border-top:0.5px solid var(--color-border-tertiary);padding-top:12px">
+        <div style="font-size:12px;font-weight:500;margin-bottom:8px;color:var(--color-text-secondary)">Ημερολόγιο βάρδιας</div>
+        <div id="log-list" style="display:flex;flex-direction:column;gap:5px;font-size:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+</div>
+</div>
+
+<script src="../js/maid.js"></script>
+</body>
+</html>
