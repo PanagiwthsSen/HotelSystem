@@ -22,7 +22,21 @@ function login() {
         // Ανακατεύθυνση στη σελίδα του Ρεσεψιονίστ (άλλαξε το path αν χρειάζεται)
         window.location.href = "../pages/receptionist.html"; 
 
-    // 5. Λάθος στοιχεία (Ούτε Admin, ούτε Receptionist)
+    // 5. Έλεγχος στοιχείων για Maid
+    } else if (username === "maid" && password === "1212") {
+        error.classList.remove("show"); // Κρύβουμε τυχόν παλιό σφάλμα
+        alert("Επιτυχής σύνδεση ως Maid!");
+        
+        // Ανακατεύθυνση στη σελίδα του Maid (άλλαξε το path αν χρειάζεται)
+        window.location.href = "../pages/maid.html"; 
+        
+    // 6. Έλεγχος στοιχείων για Minibar
+    } else if (username === "minibar" && password === "1111") {
+        error.classList.remove("show"); // Κρύβουμε τυχόν παλιό σφάλμα
+        alert("Επιτυχής σύνδεση ως Mini-bar!");
+        
+        // Ανακατεύθυνση στη σελίδα του Mini-bar (άλλαξε το path αν χρειάζεται)
+         window.location.href = "../pages/minibar.html"; 
     } else {
         // Εμφάνιση του αναδυόμενου μηνύματος λάθους
         error.classList.add("show");

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Σελίδα Υπευθύνου Mini-bar — Grand Kavala</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="../css/minibar.css">
+</head>
+<body>
+
+<h2 class="sr-only">Σελίδα υπευθύνου Mini-bar — Έλεγχος καταναλώσεων και αποθεμάτων</h2>
+
+<div class="app">
+<aside class="sb">
+  <div class="sb-top">
+    <div class="sb-logo">Grand Kavala</div>
+    <div class="sb-role"><span class="sb-dot" style="background:#378ADD"></span>Mini-bar / Room Service</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-sec">Κύριο</div>
+    <div class="sb-item active" data-v="overview"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Επισκόπηση</div>
+    <div class="sb-item" data-v="consumption"><i class="ti ti-glass-full" aria-hidden="true"></i>Νέα Καταχώρηση</div>
+    
+    <div class="sb-sec">Αποθήκη</div>
+    <div class="sb-item" data-v="stock"><i class="ti ti-packages" aria-hidden="true"></i>Αποθεματικό Καροτσιού</div>
+    <div class="sb-item" data-v="history"><i class="ti ti-history" aria-hidden="true"></i>Ιστορικό Χρεώσεων</div>
+  </nav>
+  <div class="sb-foot">
+    <div class="av">
+      <div class="av-circle" style="color:#378ADD">ΓΠ</div>
+      <div><div class="av-name">Γεωργίου Π.</div><div class="av-shift">08:00 – 16:00</div></div>
+      <i class="ti ti-logout" style="cursor:pointer; margin-left:auto; color:rgba(196,186,168,.75); font-size:18px;" title="Αποσύνδεση" onclick="logoutMinibar()"></i>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="tb-l">
+      <div>
+        <div class="tb-title" id="tb-title">Επισκόπηση Βάρδιας</div>
+        <div class="tb-meta" id="live-time">Σάββατο 9 Μαΐου 2026 · 10:14</div>
+      </div>
+    </div>
+    <div class="tb-r">
+      <span class="badge b-red">Επείγοντα: <span id="urgent-count">2</span></span>
+      <span class="badge b-teal">Καταχωρήσεις: <span id="done-count">14</span></span>
+    </div>
+  </div>
+
+  <div class="content">
+
+  <div class="view active" id="v-overview">
+    <div class="g4">
+      <div class="sc"><div class="sc-lbl">Δωμάτια για έλεγχο</div><div class="sc-val">18</div><div class="sc-sub">Βάσει αναχωρήσεων & ρουτίνας</div></div>
+      <div class="sc"><div class="sc-lbl">Χρεώσεις Σήμερα</div><div class="sc-val" style="color:#1D9E75">€184.50</div><div class="sc-sub">Στάλθηκαν στην υποδοχή</div></div>
+      <div class="sc"><div class="sc-lbl">Επείγουσες Αναχωρήσεις</div><div class="sc-val" style="color:#D85A30">2</div><div class="sc-sub">Απαιτούν άμεσο έλεγχο</div></div>
+      <div class="sc"><div class="sc-lbl">Προϊόντα σε έλλειψη</div><div class="sc-val" style="color:#EF9F27">1</div><div class="sc-sub">Απαιτείται ανεφοδιασμός</div></div>
+    </div>
+
+    <div class="ns ns-e"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>ΕΠΕΙΓΟΝ - Μ-205 (Müller B.):</strong> Ο πελάτης βρίσκεται στη ρεσεψιόν για check-out. Ελέγξτε το mini-bar ΑΜΕΣΑ.</div></div>
+    <div class="ns ns-w"><i class="ti ti-clock" aria-hidden="true"></i><div><strong>Φ-302 (Johnson T.):</strong> Αναχωρεί στις 12:00. Προγραμματίστε έλεγχο.</div></div>
+
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-list-check" aria-hidden="true"></i>Λίστα Προτεραιότητας Ελέγχων</div></div>
+        <table>
+          <thead><tr><th style="width:20%">Δωμάτιο</th><th style="width:30%">Κατάσταση</th><th style="width:30%">Σημείωση</th><th style="width:20%">Ενέργεια</th></tr></thead>
+          <tbody>
+            <tr style="background:#FFF8F8"><td><strong>Μ-205</strong></td><td><span class="pill p-r">Άμεσο Check-out</span></td><td>Ο πελάτης περιμένει</td><td><button class="btn btn-sm btn-dark" onclick="navTo('consumption'); setRoomSelect('Μ-205')">Έλεγχος</button></td></tr>
+            <tr><td><strong>Φ-302</strong></td><td><span class="pill p-a">Αναχώρηση 12:00</span></td><td>-</td><td><button class="btn btn-sm btn-dark" onclick="navTo('consumption'); setRoomSelect('Φ-302')">Έλεγχος</button></td></tr>
+            <tr><td><strong>Δ-415</strong></td><td><span class="pill p-b">Καθημερινή Ρουτίνα</span></td><td>Παραμονή πελάτη</td><td><button class="btn btn-sm" onclick="navTo('consumption'); setRoomSelect('Δ-415')">Έλεγχος</button></td></tr>
+            <tr><td><strong>S-02</strong></td><td><span class="pill p-b">Καθημερινή Ρουτίνα</span></td><td>VIP ανεφοδιασμός</td><td><button class="btn btn-sm" onclick="navTo('consumption'); setRoomSelect('S-02')">Έλεγχος</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="card">
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-history" aria-hidden="true"></i>Πρόσφατες Καταχωρήσεις Σήμερα</div><button class="btn btn-sm" onclick="navTo('history')">Όλες →</button></div>
+        <div id="recent-logs" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;justify-content:space-between;padding:8px;background:var(--color-background-secondary);border-radius:6px;">
+            <div><div style="font-weight:500;font-size:12px">Δ-108</div><div style="font-size:11px;color:var(--color-text-secondary)">Καμία κατανάλωση</div></div>
+            <div style="font-weight:500;color:var(--color-text-secondary)">€0.00</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px;background:var(--color-background-secondary);border-radius:6px;">
+            <div><div style="font-weight:500;font-size:12px">M-114</div><div style="font-size:11px;color:var(--color-text-secondary)">1× Νερό, 1× Σνακ</div></div>
+            <div style="font-weight:500;">€4.00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="v-consumption">
+    <div class="card" style="max-width: 800px; margin: 0 auto;">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-glass-full" aria-hidden="true"></i>Καταγραφή Κατανάλωσης (Mini-bar)</div></div>
+      <div class="ns ns-ok"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Συμπληρώστε τις ποσότητες που λείπουν. Η χρέωση θα υπολογιστεί αυτόματα και θα σταλεί στη καρτέλα του πελάτη στη ρεσεψιόν.</div></div>
+      
+      <div class="form-grid" style="margin-top:15px; background: var(--color-background-secondary); padding: 20px; border-radius: 8px;">
+        <div class="fg" style="grid-column: 1 / -1;">
+            <label>Αριθμός Δωματίου *</label>
+            <select id="mb-room" style="font-size: 14px; padding: 10px;">
+                <option value="">Επιλέξτε Δωμάτιο προς έλεγχο...</option>
+                <option value="Μ-205">Μ-205 (Επείγον - Check-out)</option>
+                <option value="Φ-302">Φ-302 (Αναχώρηση σήμερα)</option>
+                <option value="Δ-415">Δ-415 (Παραμονή)</option>
+                <option value="S-02">S-02 (Σουίτα - Παραμονή)</option>
+            </select>
+        </div>
+        
+        <div class="fg">
+            <label>Νερό Εμφιαλωμένο (€2.00)</label>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="number" id="qty-water" min="0" value="0" oninput="calcTotal()" style="width:80px; text-align:center;">
+                <span style="font-size:12px; color:var(--color-text-secondary)">τεμάχια</span>
+            </div>
+        </div>
+        <div class="fg">
+            <label>Αναψυκτικά (€1.50)</label>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="number" id="qty-soda" min="0" value="0" oninput="calcTotal()" style="width:80px; text-align:center;">
+                <span style="font-size:12px; color:var(--color-text-secondary)">τεμάχια</span>
+            </div>
+        </div>
+        <div class="fg">
+            <label>Μπύρα / Αλκοόλ (€4.00)</label>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="number" id="qty-beer" min="0" value="0" oninput="calcTotal()" style="width:80px; text-align:center;">
+                <span style="font-size:12px; color:var(--color-text-secondary)">τεμάχια</span>
+            </div>
+        </div>
+        <div class="fg">
+            <label>Σνακ / Σοκολάτες (€2.00)</label>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="number" id="qty-snack" min="0" value="0" oninput="calcTotal()" style="width:80px; text-align:center;">
+                <span style="font-size:12px; color:var(--color-text-secondary)">τεμάχια</span>
+            </div>
+        </div>
+        
+        <div style="grid-column: 1 / -1; margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--color-border-secondary); display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size: 16px; font-weight: 500;">Συνολική Χρέωση: <span id="mb-total-price" style="color:#1D9E75; font-size:22px; margin-left:10px;">€0.00</span></div>
+            <button class="btn btn-dark" style="padding:10px 20px; font-size:14px;" onclick="submitConsumption()"><i class="ti ti-send" aria-hidden="true"></i> Οριστική Καταχώρηση</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="v-stock">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-packages" aria-hidden="true"></i>Αποθεματικό Τροχήλατου & Ορόφου</div><button class="btn btn-sm btn-dark" onclick="triggerAction('Ζητήθηκε γενικός ανεφοδιασμός καροτσιού', 'success')"><i class="ti ti-truck-loading" aria-hidden="true"></i> Γενικός Ανεφοδιασμός</button></div>
+      <table>
+        <thead><tr><th style="width:30%">Είδος Προϊόντος</th><th style="width:20%">Τρέχον Απόθεμα</th><th style="width:15%">Ελάχ. Όριο</th><th style="width:20%">Κατάσταση</th><th style="width:15%">Ενέργεια</th></tr></thead>
+        <tbody>
+          <tr><td>Νερό Εμφιαλωμένο (500ml)</td><td>45 τεμ.</td><td>20</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
+          <tr><td>Coca-Cola / Sprite</td><td>32 τεμ.</td><td>15</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
+          <tr><td>Μπύρα (Κουτάκι 330ml)</td><td>8 τεμ.</td><td>10</td><td><span class="pill p-r">Κάτω από όριο</span></td><td><button class="btn btn-sm btn-warn" onclick="requestRestock(this)">Αίτημα</button></td></tr>
+          <tr><td>Κρασί (Φιαλίδιο)</td><td>14 τεμ.</td><td>10</td><td><span class="pill p-a">Οριακά</span></td><td><button class="btn btn-sm" onclick="requestRestock(this)">Αίτημα</button></td></tr>
+          <tr><td>Ξηροί Καρποί (Mix)</td><td>25 τεμ.</td><td>15</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
+          <tr><td>Σοκολάτες</td><td>28 τεμ.</td><td>15</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-history">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-history" aria-hidden="true"></i>Ιστορικό Χρεώσεων (Σημερινή Βάρδια)</div></div>
+      <table id="history-table">
+        <thead><tr><th style="width:15%">Ώρα</th><th style="width:15%">Δωμάτιο</th><th style="width:45%">Προϊόντα που αντικαταστάθηκαν</th><th style="width:15%">Χρέωση</th><th style="width:10%">Status</th></tr></thead>
+        <tbody>
+          <tr><td>09:45</td><td>Δ-108</td><td>Καμία κατανάλωση</td><td>€0.00</td><td><span class="pill p-g">Στάλθηκε</span></td></tr>
+          <tr><td>09:12</td><td>M-114</td><td>1× Νερό, 1× Σνακ</td><td>€4.00</td><td><span class="pill p-g">Στάλθηκε</span></td></tr>
+          <tr><td>08:30</td><td>Φ-201</td><td>2× Μπύρα, 1× Νερό</td><td>€10.00</td><td><span class="pill p-g">Στάλθηκε</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  </div>
+</div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<script src="../js/minibar.js"></script>
+
+</body>
+</html>

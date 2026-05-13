@@ -46,6 +46,14 @@
                 error.classList.remove("show");
                 alert("Επιτυχής σύνδεση ως Receptionist!");
                 window.location.href = "../pages/receptionist.html"; // Βεβαιώσου ότι το path είναι σωστό
+            } else if (username === "maid" && password === "1212") {
+                error.classList.remove("show");
+                alert("Επιτυχής σύνδεση ως Maid!");
+                window.location.href = "../pages/maid.html"; // Βεβαιώσου ότι το path είναι σωστό
+            } else if (username === "minibar" && password === "1111") {
+                error.classList.remove("show");
+                alert("Επιτυχής σύνδεση ως Mini-bar!");
+                window.location.href = "../pages/minibar.html"; // Βεβαιώσου ότι το path είναι σωστό
             } else {
                 error.classList.add("show");
                 
