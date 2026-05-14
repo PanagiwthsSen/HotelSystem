@@ -1,103 +1,69 @@
-let currentStep = 1;
+/* script.js */
 
-let bookingData = {};
+// Άνοιγμα αναζήτησης στο ίδιο tab
+function searchRoomsPage() {
+  const checkin = document.getElementById('s-in').value;
+  const checkout = document.getElementById('s-out').value;
+  const type = document.getElementById('s-type').value;
+  const pax = document.getElementById('s-pax').value;
 
-function filterRooms() {
+  // Δημιουργία παραμέτρων URL
+  const queryParams = new URLSearchParams({
+    checkin: checkin,
+    checkout: checkout,
+    type: type,
+    pax: pax
+  }).toString();
 
-  const type = document.getElementById("s-type").value;
+  // Αλλαγή σελίδας στο ίδιο παράθυρο/tab
+  window.location.href = `../pages/booking.html?${queryParams}`;
+}
 
-  const cards = document.querySelectorAll(".room-card");
+// Άνοιγμα φόρμας κράτησης συγκεκριμένου δωματίου στο ίδιο tab
+function bookRoomPage(roomName, price) {
+  const checkin = document.getElementById('s-in').value;
+  const checkout = document.getElementById('s-out').value;
+  
+  const queryParams = new URLSearchParams({
+    room: roomName,
+    price: price || 0,
+    checkin: checkin,
+    checkout: checkout
+  }).toString();
 
-  const names = {
-    mono: "Μονόκλινο",
-    dik: "Δίκλινο",
-    far: "Φαρδύκλινο",
-    suite: "Σουίτα"
-  };
+  // Αλλαγή σελίδας στο ίδιο παράθυρο/tab
+  window.location.href = `../pages/booking.html?${queryParams}`;
+}
 
-  cards.forEach(card => {
+/* * ----------------------------------------------------------------------
+ * ΥΠΟΘΕΤΙΚΗ ΛΟΓΙΚΗ ΒΑΣΗΣ ΔΕΔΟΜΕΝΩΝ & ΕΙΔΟΠΟΙΗΣΕΩΝ (ΓΙΑ ΤΟ ΝΕΟ ΑΡΧΕΙΟ booking.html)
+ * ----------------------------------------------------------------------
+ */
+async function processBookingSubmission(bookingData) {
+  try {
+    // 1. Εγγραφή στη βάση δεδομένων (API Endpoint)
+    const dbResponse = await fetch('/api/bookings/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bookingData)
+    });
 
-    const roomName =
-      card.querySelector(".room-name").textContent;
+    if (dbResponse.ok) {
+      // 2. Ενημέρωση / Ειδοποίηση προσωπικού (Webhook ή API)
+      await fetch('/api/notifications/notify-staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Νέα κράτηση: ${bookingData.roomName} από ${bookingData.guestName}`,
+          urgent: true
+        })
+      });
 
-    if (!type || roomName.includes(names[type])) {
-      card.style.display = "block";
+      console.log("Η κράτηση αποθηκεύτηκε επιτυχώς και στάλθηκαν οι ειδοποιήσεις.");
     } else {
-      card.style.display = "none";
+      console.error("Πρόβλημα κατά την αποθήκευση της κράτησης.");
     }
-
-  });
-
-}
-
-function openModal(room, price) {
-
-  bookingData.room = room;
-  bookingData.price = price;
-
-  document
-    .getElementById("modal-overlay")
-    .classList.add("open");
-
-  renderStep();
-
-}
-
-function closeModal() {
-
-  document
-    .getElementById("modal-overlay")
-    .classList.remove("open");
-
-}
-
-function renderStep() {
-
-  const modalBody =
-    document.getElementById("modal-body");
-
-  const modalFooter =
-    document.getElementById("modal-footer");
-
-  modalBody.innerHTML = `
-    <p>
-      Επιβεβαίωση κράτησης για:
-      <strong>${bookingData.room}</strong>
-    </p>
-
-    <br>
-
-    <p>
-      Τιμή:
-      <strong>€${bookingData.price}</strong>
-      / βράδυ
-    </p>
-  `;
-
-  modalFooter.innerHTML = `
-    <button class="btn-next" onclick="completeBooking()">
-      Ολοκλήρωση
-    </button>
-  `;
-
-}
-
-function completeBooking() {
-
-  document.getElementById("modal-body").innerHTML = `
-    <h2>Η κράτηση ολοκληρώθηκε ✅</h2>
-
-    <br>
-
-    <p>
-      Ευχαριστούμε που επιλέξατε το Grand Kavala Hotel.
-    </p>
-  `;
-
-  document.getElementById("modal-footer").innerHTML = `
-    <button class="btn-next" onclick="closeModal()">
-      Κλείσιμο
-    </button>
-  `;
-
+  } catch (error) {
+    console.error("Σφάλμα δικτύου:", error);
+  }
 }
