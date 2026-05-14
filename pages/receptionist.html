@@ -47,7 +47,7 @@
       <div class="tb-right">
         <span class="badge b-gold" id="season-badge"><i class="ti ti-sun" aria-hidden="true"></i> Καλοκαίρι</span>
         <span class="badge b-teal" id="live-occ-badge">Πληρ. --%</span>
-        <span class="badge b-blue" id="live-arr-badge">Αφίξεις: 12</span>
+        <span class="badge b-blue" id="live-arr-badge">Αφίξεις: --</span>
       </div>
     </div>
 
@@ -55,33 +55,30 @@
 
       <div class="view active" id="v-dash">
         <div class="g4">
-          <div class="sc"><div class="sc-lbl">Πληρότητα σήμερα</div><div class="sc-val" id="dash-occ-val">--%</div><div class="sc-sub" id="dash-occ-sub">-- / 510 δωμάτια</div><div class="prog"><div class="prog-fill" id="dash-occ-bar" style="width:0%;background:#1D9E75"></div></div></div>
-          <div class="sc"><div class="sc-lbl">Αφίξεις Ημέρας</div><div class="sc-val">12</div><div class="sc-sub">4 ολοκληρώθηκαν</div></div>
-          <div class="sc"><div class="sc-lbl">Αναχωρήσεις Ημέρας</div><div class="sc-val">8</div><div class="sc-sub">2 εκκρεμούν</div></div>
+          <div class="sc"><div class="sc-lbl">Πληρότητα σήμερα</div><div class="sc-val" id="dash-occ-val">--%</div><div class="sc-sub" id="dash-occ-sub">-- / -- δωμάτια</div><div class="prog"><div class="prog-fill" id="dash-occ-bar" style="width:0%;background:#1D9E75"></div></div></div>
+          <div class="sc"><div class="sc-lbl">Αφίξεις Ημέρας</div><div class="sc-val" id="dash-arr-count">--</div><div class="sc-sub">Σημερινές κρατήσεις</div></div>
+          <div class="sc"><div class="sc-lbl">Αναχωρήσεις Ημέρας</div><div class="sc-val" id="dash-dep-count">--</div><div class="sc-sub">Προς Check-out</div></div>
           <div class="sc"><div class="sc-lbl">Ελεύθερα & Έτοιμα</div><div class="sc-val sc-up" id="dash-free-val">--</div><div class="sc-sub">Διαθέσιμα για Walk-in</div></div>
         </div>
 
         <div class="g2">
           <div class="card">
             <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door-enter" aria-hidden="true"></i>Άμεσες Αφίξεις</div><button class="btn btn-sm" onclick="navTo('arrivals')">Διαχείριση →</button></div>
-            <table>
-              <thead><tr><th style="width:35%">Πελάτης</th><th style="width:20%">Τύπος</th><th style="width:20%">Ώρα</th><th style="width:25%">Κατάσταση</th></tr></thead>
-              <tbody>
-                <tr><td>Παπαδόπουλος Γ.</td><td>Δίκλινο</td><td>10:00</td><td><span class="pill p-a">Εκκρεμεί</span></td></tr>
-                <tr><td>Smith A.</td><td>Σουίτα</td><td>11:30</td><td><span class="pill p-a">Εκκρεμεί</span></td></tr>
-                <tr><td>Müller B.</td><td>Μονόκλινο</td><td>16:00</td><td><span class="pill p-g">Check-in OK</span></td></tr>
-              </tbody>
-            </table>
+            <div id="v-arrivals-mini">
+                <table>
+                  <thead><tr><th style="width:35%">Πελάτης</th><th style="width:25%">Κατάσταση</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+            </div>
           </div>
           <div class="card">
             <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door-exit" aria-hidden="true"></i>Εκκρεμείς Αναχωρήσεις</div><button class="btn btn-sm" onclick="navTo('departures')">Διαχείριση →</button></div>
-            <table>
-              <thead><tr><th style="width:30%">Πελάτης</th><th style="width:20%">Δωμ.</th><th style="width:25%">Υπόλοιπο</th><th style="width:25%">Mini-bar</th></tr></thead>
-              <tbody>
-                <tr><td>Αναστασίου Κ.</td><td>Δ-108</td><td>€0</td><td><span class="pill p-g">OK</span></td></tr>
-                <tr><td>Johnson T.</td><td>Φ-302</td><td>€285</td><td><span class="pill p-r">Χρέωση</span></td></tr>
-              </tbody>
-            </table>
+            <div id="v-departures-mini">
+                <table>
+                  <thead><tr><th style="width:30%">Πελάτης</th><th style="width:25%">Mini-bar</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+            </div>
           </div>
         </div>
       </div>
@@ -94,7 +91,7 @@
           <div class="sc"><div class="sc-lbl">Έτοιμα (Καθαρά)</div><div class="sc-val" style="color:#378ADD" id="stat-clean">--</div></div>
         </div>
         <div class="card">
-          <div class="card-hd"><div class="card-hd-l"><i class="ti ti-grid-dots" aria-hidden="true"></i>Χάρτης 510 δωματίων</div>
+          <div class="card-hd"><div class="card-hd-l"><i class="ti ti-grid-dots" aria-hidden="true"></i>Χάρτης Δωματίων</div>
             <div style="display:flex;gap:5px">
               <button class="btn btn-sm active-filter" data-filter="all" onclick="filterRooms('all',this)">Όλα</button>
               <button class="btn btn-sm" data-filter="free" onclick="filterRooms('free',this)">Ελεύθερα</button>
@@ -102,19 +99,13 @@
             </div>
           </div>
           <div style="display:grid;grid-template-columns:repeat(20,1fr);gap:3px;margin-bottom:15px;max-height:400px;overflow-y:auto;padding-right:5px;" id="rmap"></div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap">
-            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--color-text-secondary)"><span style="width:9px;height:9px;border-radius:2px;background:#D85A30;display:inline-block"></span>Κατειλημμένο (🔴)</div>
-            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--color-text-secondary)"><span style="width:9px;height:9px;border-radius:2px;background:#EF9F27;display:inline-block"></span>Προσεχώς Άδειο (🟠) / Υπό καθαρισμό</div>
-            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--color-text-secondary)"><span style="width:9px;height:9px;border-radius:2px;background:#1D9E75;display:inline-block"></span>Άδειο Χωρίς Καθαριότητα (🟡)</div>
-            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--color-text-secondary)"><span style="width:9px;height:9px;border-radius:2px;background:#378ADD;display:inline-block"></span>Έτοιμο για Πελάτη (🟢)</div>
-          </div>
         </div>
       </div>
 
       <div class="view" id="v-new-booking">
         <div class="card">
           <div class="card-hd"><div class="card-hd-l"><i class="ti ti-calendar-plus" aria-hidden="true"></i>Καταχώρηση Κράτησης</div></div>
-          <div class="ns ns-w"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Ο ακριβής αριθμός δωματίου προσδιορίζεται το πρωί της ημέρας άφιξης του πελάτη.</div></div>
+          <div class="ns ns-w"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Ο αριθμός δωματίου προσδιορίζεται κατά την άφιξη.</div></div>
           
           <div class="form-grid" style="margin-top:15px;">
             <div class="fg"><label>Επώνυμο *</label><input type="text" id="nb-last" placeholder="π.χ. Παπαδόπουλος"></div>
@@ -125,8 +116,8 @@
             <div class="fg"><label>Τύπος Κράτησης</label>
               <select id="nb-btype" onchange="updatePrepay()">
                 <option value="phone" selected>Τηλεφωνική (20% Προκαταβολή)</option>
-                <option value="prepaid">Προπληρωμένη (>90 ημέρες / 50% Προπληρωμή)</option>
-                <option value="group">Γκρουπ (>20 άτομα / Ειδική Έκπτωση & Προκαταβολή)</option>
+                <option value="prepaid">Προπληρωμένη (50% Προπληρωμή)</option>
+                <option value="group">Γκρουπ (Ειδική Προκαταβολή)</option>
                 <option value="walkin">Walk-in (Άμεση Πληρωμή)</option>
               </select>
             </div>
@@ -139,21 +130,21 @@
               </select>
             </div>
             
-            <div class="fg"><label>Άφιξη</label><input type="date" id="nb-in" value="2026-05-10" oninput="updatePrice()"></div>
-            <div class="fg"><label>Αναχώρηση</label><input type="date" id="nb-out" value="2026-05-13" oninput="updatePrice()"></div>
+            <div class="fg"><label>Άφιξη</label><input type="date" id="nb-in" value="2026-05-15" oninput="updatePrice()"></div>
+            <div class="fg"><label>Αναχώρηση</label><input type="date" id="nb-out" value="2026-05-18" oninput="updatePrice()"></div>
           </div>
           
-          <div class="prepay-box" id="prepay-box"><i class="ti ti-info-circle" aria-hidden="true"></i> Προκαταβολή 20% (Τραπεζικός Λογαριασμός/Κάρτα) — <strong id="prepay-amt">€84</strong></div>
+          <div class="prepay-box" id="prepay-box"><i class="ti ti-info-circle" aria-hidden="true"></i> Προκαταβολή — <strong id="prepay-amt">--</strong></div>
           <div class="sum-box">
             <div class="sum-row"><span>Δωμάτιο</span><span id="sp-room">Δίκλινο</span></div>
             <div class="sum-row"><span>Διανυκτερεύσεις</span><span id="sp-nights">3</span></div>
-            <div class="sum-row"><span>Τιμή <span id="dyn-price-notice" style="color:#d35400; font-size:10px; font-weight:bold;"></span></span><span id="sp-sub">€140 × 3</span></div>
+            <div class="sum-row"><span>Τιμή</span><span id="sp-sub">€140 × 3</span></div>
             <div class="sum-row tot"><span>Συνολικό Κόστος</span><span id="sp-total">€420</span></div>
           </div>
           
           <div style="display:flex;gap:7px;margin-top:15px;">
-            <button class="btn btn-dark" onclick="submitBooking()"><i class="ti ti-check" aria-hidden="true"></i> Καταχώρηση</button>
-            <button class="btn"><i class="ti ti-eraser" aria-hidden="true"></i> Καθαρισμός</button>
+            <button class="btn btn-dark" onclick="submitBooking()">Καταχώρηση</button>
+            <button class="btn" onclick="location.reload()">Καθαρισμός</button>
           </div>
         </div>
       </div>
@@ -162,12 +153,8 @@
         <div class="card">
           <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door-enter" aria-hidden="true"></i>Αφίξεις Ημέρας (Check-in)</div></div>
           <table id="arrivals-table">
-            <thead><tr><th style="width:25%">Πελάτης</th><th style="width:15%">Τύπος</th><th style="width:15%">Προκαταβολή</th><th style="width:15%">Εκχώρηση Δωμ.</th><th style="width:15%">Κατάσταση</th><th style="width:15%">Ενέργεια</th></tr></thead>
-            <tbody>
-              <tr><td>Παπαδόπουλος Γ.</td><td>Δίκλινο</td><td><span class="pill p-g">Εξοφλήθηκε</span></td><td><select class="form-select-sm"><option>Επιλογή...</option><option>Δ-105</option><option>Δ-108</option></select></td><td><span class="pill p-a">Εκκρεμεί</span></td><td><button class="btn btn-sm btn-dark" onclick="doCheckin(this)">Check-in</button></td></tr>
-              <tr><td>Γκρουπ Tour Elite</td><td>24 Δωμάτια</td><td><span class="pill p-b">Ειδική 15%</span></td><td>Αυτόματη</td><td><span class="pill p-a">Εκκρεμεί</span></td><td><button class="btn btn-sm btn-dark" onclick="doCheckin(this)">Check-in</button></td></tr>
-              <tr><td>Müller B.</td><td>Μονόκλινο</td><td><span class="pill p-g">50% Προπλ.</span></td><td>Μ-205</td><td><span class="pill p-g">Ολοκλ.</span></td><td><button class="btn btn-sm" disabled>C/I OK</button></td></tr>
-            </tbody>
+            <thead><tr><th>Πελάτης</th><th>Τύπος</th><th>Προκαταβολή</th><th>Δωμάτιο</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
+            <tbody></tbody>
           </table>
         </div>
       </div>
@@ -176,38 +163,32 @@
         <div class="card">
           <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door-exit" aria-hidden="true"></i>Αναχωρήσεις & Έκδοση Απόδειξης</div></div>
           <table>
-            <thead><tr><th style="width:25%">Πελάτης</th><th style="width:15%">Δωμ.</th><th style="width:15%">Mini-bar</th><th style="width:15%">Υπόλοιπο</th><th style="width:15%">Κατάσταση</th><th style="width:15%">Ενέργεια</th></tr></thead>
-            <tbody>
-              <tr><td>Αναστασίου Κ.</td><td>Δ-108</td><td><span class="pill p-g">Μηδέν</span></td><td>€0</td><td><span class="pill p-a">Εκκρεμεί</span></td><td><button class="btn btn-sm btn-dark" onclick="doCheckout(this, 'Αναστασίου Κ.')">Check-out</button></td></tr>
-              <tr><td>Johnson T.</td><td>Φ-302</td><td><span class="pill p-r">Χρέωση €14</span></td><td>€285</td><td><span class="pill p-a">Εκκρεμεί</span></td><td><button class="btn btn-sm btn-dark" onclick="doCheckout(this, 'Johnson T.')">Check-out</button></td></tr>
-            </tbody>
+            <thead><tr><th>Πελάτης</th><th>Δωμ.</th><th>Mini-bar</th><th>Υπόλοιπο</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
+            <tbody></tbody>
           </table>
         </div>
       </div>
 
       <div class="view" id="v-minibar">
         <div class="card">
-          <div class="card-hd"><div class="card-hd-l"><i class="ti ti-fridge" aria-hidden="true"></i>Ενημερώσεις Mini-bar από Καμαριέρες</div></div>
-          <div class="ns ns-ok"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Τα δεδομένα καταναλώσεων ενημερώνονται αυτόματα από την υπηρεσία καθαριότητας για να χρεωθούν στον πελάτη.</div></div>
+          <div class="card-hd"><div class="card-hd-l"><i class="ti ti-fridge" aria-hidden="true"></i>Ενημερώσεις Mini-bar</div></div>
+          <div class="ns ns-ok"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Τα δεδομένα ενημερώνονται αυτόματα.</div></div>
           <table>
-            <thead><tr><th style="width:20%">Δωμάτιο</th><th style="width:25%">Πελάτης</th><th style="width:30%">Καταναλώσεις</th><th style="width:15%">Ποσό</th><th style="width:10%">Χρέωση</th></tr></thead>
-            <tbody>
-              <tr><td>Φ-302</td><td>Johnson T.</td><td>3× αναψυκτικό, 2× snack</td><td>€14</td><td><button class="btn btn-sm btn-dark" onclick="chargeMinibar(this)">Χρέωση</button></td></tr>
-              <tr><td>Δ-415</td><td>Γεωργίου Α.</td><td>1× κρασί, 1× nuts</td><td>€22</td><td><button class="btn btn-sm btn-dark" onclick="chargeMinibar(this)">Χρέωση</button></td></tr>
-            </tbody>
+            <thead><tr><th>Δωμάτιο</th><th>Πελάτης</th><th>Καταναλώσεις</th><th>Ποσό</th><th>Χρέωση</th></tr></thead>
+            <tbody></tbody>
           </table>
         </div>
       </div>
 
       <div class="view" id="v-policies">
         <div class="card">
-          <div class="card-hd"><div class="card-hd-l"><i class="ti ti-file-info" aria-hidden="true"></i>Πολιτική Κρατήσεων & Ακυρώσεων</div></div>
+          <div class="card-hd"><div class="card-hd-l"><i class="ti ti-file-info" aria-hidden="true"></i>Πολιτική Κρατήσεων</div></div>
           <table>
-            <thead><tr><th style="width:40%">Τύπος κράτησης</th><th style="width:30%">Προκαταβολή</th><th style="width:30%">Ακύρωση</th></tr></thead>
+            <thead><tr><th>Τύπος κράτησης</th><th>Προκαταβολή</th><th>Ακύρωση</th></tr></thead>
             <tbody>
-              <tr><td>Ιδιώτης >90 ημέρες πριν</td><td>50% της αξίας</td><td>Πλήρης επιστροφή εκτός 15νθμ.</td></tr>
-              <tr><td>Τηλεφωνική / walk-in</td><td>20% ή πιστ. κάρτα</td><td>Απώλεια προκαταβολής στις <=15 ημέρες. Νωρίτερα επιστρέφεται όλη.</td></tr>
-              <tr><td>Γκρουπ >20 άτομα</td><td>Ειδική Έκπτωση Υ%</td><td>Πλήρης επιστροφή μόνο εάν ακυρώσουν 2 μήνες νωρίτερα.</td></tr>
+              <tr><td>Ιδιώτης άνω των 90 ημερών</td><td>50% της αξίας</td><td>Πλήρης επιστροφή εκτός 15νθμ.</td></tr>
+              <tr><td>Τηλεφωνική / walk-in</td><td>20% ή κάρτα</td><td>Απώλεια προκαταβολής στις 15 ημέρες ή λιγότερο.</td></tr>
+              <tr><td>Γκρουπ άνω των 20 ατόμων</td><td>Ειδική Έκπτωση</td><td>Πλήρης επιστροφή μόνο εάν ακυρώσουν 2 μήνες νωρίτερα.</td></tr>
             </tbody>
           </table>
         </div>
@@ -216,28 +197,28 @@
     </div>
   </div>
 </div>
+
 <div id="checkin-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
-  <div class="card" style="width: 400px; background: var(--color-bg); padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-    <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;"><i class="ti ti-key"></i> Εκχώρηση Δωματίου</h3>
-    <p style="margin-bottom:15px; color:var(--color-text-secondary);">Πελάτης: <strong id="modal-cust-name" style="color:var(--color-text)"></strong></p>
-    
+  <div class="card" style="width: 400px; background: var(--color-bg); padding: 25px; border-radius: 12px;">
+    <h3><i class="ti ti-key"></i> Εκχώρηση Δωματίου</h3>
+    <p>Πελάτης: <strong id="modal-cust-name"></strong></p>
     <div class="fg">
-        <label>Επιλογή διαθέσιμου (Καθαρού) δωματίου:</label>
-        <select id="modal-room-select" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
+        <label>Διαθέσιμο δωμάτιο:</label>
+        <select id="modal-room-select" style="width:100%; padding:8px;"></select>
     </div>
-    
     <div style="display:flex; gap:10px; margin-top:25px;">
         <button class="btn btn-dark" style="flex:1" onclick="confirmCheckin()">Επιβεβαίωση</button>
         <button class="btn" style="flex:1" onclick="closeModal()">Ακύρωση</button>
     </div>
   </div>
 </div>
+
 <div id="toast-container" class="toast-container"></div>
-<script type="module" src="/js/supabase-config.js"></script>
 
+<script type="module" src="../js/supabase-config.js"></script>
 <script src="../js/receptionist.js"></script>
-
 <script src="../js/login.js"></script>
-<script type="module" src="/js/app.js"></script>
+<script type="module" src="../js/app.js"></script>
+
 </body>
 </html>
