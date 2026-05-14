@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Σύνδεση - Grand Kavala</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/login.css"> </head>
+    <link rel="stylesheet" href="/css/login.css">
+</head>
 <body>
 
     <div class="login-container">
@@ -14,7 +15,7 @@
             <p>Σύστημα Διαχείρισης Ξενοδοχείου</p>
         </div>
 
-        <form onsubmit="event.preventDefault(); login();">
+        <form id="login-form">
             <div class="form-group">
                 <label for="username">Όνομα Χρήστη</label>
                 <input type="text" id="username" placeholder="π.χ. admin" required>
@@ -31,40 +32,7 @@
 
     <div id="error-message">Λάθος όνομα χρήστη ή κωδικός!</div>
 
-    <script>
-        // Εδώ βάζεις την JS συνάρτηση login() που έφτιαξες
-        function login() {
-            const username = document.getElementById("username").value.trim();
-            const password = document.getElementById("password").value.trim();
-            const error = document.getElementById("error-message");
-
-            if (username === "admin" && password === "1234") {
-                error.classList.remove("show");
-                alert("Επιτυχής σύνδεση ως Admin!");
-                window.location.href = "../pages/admin.html";
-            } else if (username === "receptionist" && password === "5678") {
-                error.classList.remove("show");
-                alert("Επιτυχής σύνδεση ως Receptionist!");
-                window.location.href = "../pages/receptionist.html"; // Βεβαιώσου ότι το path είναι σωστό
-            } else if (username === "maid" && password === "1212") {
-                error.classList.remove("show");
-                alert("Επιτυχής σύνδεση ως Maid!");
-                window.location.href = "../pages/maid.html"; // Βεβαιώσου ότι το path είναι σωστό
-            } else if (username === "minibar" && password === "1111") {
-                error.classList.remove("show");
-                alert("Επιτυχής σύνδεση ως Mini-bar!");
-                window.location.href = "../pages/minibar.html"; // Βεβαιώσου ότι το path είναι σωστό
-            } else {
-                error.classList.add("show");
-                
-                // Προαιρετικό: Κρύβει το μήνυμα αυτόματα μετά από 3 δευτερόλεπτα
-                setTimeout(() => {
-                    error.classList.remove("show");
-                }, 3000);
-            }
-        }
-    </script>
     <script type="module" src="/js/supabase-config.js"></script>
-    <script type="module" src="/js/app.js"></script>
+    <script type="module" src="/js/login.js"></script>
 </body>
 </html>

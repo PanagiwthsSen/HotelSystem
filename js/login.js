@@ -1,64 +1,67 @@
-function login() {
-    // 1. Παίρνουμε τις τιμές που έγραψε ο χρήστης
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value.trim();
-    
-    // 2. Εντοπίζουμε το κουτί του μηνύματος λάθους
-    const error = document.getElementById("error-message");
-
-    // 3. Έλεγχος στοιχείων για Admin
-    if (username === "admin" && password === "1234") {
-        error.classList.remove("show"); // Κρύβουμε τυχόν παλιό σφάλμα
-        alert("Επιτυχής σύνδεση ως Admin!");
-        
-        // Ανακατεύθυνση στη σελίδα του Admin (άλλαξε το path αν χρειάζεται)
-        window.location.href = "../pages/admin.html"; 
-
-    // 4. Έλεγχος στοιχείων για Receptionist
-    } else if (username === "receptionist" && password === "5678") {
-        error.classList.remove("show"); // Κρύβουμε τυχόν παλιό σφάλμα
-        alert("Επιτυχής σύνδεση ως Receptionist!");
-        
-        // Ανακατεύθυνση στη σελίδα του Ρεσεψιονίστ (άλλαξε το path αν χρειάζεται)
-        window.location.href = "../pages/receptionist.html"; 
-
-    // 5. Έλεγχος στοιχείων για Maid
-    } else if (username === "maid" && password === "1212") {
-        error.classList.remove("show"); // Κρύβουμε τυχόν παλιό σφάλμα
-        alert("Επιτυχής σύνδεση ως Maid!");
-        
-        // Ανακατεύθυνση στη σελίδα του Maid (άλλαξε το path αν χρειάζεται)
-        window.location.href = "../pages/maid.html"; 
-        
-    // 6. Έλεγχος στοιχείων για Minibar
-    } else if (username === "minibar" && password === "1111") {
-        error.classList.remove("show"); // Κρύβουμε τυχόν παλιό σφάλμα
-        alert("Επιτυχής σύνδεση ως Mini-bar!");
-        
-        // Ανακατεύθυνση στη σελίδα του Mini-bar (άλλαξε το path αν χρειάζεται)
-         window.location.href = "../pages/minibar.html"; 
-    } else {
-        // Εμφάνιση του αναδυόμενου μηνύματος λάθους
-        error.classList.add("show");
-        
-        // Κρύβουμε το μήνυμα αυτόματα μετά από 3 δευτερόλεπτα (3000ms)
-        setTimeout(() => {
-            error.classList.remove("show");
-        }, 3000);
-    }
-}
-
-function logout() {
-    // Ελέγχει αν υπάρχει η συνάρτηση showToast στη συγκεκριμένη σελίδα
-    if (typeof showToast === "function") {
-        showToast("Γίνεται αποσύνδεση... Παρακαλώ περιμένετε.", "info");
-    } else {
-        // Αν δεν υπάρχει, βγάζει απλό μήνυμα
-        alert("Γίνεται αποσύνδεση...");
+document.addEventListener('DOMContentLoaded', () => {
+    // Έλεγχος αν ο χρήστης είναι ήδη συνδεδεμένος
+    const savedUser = localStorage.getItem('hotel_user');
+    if (savedUser) {
+        const user = JSON.parse(savedUser);
+        redirectToRole(user.Role);
+        return;
     }
 
-    // Περιμένει 1.5 δευτερόλεπτο και σε πάει στο login
-    setTimeout(() => {
-        window.location.href = "login.html"; // Βεβαιώσου ότι αυτό είναι το σωστό path!
-    }, 1500);
-}
+    const loginForm = document.getElementById('login-form');
+    const errorMsg = document.getElementById('error-message');
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const usernameInput = document.getElementById('username').value.trim();
+            const passwordInput = document.getElementById('password').value.trim();
+
+            try {
+                // Αναζήτηση στον πίνακα EMPLOYEE
+                const { data, error } = await window.supabase
+                    .from('EMPLOYEE')
+                    .select('EmpID, FullName, Role, isActive')
+                    .eq('Username', usernameInput)
+                    .eq('Password', passwordInput)
+                    .maybeSingle()
+
+                if (error) throw error;
+
+                if (data) {
+                    if (!data.isActive) {
+                        alert("Ο λογαριασμός σας είναι ανενεργός.");
+                        return;
+                    }
+
+                    // Αποθήκευση συνεδρίας (session)
+                    localStorage.setItem('hotel_user', JSON.stringify({
+                        id: data.EmpID,
+                        name: data.FullName,
+                        Role: data.Role
+                    }));
+
+                    alert(`Καλωσήρθες, ${data.FullName}!`);
+                    redirectToRole(data.Role);
+                }
+            } catch (err) {
+                console.error("Σφάλμα:", err.message);
+                showError();
+            }
+        });
+    }
+
+    function showError() {
+        errorMsg.classList.add('show');
+        setTimeout(() => { errorMsg.classList.remove('show'); }, 3000);
+    }
+
+    function redirectToRole(role) {
+        const r = role.toLowerCase().trim();
+        if (r === 'admin' || r === 'manager') window.location.href = "/pages/admin.html";
+        else if (r === 'receptionist') window.location.href = "/pages/receptionist.html";
+        else if (r === 'maid') window.location.href = "/pages/maid.html";
+        else if (r === 'minibar') window.location.href = "/pages/minibar.html";
+        else alert("Άγνωστος ρόλος: " + role);
+    }
+});

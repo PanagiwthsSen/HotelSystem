@@ -1,3 +1,17 @@
+// ΠΡΟΣΘΗΚΗ ΣΤΗΝ ΑΡΧΗ ΤΟΥ admin.js
+const userData = localStorage.getItem('hotel_user');
+if (!userData) {
+    // Αν δεν υπάρχει καν χρήστης στη μνήμη, πήγαινε στο login
+    window.location.href = "/pages/login.html";
+} else {
+    const user = JSON.parse(userData);
+    const role = user.Role.toLowerCase().trim();
+    // Αν είναι συνδεδεμένος αλλά ΔΕΝ είναι admin ή manager, πέτα τον έξω
+    if (role !== 'admin' && role !== 'manager') {
+        alert("Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη σελίδα!");
+        window.location.href = "/pages/login.html";
+    }
+}
 /* ==============================================================
    TOAST NOTIFICATION SYSTEM (ΖΩΝΤΑΝΕΣ ΕΙΔΟΠΟΙΗΣΕΙΣ)
    ============================================================== */
@@ -341,6 +355,25 @@ function buildRevChart() {
             }
         }
     });
+}
+/* ==============================================================
+   ΛΕΙΤΟΥΡΓΙΑ ΑΠΟΣΥΝΔΕΣΗΣ (LOGOUT)
+   ============================================================== */
+function logout() {
+    // 1. Διαγραφή των δεδομένων του χρήστη από το localStorage
+    localStorage.removeItem('hotel_user');
+    
+    // 2. Εμφάνιση ενός μηνύματος (προαιρετικά)
+    alert("Αποσυνδεθήκατε επιτυχώς!");
+    
+    // 3. Ανακατεύθυνση στη σελίδα Login
+    window.location.href = "/pages/login.html";
+}
+
+// Σύνδεση του κουμπιού με τη συνάρτηση
+const logoutBtn = document.getElementById('logout-btn');
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', logout);
 }
 
 document.querySelectorAll('.sb-item').forEach(el => {
