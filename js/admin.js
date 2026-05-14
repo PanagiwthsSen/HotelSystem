@@ -1,3 +1,5 @@
+import { supabase } from './supabase-config.js';
+
 // ΠΡΟΣΘΗΚΗ ΣΤΗΝ ΑΡΧΗ ΤΟΥ admin.js
 const userData = localStorage.getItem('hotel_user');
 if (!userData) {
@@ -95,30 +97,87 @@ function dismissAdminNotif(el) {
 
 
 /* ==============================================================
-   ΔΗΜΙΟΥΡΓΙΑ 510 ΔΩΜΑΤΙΩΝ & LIVE STATS
+   ΚΑΤΑΣΤΑΣΗ ΔΩΜΑΤΙΩΝ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
    ============================================================== */
-const roomConfig = [
-    { prefix: 'Δ', count: 300, name: 'Δίκλινο' },
-    { prefix: 'Φ', count: 150, name: 'Φαρδύκλινο' },
-    { prefix: 'Μ', count: 50, name: 'Μονόκλινο' },
-    { prefix: 'Σ', count: 10, name: 'Σουίτα' }
-];
+let hotelRooms = []; // Κενός πίνακας που θα γεμίσει από τη βάση
 
-const hotelRooms = [];
-roomConfig.forEach(conf => {
-    for (let i = 1; i <= conf.count; i++) {
-        const r = Math.random();
-        let state = 'free';
-        if (r < 0.65) state = 'occ'; 
-        else if (r < 0.75) state = 'dirty';
-        else if (r < 0.85) state = 'clean';
-        hotelRooms.push({ id: `${conf.prefix}-${i}`, type: conf.name, state: state });
+// 1. Ασύγχρονη συνάρτηση για την ανάκτηση των δωματίων
+async function fetchRooms() {
+    try {
+        const rmap = document.getElementById('rmap');
+        if (rmap) rmap.innerHTML = '<div style="width:100%; text-align:center; padding: 2rem; color: var(--text-muted);"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 2rem;"></i><p>Φόρτωση δωματίων από Supabase...</p></div>';
+
+        // Τραβάμε τα δωμάτια ταξινομημένα με βάση τον αριθμό τους
+        // ... μέσα στη fetchRooms
+        const { data, error } = await supabase // <--- Χωρίς window.
+            .from('ROOM')
+            .select('RoomNumber, RoomType, Status')
+            .order('RoomNumber', { ascending: true });
+
+        if (error) throw error;
+
+        // 2. Μετατροπή των δεδομένων της βάσης στη μορφή που θέλει το frontend
+        hotelRooms = data.map(room => {
+            let uiState = 'free'; // Default κατάσταση
+            const dbStatus = room.Status ? room.Status.toLowerCase().trim() : '';
+            
+            // Έξυπνο mapping: Πιάνουμε διάφορες εκδοχές των λέξεων (π.χ. 'occupied', 'occ', 'cleaning')
+            if (dbStatus.includes('occup') || dbStatus === 'occ') uiState = 'occ';
+            else if (dbStatus.includes('clean') || dbStatus === 'dirty') uiState = 'dirty';
+            else if (dbStatus.includes('ready') || dbStatus === 'clean') uiState = 'clean';
+            else if (dbStatus.includes('avail') || dbStatus === 'free') uiState = 'free';
+
+            return {
+                id: room.RoomNumber,
+                type: room.RoomType,
+                state: uiState
+            };
+        });
+
+        // 3. Ζωγραφίζουμε το χάρτη με τα νέα δεδομένα
+        renderMap();
+        
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης δωματίων:", err.message);
+        showToast("Αποτυχία φόρτωσης χάρτη δωματίων από τη βάση.", "error");
     }
-});
+}
 
+// 4. Ζωγραφίζει τα κουτάκια (UI)
+function renderMap() {
+    const rmap = document.getElementById('rmap');
+    if (!rmap) return;
+    rmap.innerHTML = '';
+    
+    if (hotelRooms.length === 0) {
+        rmap.innerHTML = '<p style="color: var(--text-muted);">Δεν βρέθηκαν δωμάτια στη βάση.</p>';
+        calculateLiveStats(); // Μηδενίζει τα στατιστικά
+        return;
+    }
+
+    hotelRooms.forEach(r => {
+        const d = document.createElement('div');
+        d.className = 'rc rc-' + r.state;
+        d.textContent = r.id; 
+        
+        let stateGr = 'Ελεύθερο';
+        if (r.state === 'occ') stateGr = 'Κατειλημμένο';
+        else if (r.state === 'dirty') stateGr = 'Υπό Καθαρισμό';
+        else if (r.state === 'clean') stateGr = 'Έτοιμο';
+
+        d.title = `${r.type} ${r.id} | ${stateGr}`;
+        rmap.appendChild(d);
+    });
+    
+    calculateLiveStats();
+}
+
+// 5. Δυναμικός Υπολογισμός Στατιστικών (δεν χρησιμοποιούμε πια το "510" καρφωτά)
 let currentOcc = 0, currentFree = 0, currentDirty = 0, currentClean = 0;
 function calculateLiveStats() {
+    const totalRooms = hotelRooms.length || 1; // || 1 για αποφυγή διαίρεσης με το 0 αν η βάση είναι άδεια
     currentOcc = 0; currentFree = 0; currentDirty = 0; currentClean = 0;
+    
     hotelRooms.forEach(r => {
         if (r.state === 'occ') currentOcc++;
         else if (r.state === 'free') currentFree++;
@@ -126,14 +185,14 @@ function calculateLiveStats() {
         else if (r.state === 'clean') currentClean++;
     });
     
-    const occPct = Math.round((currentOcc / 510) * 100);
-    const freePct = Math.round((currentFree / 510) * 100);
+    const occPct = Math.round((currentOcc / totalRooms) * 100);
+    const freePct = Math.round((currentFree / totalRooms) * 100);
 
-    // Ενημέρωση UI
-    document.getElementById('live-occ-badge').textContent = `Πληρ. ${occPct}%`;
-    document.getElementById('dash-occ-val').textContent = `${occPct}%`;
-    document.getElementById('dash-occ-sub').textContent = `${currentOcc} / 510 δωμάτια`;
-    document.getElementById('dash-occ-bar').style.width = `${occPct}%`;
+    // Ενημέρωση UI στα dashboards
+    if(document.getElementById('live-occ-badge')) document.getElementById('live-occ-badge').textContent = `Πληρ. ${occPct}%`;
+    if(document.getElementById('dash-occ-val')) document.getElementById('dash-occ-val').textContent = `${occPct}%`;
+    if(document.getElementById('dash-occ-sub')) document.getElementById('dash-occ-sub').textContent = `${currentOcc} / ${hotelRooms.length} δωμάτια`;
+    if(document.getElementById('dash-occ-bar')) document.getElementById('dash-occ-bar').style.width = `${occPct}%`;
     
     if(document.getElementById('stat-occ')) {
         document.getElementById('stat-occ').textContent = currentOcc;
@@ -144,23 +203,12 @@ function calculateLiveStats() {
         document.getElementById('stat-dirty').textContent = currentDirty;
         document.getElementById('stat-clean').textContent = currentClean;
     }
-    checkDynamicPricing(occPct);
+    
+    if (typeof checkDynamicPricing === "function") checkDynamicPricing(occPct);
 }
 
-function renderMap() {
-    const rmap = document.getElementById('rmap');
-    if (!rmap) return;
-    rmap.innerHTML = '';
-    hotelRooms.forEach(r => {
-        const d = document.createElement('div');
-        d.className = 'rc rc-' + r.state;
-        d.textContent = r.id; 
-        d.title = `${r.type} ${r.id} | ${r.state === 'occ' ? 'Κατειλημμένο' : r.state === 'free' ? 'Ελεύθερο' : r.state === 'dirty' ? 'Υπό Καθαρισμό' : 'Έτοιμο'}`;
-        rmap.appendChild(d);
-    });
-    calculateLiveStats();
-}
-renderMap();
+// Εκκίνηση φόρτωσης όταν τρέξει το script
+fetchRooms();
 
 
 /* ==============================================================
@@ -234,43 +282,279 @@ function assignRoom(btn, roomNum) {
 /* ==============================================================
    ΚΟΥΜΠΙΑ: ΠΡΟΣΩΠΙΚΟ & ΠΑΡΑΠΟΝΑ
    ============================================================== */
-const staffData = [
-    {n:'Αναστασίου Κ.',dept:'Υποδοχή',since:'2021',leaves:'5',salary:'€850',score:'4.8'},
-    {n:'Δημητρίου Σ.',dept:'Εστιατόριο',since:'2019',leaves:'8',salary:'€780',score:'4.5'},
-    {n:'Νικολάου Π.',dept:'Καθαριότητα',since:'2022',leaves:'12',salary:'€700',score:'4.6'},
-];
-function renderStaff(filter){
-    const data = filter === 'all' ? staffData : staffData.filter(s => ({reception:'Υποδοχή',clean:'Καθαριότητα',restaurant:'Εστιατόριο'}[filter] === s.dept));
-    document.getElementById('staff-body').innerHTML = data.map(s => `<tr><td>${s.n}</td><td>${s.dept}</td><td>Από ${s.since}</td><td>${s.leaves} ημ.</td><td>${s.salary}</td><td>⭐${s.score}</td><td><button class="btn btn-sm" onclick="triggerAction('Προβολή καρτέλας: ${s.n}', 'info')"><i class="ti ti-eye" aria-hidden="true"></i></button></td></tr>`).join('');
-}
-if(document.getElementById('staff-body')) renderStaff('all');
+let staffData = [];
 
+// 1. Fetch δεδομένων από τη βάση
+async function fetchStaff() {
+    try {
+        const tbody = document.getElementById('staff-body');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση προσωπικού...</td></tr>';
+
+        // Τραβάμε μόνο τους ενεργούς (isActive = true) υπαλλήλους
+        const { data, error } = await supabase
+            .from('EMPLOYEE')
+            .select('FullName, Role, Salary, Leaves, Score')
+            .eq('isActive', true)
+            .order('Role', { ascending: true });
+
+        if (error) throw error;
+
+        // 2. Μετατροπή και προσαρμογή δεδομένων για το UI
+        staffData = data.map(emp => {
+            const roleKey = emp.Role ? emp.Role.toLowerCase().trim() : '';
+            let deptGR = emp.Role; // Default αν δεν ταιριάζει κάτι
+
+            // Μετάφραση των αγγλικών ρόλων της βάσης σε ελληνικά τμήματα
+            if (roleKey === 'receptionist') deptGR = 'Υποδοχή';
+            else if (roleKey === 'maid') deptGR = 'Καθαριότητα';
+            else if (roleKey === 'minibar' || roleKey === 'restaurant') deptGR = 'Εστιατόριο';
+            else if (roleKey === 'admin' || roleKey === 'manager') deptGR = 'Διοίκηση';
+
+            return {
+                n: emp.FullName || 'Χωρίς Όνομα',
+                dept: deptGR,
+                dbRole: roleKey,
+                since: '2024',
+                leaves: emp.Leaves !== null ? `${emp.Leaves} ημ.` : '0 ημ.', // <--- Από τη βάση
+                salary: `€${emp.Salary || 0}`,
+                score: emp.Score !== null ? `⭐${emp.Score}` : '⭐-'       // <--- Από τη βάση
+            };
+        });
+
+        renderStaff('all'); // Εμφάνιση όλων αρχικά
+
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης προσωπικού:", err.message);
+        showToast("Αποτυχία φόρτωσης προσωπικού.", "error");
+    }
+}
+
+// 3. Render του HTML
+function renderStaff(filter){
+    const tbody = document.getElementById('staff-body');
+    if (!tbody) return;
+
+    // Φιλτράρισμα με βάση τον αγγλικό ρόλο (dbRole)
+    const filteredData = filter === 'all' 
+        ? staffData 
+        : staffData.filter(s => {
+            if (filter === 'reception') return s.dbRole === 'receptionist';
+            if (filter === 'clean') return s.dbRole === 'maid';
+            if (filter === 'restaurant') return s.dbRole === 'minibar' || s.dbRole === 'restaurant';
+            return false;
+        });
+
+    if (filteredData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">Δεν βρέθηκαν υπάλληλοι σε αυτό το τμήμα.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filteredData.map(s => 
+        `<tr>
+            <td>${s.n}</td>
+            <td><span class="pill p-b">${s.dept}</span></td>
+            <td>Από ${s.since}</td>
+            <td>${s.leaves}</td>
+            <td>${s.salary}</td>
+            <td>${s.score}</td>
+            <td>
+                <button class="btn btn-sm" onclick="triggerAction('Προβολή καρτέλας: ${s.n}', 'info')">
+                    <i class="ti ti-eye" aria-hidden="true"></i>
+                </button>
+            </td>
+        </tr>`
+    ).join('');
+}
+
+// Λειτουργία των Tabs
 function stTab(f, el){
     document.querySelectorAll('#v-staff .tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
     renderStaff(f);
 }
 
-function resolveComplaint(btn) {
-    const row = btn.closest('tr');
-    row.cells[3].innerHTML = '<span class="pill p-g">Επιλύθηκε</span>';
-    btn.textContent = 'Αρχείο';
-    btn.classList.replace('btn-dark', 'btn');
-    btn.onclick = () => archiveComplaint(btn);
-    showToast("Το παράπονο επισημάνθηκε ως επιλυμένο.", "success");
-}
-
-function archiveComplaint(btn) {
-    const row = btn.closest('tr');
-    row.style.opacity = '0';
-    setTimeout(() => { row.remove(); showToast("Το παράπονο μεταφέρθηκε στο αρχείο.", "info"); }, 300);
-}
-
+// Ξεκινάει το fetch αν βρισκόμαστε στο σωστό σημείο
+if(document.getElementById('staff-body')) fetchStaff();
 
 /* ==============================================================
-   ΚΟΥΜΠΙΑ: ΕΣΤΙΑΤΟΡΙΟ (ΠΑΡΑΓΓΕΛΙΕΣ)
+   ΠΑΡΑΠΟΝΑ ΠΕΛΑΤΩΝ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
    ============================================================== */
-function placeOrder(btn, itemName) {
+async function fetchComplaints() {
+    try {
+        // Βεβαιώσου ότι στο HTML σου, το <tbody> των παραπόνων έχει id="complaints-body"
+        const tbody = document.getElementById('complaints-body');
+        if (!tbody) return; 
+
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση παραπόνων...</td></tr>';
+
+        // Τραβάμε τα παράπονα και κάνουμε JOIN τους πίνακες CUSTOMER & EMPLOYEE για να πάρουμε τα ονόματά τους
+        const { data, error } = await supabase
+            .from('COMPLAINT')
+            .select(`
+                ComplaintID, Description, Status, CreatedAt,
+                CUSTOMER (FullName),
+                EMPLOYEE (FullName)
+            `)
+            .order('CreatedAt', { ascending: false });
+
+        if (error) throw error;
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Δεν υπάρχουν παράπονα στο αρχείο.</td></tr>';
+            return;
+        }
+
+        // Χτίσιμο του HTML με βάση τα δεδομένα
+        tbody.innerHTML = data.map(c => {
+            const custName = c.CUSTOMER ? c.CUSTOMER.FullName : 'Άγνωστος Πελάτης';
+            const empName = c.EMPLOYEE ? c.EMPLOYEE.FullName : '-';
+            
+            // Μορφοποίηση ημερομηνίας
+            const dateObj = new Date(c.CreatedAt);
+            const dateStr = dateObj.toLocaleDateString('el-GR') + ' ' + dateObj.toLocaleTimeString('el-GR', {hour: '2-digit', minute:'2-digit'});
+            
+            let statusHtml = '';
+            let btnHtml = '';
+
+            // Ανάλογα με το Status, βγάζουμε τα σωστά κουμπιά και χρώματα
+            if (c.Status === 'pending') {
+                statusHtml = '<span class="pill p-r">Εκκρεμεί</span>';
+                btnHtml = `<button class="btn btn-dark btn-sm" onclick="resolveComplaint(this, ${c.ComplaintID})">Επίλυση</button>`;
+            } else {
+                statusHtml = '<span class="pill p-g">Επιλύθηκε</span>';
+                btnHtml = `<button class="btn btn-sm" onclick="archiveComplaint(this, ${c.ComplaintID})">Αρχείο</button>`;
+            }
+
+            return `
+                <tr id="comp-row-${c.ComplaintID}">
+                    <td>${dateStr}</td>
+                    <td><strong>${custName}</strong></td>
+                    <td>${c.Description} <br><small style="color:var(--text-muted)">Καταχωρήθηκε από: ${empName}</small></td>
+                    <td>${statusHtml}</td>
+                    <td>${btnHtml}</td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης παραπόνων:", err.message);
+        showToast("Αποτυχία φόρτωσης παραπόνων.", "error");
+    }
+}
+
+// Λειτουργία: Επίλυση Παραπόνου (UPDATE στη βάση)
+async function resolveComplaint(btn, id) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader" style="animation: spin 1s linear infinite;"></i>';
+    
+    try {
+        const { error } = await supabase
+            .from('COMPLAINT')
+            .update({ Status: 'resolved' })
+            .eq('ComplaintID', id);
+
+        if (error) throw error;
+        
+        showToast("Το παράπονο ενημερώθηκε επιτυχώς στη βάση!", "success");
+        fetchComplaints(); // Ξαναφορτώνουμε τη λίστα για να ανανεωθεί το UI
+    } catch (err) {
+        console.error(err);
+        showToast("Σφάλμα κατά την ενημέρωση.", "error");
+        btn.disabled = false;
+        btn.textContent = 'Επίλυση';
+    }
+}
+
+// Λειτουργία: Αρχειοθέτηση Παραπόνου (DELETE από τη βάση - Προαιρετικά μπορεί να είναι απλό hide)
+async function archiveComplaint(btn, id) {
+    btn.disabled = true;
+    try {
+        const { error } = await supabase
+            .from('COMPLAINT')
+            .delete()
+            .eq('ComplaintID', id);
+
+        if (error) throw error;
+        
+        showToast("Το παράπονο αρχειοθετήθηκε (διαγράφηκε).", "info");
+        
+        // Ομαλό animation αφαίρεσης από την οθόνη χωρίς ολόκληρο refresh
+        const row = document.getElementById(`comp-row-${id}`);
+        if(row) {
+            row.style.opacity = '0';
+            setTimeout(() => row.remove(), 300);
+        }
+    } catch (err) {
+        console.error(err);
+        showToast("Σφάλμα κατά τη διαγραφή.", "error");
+        btn.disabled = false;
+    }
+}
+
+// Κλήση της συνάρτησης όταν υπάρχει το αντίστοιχο element
+if(document.getElementById('complaints-body')) fetchComplaints();
+// Κάνουμε τις συναρτήσεις διαθέσιμες στο HTML (απαραίτητο για ES Modules)
+window.resolveComplaint = resolveComplaint;
+window.archiveComplaint = archiveComplaint;
+
+/* ==============================================================
+   ΕΣΤΙΑΤΟΡΙΟ & ΑΠΟΘΗΚΕΣ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
+   ============================================================== */
+async function fetchInventory() {
+    try {
+        const tbody = document.getElementById('inventory-body');
+        if (!tbody) return;
+
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση αποθήκης...</td></tr>';
+
+        const { data, error } = await supabase
+            .from('INVENTORY_ITEM')
+            .select('*')
+            .order('Category', { ascending: true })
+            .order('Name', { ascending: true });
+
+        if (error) throw error;
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Δεν υπάρχουν προϊόντα στην αποθήκη.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(item => {
+            let statusHtml = '';
+            let btnHtml = '';
+
+            // Λογική για το χρώμα και το κουμπί με βάση το απόθεμα
+            if (item.Quantity === 0) {
+                statusHtml = '<span class="pill p-r">Εξαντλήθηκε</span>';
+                btnHtml = `<button class="btn btn-dark btn-sm" onclick="placeOrder(this, '${item.Name}')">Παραγγελία</button>`;
+            } else if (item.Quantity <= item.MinThreshold) {
+                statusHtml = '<span class="pill p-a">Οριακό Απόθεμα</span>';
+                btnHtml = `<button class="btn btn-dark btn-sm" onclick="placeOrder(this, '${item.Name}')">Παραγγελία</button>`;
+            } else {
+                statusHtml = '<span class="pill p-g">Επαρκές</span>';
+                btnHtml = `<span style="color: var(--text-muted)">-</span>`;
+            }
+
+            return `
+                <tr>
+                    <td><strong>${item.Name}</strong></td>
+                    <td>${item.Category}</td>
+                    <td>${item.Quantity} τεμ. <br><small style="color:var(--text-muted)">(Όριο: ${item.MinThreshold})</small></td>
+                    <td>${statusHtml}</td>
+                    <td>${btnHtml}</td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης αποθήκης:", err.message);
+        showToast("Αποτυχία φόρτωσης αποθήκης.", "error");
+    }
+}
+
+// Συνάρτηση Παραγγελίας (Εκτεθειμένη στο window για το Vite)
+window.placeOrder = function(btn, itemName) {
     btn.disabled = true;
     btn.textContent = "Παραγγέλθηκε";
     btn.classList.replace('btn-dark', 'btn');
@@ -281,11 +565,126 @@ function placeOrder(btn, itemName) {
     showToast(`Στάλθηκε αυτόματη παραγγελία στον προμηθευτή για: ${itemName}`, "success");
 }
 
+// Εκκίνηση Φόρτωσης
+if(document.getElementById('inventory-body')) fetchInventory();
 
 /* ==============================================================
-   ΚΟΥΜΠΙΑ: ΕΝΟΙΚΙΑΖΟΜΕΝΑ (ΝΟΜΙΚΕΣ ΕΙΔΟΠΟΙΗΣΕΙΣ)
+   ΟΧΗΜΑΤΑ & ΜΕΤΑΦΟΡΕΣ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
    ============================================================== */
-function sendNotice(btn, type) {
+async function fetchVehicles() {
+    try {
+        const tbody = document.getElementById('vehicles-body');
+        if (!tbody) return;
+
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση στόλου οχημάτων...</td></tr>';
+
+        const { data, error } = await supabase
+            .from('VEHICLE')
+            .select('*')
+            .order('Type', { ascending: true });
+
+        if (error) throw error;
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">Δεν υπάρχουν καταχωρημένα οχήματα.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(v => {
+            let statusHtml = '';
+            let statusText = '';
+            const dbStatus = v.Status ? v.Status.toLowerCase() : '';
+
+            // Mapping καταστάσεων σε UI Elements
+            if (dbStatus === 'available') {
+                statusHtml = '<span class="pill p-g">Διαθέσιμο</span>';
+                statusText = 'available';
+            } else if (dbStatus === 'in_use') {
+                statusHtml = '<span class="pill p-b">Σε Δρομολόγιο</span>';
+                statusText = 'in_use';
+            } else if (dbStatus === 'maintenance') {
+                statusHtml = '<span class="pill p-r">Σε Συντήρηση</span>';
+                statusText = 'maintenance';
+            } else {
+                statusHtml = `<span class="pill p-a">${v.Status}</span>`;
+            }
+
+            return `
+                <tr>
+                    <td><strong>${v.Type}</strong></td>
+                    <td><code style="background:var(--bg-card); padding:2px 6px; border-radius:4px;">${v.PlateNumber}</code></td>
+                    <td>${statusHtml}</td>
+                    <td>
+                        <button class="btn btn-sm" onclick="triggerAction('Προγραμματισμός δρομολογίου για: ${v.PlateNumber}', 'info')">
+                            <i class="ti ti-calendar-event"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης οχημάτων:", err.message);
+        showToast("Αποτυχία φόρτωσης στόλου οχημάτων.", "error");
+    }
+}
+
+// Εκκίνηση Φόρτωσης
+if(document.getElementById('vehicles-body')) fetchVehicles();
+
+
+/* ==============================================================
+   ΕΝΟΙΚΙΑΖΟΜΕΝΑ ΚΑΤΑΣΤΗΜΑΤΑ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
+   ============================================================== */
+async function fetchRentals() {
+    try {
+        const tbody = document.getElementById('rentals-body');
+        if (!tbody) return;
+
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση μισθώσεων...</td></tr>';
+
+        // Join RENTED_SHOP με LEASE_PAYMENT
+        const { data, error } = await supabase
+            .from('RENTED_SHOP')
+            .select(`
+                ShopID, ShopName, TenantName, MonthlyRent,
+                LEASE_PAYMENT (IsDelayed)
+            `);
+
+        if (error) throw error;
+
+        tbody.innerHTML = data.map(shop => {
+            // Παίρνουμε την κατάσταση πληρωμής (αν υπάρχει εγγραφή)
+            const payment = shop.LEASE_PAYMENT && shop.LEASE_PAYMENT.length > 0 ? shop.LEASE_PAYMENT[0] : null;
+            const isDelayed = payment ? payment.IsDelayed : false;
+
+            const statusHtml = isDelayed 
+                ? '<span class="pill p-r">Εκκρεμεί / Καθυστέρηση</span>' 
+                : '<span class="pill p-g">Πληρώθηκε</span>';
+
+            const actionBtn = isDelayed
+                ? `<button class="btn btn-dark btn-sm" onclick="sendNotice(this, 'legal')">Εξώδικο</button>`
+                : `<button class="btn btn-sm" onclick="sendNotice(this, 'friendly')">Υπενθύμιση</button>`;
+
+            return `
+                <tr>
+                    <td><strong>${shop.ShopName || 'Κατάστημα ' + shop.ShopID}</strong></td>
+                    <td>${shop.TenantName}</td>
+                    <td>€${shop.MonthlyRent}</td>
+                    <td>${statusHtml}</td>
+                    <td>${actionBtn}</td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης ενοικίων:", err.message);
+        showToast("Αποτυχία ενημέρωσης μισθώσεων.", "error");
+    }
+}
+
+// Εκθέτουμε τη συνάρτηση ειδοποιήσεων για το Vite
+window.sendNotice = function(btn, type) {
     btn.disabled = true;
     if(type === 'legal') {
         btn.textContent = "Εστάλη Εξώδικο";
@@ -294,8 +693,84 @@ function sendNotice(btn, type) {
         btn.textContent = "Εστάλη";
         showToast("Η φιλική υπενθύμιση εστάλη στον ενοικιαστή.", "success");
     }
+};
+
+// Εκκίνηση Φόρτωσης
+if(document.getElementById('rentals-body')) fetchRentals();
+
+/* ==============================================================
+   ΜΙΣΘΟΔΟΣΙΑ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
+   ============================================================== */
+async function fetchPayroll() {
+    try {
+        const tbody = document.getElementById('payroll-body');
+        if (!tbody) return;
+
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Υπολογισμός μισθοδοσίας...</td></tr>';
+
+        const { data, error } = await supabase
+            .from('EMPLOYEE')
+            .select('EmpID, FullName, Role, Salary, IBAN, LastPaymentDate')
+            .eq('isActive', true)
+            .order('FullName', { ascending: true });
+
+        if (error) throw error;
+
+        tbody.innerHTML = data.map(emp => {
+            const lastDate = emp.LastPaymentDate ? new Date(emp.LastPaymentDate).toLocaleDateString('el-GR') : 'Ποτέ';
+            const ibanFormatted = emp.IBAN ? `<code>${emp.IBAN.substring(0, 4)}...${emp.IBAN.slice(-4)}</code>` : '<span class="pill p-r">Λείπει IBAN</span>';
+            
+            return `
+                <tr>
+                    <td><strong>${emp.FullName}</strong></td>
+                    <td><span class="pill p-b">${emp.Role}</span></td>
+                    <td>€${emp.Salary}</td>
+                    <td>${ibanFormatted}</td>
+                    <td>${lastDate}</td>
+                    <td>
+                        <button class="btn btn-dark btn-sm" onclick="payEmployee(this, ${emp.EmpID}, '${emp.FullName}')">
+                            Πληρωμή
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Σφάλμα μισθοδοσίας:", err.message);
+        showToast("Αποτυχία φόρτωσης μισθοδοσίας.", "error");
+    }
 }
 
+// Λειτουργία Πληρωμής (Ενημέρωση ημερομηνίας στη βάση)
+window.payEmployee = async function(btn, id, name) {
+    if (!confirm(`Επιβεβαίωση πληρωμής για τον/την ${name};`)) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader" style="animation: spin 1s linear infinite;"></i>';
+
+    const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+
+    try {
+        const { error } = await supabase
+            .from('EMPLOYEE')
+            .update({ LastPaymentDate: today })
+            .eq('EmpID', id);
+
+        if (error) throw error;
+
+        showToast(`Η πληρωμή για τον/την ${name} ολοκληρώθηκε!`, "success");
+        fetchPayroll(); // Ανανέωση πίνακα
+    } catch (err) {
+        console.error(err);
+        showToast("Σφάλμα κατά την πληρωμή.", "error");
+        btn.disabled = false;
+        btn.textContent = "Πληρωμή";
+    }
+};
+
+// Εκκίνηση Φόρτωσης
+if(document.getElementById('payroll-body')) fetchPayroll();
 
 /* ==============================================================
    ΚΟΥΜΠΙΑ: BACKUP SYSTEM

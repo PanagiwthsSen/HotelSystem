@@ -10,4 +10,4 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 // Δημιουργία του client και ανάθεση στο window για να είναι global
-window.supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey);

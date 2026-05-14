@@ -188,10 +188,16 @@
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-message-report" aria-hidden="true"></i>Παράπονα Πελατών</div></div>
       <table id="complaints-table">
-        <thead><tr><th style="width:14%">Ημερ.</th><th style="width:24%">Υπάλληλος</th><th style="width:38%">Παράπονο</th><th style="width:14%">Κατάσταση</th><th style="width:10%"></th></tr></thead>
-        <tbody>
-          <tr><td>Σήμερα</td><td>Παπάς Δ.</td><td>Αργοπορία στο room service</td><td><span class="pill p-a">Εκκρεμεί</span></td><td><button class="btn btn-sm btn-dark" onclick="resolveComplaint(this)">Διαχ.</button></td></tr>
-          <tr><td>04/05</td><td>Κοντού Μ.</td><td>Λανθασμένη χρέωση mini-bar</td><td><span class="pill p-g">Επιλύθηκε</span></td><td><button class="btn btn-sm" onclick="archiveComplaint(this)">Αρχείο</button></td></tr>
+        <thead>
+          <tr>
+            <th style="width:14%">Ημερ.</th>
+            <th style="width:24%">Υπάλληλος / Πελάτης</th> <th style="width:38%">Παράπονο</th>
+            <th style="width:14%">Κατάσταση</th>
+            <th style="width:10%"></th>
+          </tr>
+        </thead>
+        <tbody id="complaints-body">
+          
         </tbody>
       </table>
     </div>
@@ -200,29 +206,38 @@
   <div class="view" id="v-restaurant">
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-package" aria-hidden="true"></i>Αποθέματα & Ελάχιστα Επίπεδα</div><button class="btn btn-sm btn-dark" onclick="triggerAction('Άνοιγμα φόρμας νέας μαζικής παραγγελίας...', 'info')"><i class="ti ti-plus" aria-hidden="true"></i> Νέα Παραγγελία</button></div>
-      <table>
-        <thead><tr><th style="width:24%">Είδος</th><th style="width:16%">Αποθήκη</th><th style="width:14%">Ποσότητα</th><th style="width:14%">Ελάχ.</th><th style="width:16%">Κατάσταση</th><th style="width:16%">Ενέργεια</th></tr></thead>
-        <tbody>
-          <tr><td>Κρασί Merlot</td><td>Εστιατόριο</td><td>8 φιάλες</td><td>20</td><td><span class="pill p-r">Κάτω ελαχ.</span></td><td><button class="btn btn-sm btn-dark" onclick="placeOrder(this, 'Κρασί Merlot')">Παραγγελία</button></td></tr>
-          <tr><td>Ελαιόλαδο ΠΟΠ</td><td>Εστιατόριο</td><td>45 lt</td><td>20</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
-          <tr><td>Μπύρα Pilsner</td><td>Bar</td><td>22 κιβ.</td><td>15</td><td><span class="pill p-a">Κοντά</span></td><td><button class="btn btn-sm btn-dark" onclick="placeOrder(this, 'Μπύρα Pilsner')">Παραγγελία</button></td></tr>
-          <tr><td>Αναψυκτικά</td><td>Mini-bar</td><td>144 τεμ.</td><td>60</td><td><span class="pill p-g">OK</span></td><td>—</td></tr>
-        </tbody>
-      </table>
+      <table id="inventory-table">
+      <thead>
+        <tr>
+          <th>Προϊόν</th>
+          <th>Κατηγορία</th>
+          <th>Απόθεμα</th>
+          <th>Κατάσταση</th>
+          <th>Ενέργεια</th>
+        </tr>
+      </thead>
+    <tbody id="inventory-body">
+    </tbody>
+</table>
     </div>
   </div>
 
   <div class="view" id="v-rentals">
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-building-store" aria-hidden="true"></i>Ενοικιαζόμενα Καταστήματα</div></div>
-      <table>
-        <thead><tr><th style="width:28%">Κατάστημα</th><th style="width:16%">Μίσθωμα</th><th style="width:18%">Τελ. πληρωμή</th><th style="width:18%">Μαΐου 2026</th><th style="width:20%">Ενέργεια</th></tr></thead>
-        <tbody>
-          <tr><td>Ελλάδα Gift Shop</td><td>€850</td><td>09/05/2026</td><td><span class="pill p-g">Εξοφλήθηκε</span></td><td>—</td></tr>
-          <tr class="highlight-row" style="background:#FCEBEB"><td>Cafeteria Sunrise</td><td>€1.200</td><td>02/04/2026</td><td><span class="pill p-r">Καθυστέρηση</span></td><td><button class="btn btn-sm" style="border-color:#F09595;color:#791F1F" onclick="sendNotice(this, 'legal')">Όχληση δικηγόρο</button></td></tr>
-          <tr><td>Pharmacy Point</td><td>€700</td><td>05/05/2026</td><td><span class="pill p-a">Μερική</span></td><td><button class="btn btn-sm" onclick="sendNotice(this, 'reminder')">Υπενθύμιση</button></td></tr>
-        </tbody>
-      </table>
+      <table id="rentals-table">
+        <thead>
+          <tr>
+            <th>Κατάστημα / Επιχείρηση</th>
+            <th>Ενοικιαστής</th>
+            <th>Μηνιαίο Μίσθωμα</th>
+            <th>Κατάσταση Πληρωμής</th>
+            <th>Ενέργειες</th>
+          </tr>
+        </thead>
+      <tbody id="rentals-body">
+    </tbody>
+</table>
     </div>
   </div>
 
@@ -253,10 +268,57 @@
     </div>
   </div>
 
-  <div class="view" id="v-vehicles"><div class="card"><div class="card-hd">Οχήματα</div><button class="btn btn-sm btn-dark" onclick="triggerAction('Λήψη αναφοράς στόλου...', 'success')">Αναφορά</button></div></div>
-  <div class="view" id="v-gardens"><div class="card"><div class="card-hd">Κήποι</div></div></div>
-  <div class="view" id="v-payroll"><div class="card"><div class="card-hd"><div class="card-hd-l">Μισθοδοσία</div><button class="btn btn-sm btn-dark" onclick="triggerAction('Εξαγωγή μισθοδοσίας Excel...', 'success')"><i class="ti ti-download" aria-hidden="true"></i> Εξαγωγή</button></div></div></div>
+  <div class="view" id="v-vehicles">
+  <div class="card">
+    
+    <div class="card-hd">
+      <div class="card-hd-l">
+        <i class="ti ti-car" aria-hidden="true"></i> Στόλος Οχημάτων
+      </div>
+      <button class="btn btn-sm btn-dark" onclick="triggerAction('Λήψη αναφοράς στόλου...', 'success')">Αναφορά</button>
+    </div>
 
+    <table id="vehicles-table">
+      <thead>
+        <tr>
+          <th style="width:35%">Όχημα / Μοντέλο</th>
+          <th style="width:20%">Πινακίδα</th>
+          <th style="width:25%">Κατάσταση</th>
+          <th style="width:20%">Ενέργεια</th>
+        </tr>
+      </thead>
+      <tbody id="vehicles-body">
+        </tbody>
+    </table>
+    
+  </div>
+</div>
+  <div class="view" id="v-gardens"><div class="card"><div class="card-hd">Κήποι</div></div></div>
+<div class="view" id="v-payroll">
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-hd-l">
+        <i class="ti ti-cash-banknote" aria-hidden="true"></i> Τρέχουσα Μισθοδοσία
+      </div>
+      <button class="btn btn-sm btn-dark" onclick="triggerAction('Εξαγωγή αρχείου τράπεζας (SEPA)...', 'info')">Εξαγωγή SEPA</button>
+    </div>
+
+    <table id="payroll-table">
+      <thead>
+        <tr>
+          <th>Υπάλληλος</th>
+          <th>Ρόλος / Τμήμα</th>
+          <th>Μηνιαίος Μισθός</th>
+          <th>IBAN Λογαριασμού</th>
+          <th>Τελ. Πληρωμή</th>
+          <th>Ενέργεια</th>
+        </tr>
+      </thead>
+      <tbody id="payroll-body">
+        </tbody>
+    </table>
+  </div>
+</div>
   </div>
 </div>
 </div>
@@ -264,8 +326,8 @@
 <div id="toast-container" class="toast-container"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script type="module" src="/js/admin.js"></script>
-<script type="module" src="/js/supabase-config.js"></script>
+<script type="module" src="../js/admin.js"></script>
+<script type="module" src="../js/supabase-config.js"></script>
 
 
 </body>

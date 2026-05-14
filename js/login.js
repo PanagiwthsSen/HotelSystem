@@ -1,3 +1,5 @@
+import { supabase } from './supabase-config.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     // Έλεγχος αν ο χρήστης είναι ήδη συνδεδεμένος
     const savedUser = localStorage.getItem('hotel_user');
@@ -19,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Αναζήτηση στον πίνακα EMPLOYEE
-                const { data, error } = await window.supabase
+                const { data, error } = await supabase
                     .from('EMPLOYEE')
                     .select('EmpID, FullName, Role, isActive')
                     .eq('Username', usernameInput)
