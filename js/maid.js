@@ -127,6 +127,17 @@ function showToast(id,msg){
   setTimeout(()=>el.classList.remove('show'),3200);
 }
 
+function logout() {
+    // 1. Διαγραφή των δεδομένων του χρήστη από το localStorage
+    localStorage.removeItem('hotel_user');
+    
+    // 2. Εμφάνιση ενός μηνύματος (προαιρετικά)
+    alert("Αποσυνδεθήκατε επιτυχώς!");
+    
+    // 3. Ανακατεύθυνση στη σελίδα Login
+    window.location.href = "/pages/login.html";
+}
+
 const logList=document.getElementById('log-list');
 function addLog(msg){
   if(!logList)return;

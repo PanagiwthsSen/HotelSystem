@@ -23,12 +23,7 @@ function showToast(message, type = 'success') {
 }
 
 /* ==============================================================
-   LOGOUT RECEPTIONIST
-   ============================================================== */
-
-
-/* ==============================================================
-   NAVIGATION
+   NAVIGATION & LIVE TIME
    ============================================================== */
 const viewTitles = {
     dash: 'Επισκόπηση', rooms: 'Κατάσταση Δωματίων', 'new-booking': 'Νέα Κράτηση',
@@ -46,44 +41,57 @@ document.querySelectorAll('.sb-item').forEach(el => {
     el.addEventListener('click', () => navTo(el.dataset.v));
 });
 
-/* ==============================================================
-   LIVE TIME
-   ============================================================== */
 function updateLiveTime() {
     const now = new Date();
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-    document.getElementById('live-time').innerHTML = now.toLocaleDateString('el-GR', options);
+    const liveTimeEl = document.getElementById('live-time');
+    if(liveTimeEl) liveTimeEl.innerHTML = now.toLocaleDateString('el-GR', options);
 }
 setInterval(updateLiveTime, 60000);
 updateLiveTime();
 
 /* ==============================================================
-   ROOMS GENERATION & LIVE STATS
+   STATE & ROOMS FETCHING (SUPABASE)
    ============================================================== */
-const roomConfig = [
-    { prefix: 'Δ', count: 300, name: 'Δίκλινο' },
-    { prefix: 'Φ', count: 150, name: 'Φαρδύκλινο' },
-    { prefix: 'Μ', count: 50, name: 'Μονόκλινο' },
-    { prefix: 'Σ', count: 10, name: 'Σουίτα' }
-];
-
-const hotelRooms = [];
-roomConfig.forEach(conf => {
-    for (let i = 1; i <= conf.count; i++) {
-        const r = Math.random();
-        let state = 'free'; // Άδειο χωρίς καθαριότητα
-        if (r < 0.65) state = 'occ'; // Κατειλημμένο
-        else if (r < 0.75) state = 'dirty'; // Προσεχώς άδειο / Υπό καθαρισμό
-        else if (r < 0.85) state = 'clean'; // Έτοιμο για νέο πελάτη
-        
-        hotelRooms.push({ id: `${conf.prefix}-${i}`, type: conf.name, state: state });
-    }
-});
-
+let hotelRooms = [];
 let currentOcc = 0, currentFree = 0, currentDirty = 0, currentClean = 0;
+
+function mapDbStatusToUI(dbStatus) {
+    switch (dbStatus) {
+        case 'Occupied': case 'occ': return 'occ';
+        case 'Available': case 'free': return 'free'; 
+        case 'Cleaning': case 'dirty': return 'dirty';
+        case 'Clean': case 'clean': return 'clean'; 
+        default: return 'free';
+    }
+}
+
+async function fetchRoomsAndRender() {
+    try {
+        const { data: rooms, error } = await window.supabase
+            .from('ROOM')
+            .select('*')
+            .order('RoomNumber', { ascending: true });
+
+        if (error) throw error;
+
+        hotelRooms = rooms.map(r => ({
+            id: r.RoomNumber,
+            type: r.RoomType,
+            state: mapDbStatusToUI(r.Status),
+            dbStatus: r.Status 
+        }));
+
+        renderMap();
+    } catch (err) {
+        console.error("Σφάλμα κατά τη φόρτωση των δωματίων:", err.message);
+        showToast("Αποτυχία φόρτωσης δωματίων από τη βάση.", "error");
+    }
+}
 
 function calculateLiveStats() {
     currentOcc = 0; currentFree = 0; currentDirty = 0; currentClean = 0;
+    
     hotelRooms.forEach(r => {
         if (r.state === 'occ') currentOcc++;
         else if (r.state === 'free') currentFree++;
@@ -91,12 +99,23 @@ function calculateLiveStats() {
         else if (r.state === 'clean') currentClean++;
     });
     
-    const occPct = Math.round((currentOcc / 510) * 100);
+    const totalRooms = hotelRooms.length || 1;
+    const occPct = Math.round((currentOcc / totalRooms) * 100);
 
-    document.getElementById('live-occ-badge').textContent = `Πληρ. ${occPct}%`;
-    document.getElementById('dash-occ-val').textContent = `${occPct}%`;
-    document.getElementById('dash-occ-bar').style.width = `${occPct}%`;
-    document.getElementById('dash-free-val').textContent = currentFree + currentClean;
+    const liveBadge = document.getElementById('live-occ-badge');
+    if(liveBadge) liveBadge.textContent = `Πληρ. ${occPct}%`;
+    
+    const dashOccVal = document.getElementById('dash-occ-val');
+    if(dashOccVal) dashOccVal.textContent = `${occPct}%`;
+    
+    const dashOccSub = document.getElementById('dash-occ-sub');
+    if(dashOccSub) dashOccSub.textContent = `${currentOcc} / ${totalRooms} δωμάτια`;
+    
+    const dashOccBar = document.getElementById('dash-occ-bar');
+    if(dashOccBar) dashOccBar.style.width = `${occPct}%`;
+    
+    const dashFreeVal = document.getElementById('dash-free-val');
+    if(dashFreeVal) dashFreeVal.textContent = currentFree + currentClean;
     
     if(document.getElementById('stat-occ')) {
         document.getElementById('stat-occ').textContent = currentOcc;
@@ -111,16 +130,18 @@ function renderMap(filter = 'all') {
     const rmap = document.getElementById('rmap');
     if (!rmap) return;
     rmap.innerHTML = '';
+    
     hotelRooms.forEach(r => {
         if (filter !== 'all' && r.state !== filter) return;
         const d = document.createElement('div');
         d.className = 'rc rc-' + r.state;
         d.textContent = r.id; 
         
-        let sText = r.state === 'occ' ? 'Κατειλημμένο' : r.state === 'free' ? 'Άδειο χωρίς καθαριότητα' : r.state === 'dirty' ? 'Προσεχώς άδειο' : 'Έτοιμο';
+        let sText = r.state === 'occ' ? 'Κατειλημμένο' : r.state === 'free' ? 'Άδειο χωρίς καθαριότητα' : r.state === 'dirty' ? 'Υπό καθαρισμό' : 'Έτοιμο';
         d.title = `${r.type} ${r.id} | ${sText}`;
         rmap.appendChild(d);
     });
+    
     calculateLiveStats();
 }
 
@@ -130,14 +151,103 @@ function filterRooms(f, el) {
     renderMap(f);
 }
 
-renderMap();
+/* ==============================================================
+   RESERVATIONS FETCHING (SUPABASE)
+   ============================================================== */
+async function fetchTodayReservations() {
+    const today = new Date().toISOString().split('T')[0];
+
+    try {
+        // Αφίξεις Σήμερα
+        const { data: arrivals, error: arrErr } = await window.supabase
+            .from('RESERVATION')
+            .select(`ReservationID, Status, CUSTOMER ( FullName ), RESERVATION_ROOM ( RoomNumber )`)
+            .eq('CheckInDate', today);
+
+        // Αναχωρήσεις Σήμερα
+        const { data: departures, error: depErr } = await window.supabase
+            .from('RESERVATION')
+            .select(`ReservationID, Status, TotalCost, CUSTOMER ( FullName ), RESERVATION_ROOM ( RoomNumber )`)
+            .eq('CheckOutDate', today);
+
+        if (arrErr) throw arrErr;
+        if (depErr) throw depErr;
+
+        renderArrivals(arrivals || []);
+        renderDepartures(departures || []);
+        
+        const liveArrBadge = document.getElementById('live-arr-badge');
+        if(liveArrBadge) liveArrBadge.textContent = `Αφίξεις: ${arrivals ? arrivals.length : 0}`;
+
+    } catch (err) {
+        console.error("Σφάλμα κρατήσεων:", err.message);
+    }
+}
+
+function renderArrivals(arrivals) {
+    const tbody = document.querySelector('#v-arrivals table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    arrivals.forEach(arr => {
+        const customerName = arr.CUSTOMER?.FullName || 'Άγνωστος';
+        const roomNumber = arr.RESERVATION_ROOM?.[0]?.RoomNumber || '-';
+        const isCheckedIn = (arr.Status === 'CheckedIn' || arr.Status === 'CheckedOut');
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${customerName}</td>
+            <td>-</td>
+            <td><span class="pill p-g">ΟΚ</span></td>
+            <td>${roomNumber}</td>
+            <td><span class="pill ${isCheckedIn ? 'p-g' : 'p-a'}">${isCheckedIn ? 'Ολοκλ.' : 'Εκκρεμεί'}</span></td>
+            <td>
+                <button class="btn btn-sm ${isCheckedIn ? '' : 'btn-dark'}" 
+                        ${isCheckedIn ? 'disabled' : ''} 
+                        onclick="openCheckinModal(${arr.ReservationID}, '${customerName}')">
+                    ${isCheckedIn ? 'C/I OK' : 'Check-in'}
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderDepartures(departures) {
+    const tbody = document.querySelector('#v-departures table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    departures.forEach(dep => {
+        const customerName = dep.CUSTOMER?.FullName || 'Άγνωστος';
+        const roomNumber = dep.RESERVATION_ROOM?.[0]?.RoomNumber || '-';
+        const isCheckedOut = dep.Status === 'CheckedOut';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${customerName}</td>
+            <td>${roomNumber}</td>
+            <td><span class="pill p-g">OK</span></td>
+            <td>€${dep.TotalCost || 0}</td>
+            <td><span class="pill ${isCheckedOut ? 'p-g' : 'p-a'}">${isCheckedOut ? 'Ολοκλ.' : 'Εκκρεμεί'}</span></td>
+            <td>
+                <button class="btn btn-sm ${isCheckedOut ? '' : 'btn-dark'}" 
+                        ${isCheckedOut ? 'disabled' : ''} 
+                        onclick="doCheckout(this, '${customerName}', ${dep.ReservationID}, '${roomNumber}')">
+                    ${isCheckedOut ? 'C/O OK' : 'Check-out'}
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
 
 /* ==============================================================
-   BOOKING LOGIC
+   BOOKING LOGIC (UI CALCS & SUBMIT)
    ============================================================== */
 const prepayMap = {
     phone: { txt: 'Τηλεφωνική/Κάρτα (20%)', pct: 20 },
-    prepaid: { txt: 'Προπληρωμένη >90 ημέρες (50%)', pct: 50 },
+    prepaid: { txt: 'Προπληρωμένη (50%)', pct: 50 },
     group: { txt: 'Ειδική Γκρουπ (15%)', pct: 15 },
     walkin: { txt: 'Walk-in (100% κατά την άφιξη)', pct: 100 }
 };
@@ -145,32 +255,22 @@ const prepayMap = {
 function calcNights() {
     const i = document.getElementById('nb-in')?.value;
     const o = document.getElementById('nb-out')?.value;
-    if(!i || !o) return 3;
+    if(!i || !o) return 1;
     return Math.max(1, Math.round((new Date(o) - new Date(i)) / 86400000));
 }
 
 function updatePrice() {
-    const price = parseInt(document.getElementById('nb-rtype')?.value || 140);
+    const rtypeEl = document.getElementById('nb-rtype');
+    if(!rtypeEl) return;
+    const price = parseInt(rtypeEl.value || 140);
     const nights = calcNights();
     
-    // Έλεγχος Z% (Έστω ότι η πληρότητα είναι μικρότερη του 60%)
-    const occPct = Math.round((currentOcc / 510) * 100);
-    let finalPrice = price;
-    let dynNotice = "";
-    if (occPct < 60) {
-        finalPrice = Math.round(price * 0.85); // -15% έκπτωση
-        dynNotice = "(-15% λόγω χαμηλής πληρότητας)";
-    }
-    
-    const total = finalPrice * nights;
-    
-    const typeSelect = document.getElementById('nb-rtype');
-    const typeText = typeSelect.options[typeSelect.selectedIndex].text;
+    const total = price * nights;
+    const typeText = rtypeEl.options[rtypeEl.selectedIndex].text;
     
     document.getElementById('sp-room').textContent = typeText;
     document.getElementById('sp-nights').textContent = nights;
-    document.getElementById('sp-sub').textContent = `€${finalPrice} × ${nights}`;
-    document.getElementById('dyn-price-notice').textContent = dynNotice;
+    document.getElementById('sp-sub').textContent = `€${price} × ${nights}`;
     document.getElementById('sp-total').textContent = `€${total}`;
     
     updatePrepay(total);
@@ -179,57 +279,155 @@ function updatePrice() {
 function updatePrepay(totalVal) {
     const t = document.getElementById('nb-btype')?.value;
     if(!t) return;
-    
     const total = totalVal || parseInt(document.getElementById('sp-total').textContent.replace('€',''));
     const config = prepayMap[t];
     const amt = Math.round(total * config.pct / 100);
     
-    const box = document.getElementById('prepay-box');
-    box.innerHTML = `<i class="ti ti-info-circle" aria-hidden="true"></i> Προκαταβολή: ${config.txt} — <strong id="prepay-amt">€${amt}</strong>`;
+    document.getElementById('prepay-box').innerHTML = `<i class="ti ti-info-circle" aria-hidden="true"></i> Προκαταβολή: ${config.txt} — <strong>€${amt}</strong>`;
 }
 
-function submitBooking() {
-    const last = document.getElementById('nb-last')?.value;
-    if(!last) {
-        showToast('Παρακαλώ συμπληρώστε τουλάχιστον το Επώνυμο.', 'error');
+async function submitBooking() {
+    const firstName = document.getElementById('nb-first')?.value;
+    const lastName = document.getElementById('nb-last')?.value;
+    const phone = document.getElementById('nb-phone')?.value;
+    const email = document.getElementById('nb-email')?.value;
+    const checkIn = document.getElementById('nb-in')?.value;
+    const checkOut = document.getElementById('nb-out')?.value;
+    const bookingType = document.getElementById('nb-btype')?.value;
+    const totalCostText = document.getElementById('sp-total').textContent;
+    const totalCost = parseFloat(totalCostText.replace('€', ''));
+
+    if (!lastName || !firstName || !checkIn || !checkOut) {
+        showToast('Παρακαλώ συμπληρώστε Επώνυμο, Όνομα και ημερομηνίες.', 'error');
         return;
     }
-    showToast('Η κράτηση καταχωρήθηκε επιτυχώς! Ο αριθμός δωματίου θα οριστεί το πρωί της άφιξης.', 'success');
+
+    try {
+        const fullName = `${lastName} ${firstName}`;
+        const { data: customer, error: custError } = await window.supabase
+            .from('CUSTOMER')
+            .insert([{ FullName: fullName, Phone: phone, Email: email, IsGroup: (bookingType === 'group') }])
+            .select().single();
+
+        if (custError) throw custError;
+
+        const { error: resError } = await window.supabase
+            .from('RESERVATION')
+            .insert([{
+                CustomerID: customer.CustomerID,
+                CheckInDate: checkIn,
+                CheckOutDate: checkOut,
+                TotalCost: totalCost,
+                Status: 'Confirmed'
+            }]);
+
+        if (resError) throw resError;
+
+        showToast('Η κράτηση καταχωρήθηκε επιτυχώς!', 'success');
+        fetchTodayReservations(); 
+        navTo('dash');
+        
+        // Καθαρισμός φόρμας
+        document.getElementById('nb-first').value = '';
+        document.getElementById('nb-last').value = '';
+        
+    } catch (err) {
+        showToast("Αποτυχία καταχώρησης: " + err.message, "error");
+    }
 }
 
-if(document.getElementById('nb-rtype')) {
-    updatePrice();
+if(document.getElementById('nb-rtype')) updatePrice();
+
+/* ==============================================================
+   PRO CHECK-IN (WITH MODAL) & CHECK-OUT LOGIC
+   ============================================================== */
+let activeCheckinResId = null;
+
+function openCheckinModal(reservationId, customerName) {
+    activeCheckinResId = reservationId;
+    document.getElementById('modal-cust-name').textContent = customerName;
+    
+    // Γέμισμα του Dropdown ΜΟΝΟ με ελεύθερα/καθαρά δωμάτια
+    const select = document.getElementById('modal-room-select');
+    select.innerHTML = '<option value="">-- Επιλέξτε Δωμάτιο --</option>';
+    
+    const availableRooms = hotelRooms.filter(r => r.state === 'clean' || r.state === 'free');
+    
+    availableRooms.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = `Δωμάτιο ${r.id} (${r.type})`;
+        select.appendChild(opt);
+    });
+
+    document.getElementById('checkin-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('checkin-modal').style.display = 'none';
+    activeCheckinResId = null;
+}
+
+async function confirmCheckin() {
+    const selectedRoom = document.getElementById('modal-room-select').value;
+    
+    if (!selectedRoom) {
+        showToast('Πρέπει να επιλέξετε ένα δωμάτιο για τον πελάτη!', 'error');
+        return;
+    }
+
+    try {
+        // 1. Ενημέρωση κράτησης σε CheckedIn
+        await window.supabase.from('RESERVATION').update({ Status: 'CheckedIn' }).eq('ReservationID', activeCheckinResId);
+        
+        // 2. Σύνδεση Κράτησης με Δωμάτιο στον πίνακα RESERVATION_ROOM
+        await window.supabase.from('RESERVATION_ROOM').insert([{ ReservationID: activeCheckinResId, RoomNumber: selectedRoom }]);
+        
+        // 3. Ενημέρωση κατάστασης Δωματίου σε Occupied ('occ')
+        await window.supabase.from('ROOM').update({ Status: 'Occupied' }).eq('RoomNumber', selectedRoom);
+
+        showToast(`Το Check-in ολοκληρώθηκε! Εκχωρήθηκε το δωμάτιο ${selectedRoom}.`, 'success');
+        
+        closeModal();
+        fetchTodayReservations(); 
+        fetchRoomsAndRender();    
+
+    } catch (err) {
+        showToast("Σφάλμα κατά το Check-in: " + err.message, "error");
+    }
+}
+
+async function doCheckout(btn, name, reservationId, roomNumber) {
+    try {
+        // 1. Ενημέρωση κράτησης σε CheckedOut
+        await window.supabase.from('RESERVATION').update({ Status: 'CheckedOut' }).eq('ReservationID', reservationId);
+        
+        // 2. Αν υπάρχει δωμάτιο, το κάνουμε "Cleaning" (Υπό καθαρισμό / dirty)
+        if (roomNumber && roomNumber !== '-') {
+            await window.supabase.from('ROOM').update({ Status: 'Cleaning' }).eq('RoomNumber', roomNumber);
+        }
+
+        showToast(`Επιτυχές Check-out! Το δωμάτιο ${roomNumber} στάλθηκε για καθάρισμα.`, 'success');
+        
+        fetchTodayReservations();
+        fetchRoomsAndRender();
+
+    } catch (err) {
+        showToast("Σφάλμα Check-out: " + err.message, "error");
+    }
 }
 
 /* ==============================================================
-   CHECK-IN / CHECK-OUT / MINIBAR ACTIONS
+   INITIALIZATION
    ============================================================== */
-function doCheckin(btn) {
-    btn.disabled = true;
-    btn.textContent = "Ολοκληρώθηκε";
-    btn.classList.replace('btn-dark', 'btn');
-    
-    const statusCell = btn.parentElement.previousElementSibling;
-    statusCell.innerHTML = '<span class="pill p-g">Check-in OK</span>';
-    
-    showToast('Το Check-in ολοκληρώθηκε και το δωμάτιο εκχωρήθηκε στον πελάτη.', 'success');
-}
-
-function doCheckout(btn, name) {
-    btn.disabled = true;
-    btn.innerHTML = '<i class="ti ti-printer"></i> Απόδειξη';
-    btn.classList.replace('btn-dark', 'btn');
-    
-    const statusCell = btn.parentElement.previousElementSibling;
-    statusCell.innerHTML = '<span class="pill p-g">Εξοφλήθηκε</span>';
-    
-    showToast(`Επιτυχές Check-out για τον πελάτη: ${name}. Η απόδειξη εκτυπώνεται...`, 'success');
-}
-
-function chargeMinibar(btn) {
-    btn.disabled = true;
-    btn.textContent = "Χρεώθηκε";
-    btn.classList.replace('btn-dark', 'btn');
-    
-    showToast('Το ποσό του Mini-bar προστέθηκε επιτυχώς στον λογαριασμό του πελάτη.', 'success');
-}
+document.addEventListener('DOMContentLoaded', () => {
+    // Δίνουμε 500ms για να σιγουρευτούμε ότι το supabase-config.js φόρτωσε το window.supabase
+    setTimeout(() => {
+        if(window.supabase) {
+            fetchRoomsAndRender();
+            fetchTodayReservations();
+        } else {
+            showToast('Αποτυχία σύνδεσης με τη βάση (Supabase is missing)', 'error');
+        }
+    }, 500);
+});
