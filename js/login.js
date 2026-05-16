@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Αναζήτηση στον πίνακα EMPLOYEE
                 const { data, error } = await supabase
                     .from('EMPLOYEE')
-                    .select('EmpID, FullName, Role, isActive')
+                    .select('EmpID, FirstName, LastName, Role, isActive')
                     .eq('Username', usernameInput)
                     .eq('Password', passwordInput)
                     .maybeSingle()
@@ -36,14 +36,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
 
+                    const displayName = `${data.FirstName || ''} ${data.LastName || ''}`.trim();
+
                     // Αποθήκευση συνεδρίας (session)
                     localStorage.setItem('hotel_user', JSON.stringify({
                         id: data.EmpID,
-                        name: data.FullName,
+                        name: displayName,
                         Role: data.Role
                     }));
 
-                    alert(`Καλωσήρθες, ${data.FullName}!`);
+                    alert(`Καλωσήρθες, ${displayName}!`);
                     redirectToRole(data.Role);
                 }
             } catch (err) {

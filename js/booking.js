@@ -1,5 +1,22 @@
 /* booking.js */
 
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `live-toast ${type}`;
+    let iconClass = 'ti-circle-check';
+    if (type === 'error') iconClass = 'ti-alert-circle';
+    if (type === 'info') iconClass = 'ti-info-circle';
+    if (type === 'warning') iconClass = 'ti-alert-triangle';
+    toast.innerHTML = `<i class="ti ${iconClass}" aria-hidden="true"></i> <span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+}
+
 let currentStep = 1;
 let bookingData = {
   room: 'Δωμάτιο Standard',
@@ -10,7 +27,8 @@ let bookingData = {
   last: '',
   email: '',
   phone: '',
-  country: 'GR'
+  country: 'GR',
+  reservationId: null
 };
 
 function initApp() {
@@ -118,7 +136,7 @@ function renderStep() {
     }, 0);
   } 
   else if (currentStep === 3) {
-    const code = 'GKH-' + Math.floor(10000 + Math.random() * 90000);
+    const code = bookingData.reservationId ? 'GKH-' + bookingData.reservationId : ('GKH-' + Math.floor(10000 + Math.random() * 90000));
     bodyEl.innerHTML = `
       <div class="step-indicator">${dots}</div>
       <div class="success-msg">
@@ -143,7 +161,7 @@ async function nextStep() {
     const first = document.getElementById('f-first').value.trim();
     const email = document.getElementById('f-email').value.trim();
     if (!last || !first || !email) {
-      alert('Παρακαλώ συμπληρώστε τα υποχρεωτικά πεδία (Όνομα, Επώνυμο, Email).');
+      showToast('Παρακαλώ συμπληρώστε τα υποχρεωτικά πεδία (Όνομα, Επώνυμο, Email).', 'error');
       return;
     }
     bookingData.last = last;
@@ -156,10 +174,14 @@ async function nextStep() {
   if (currentStep === 2) {
     const card = document.getElementById('f-card').value.replace(/\s/g, '');
     if (card.length < 16) {
-      alert('Παρακαλώ εισάγετε έναν έγκυρο αριθμό κάρτας 16 ψηφίων.');
+      showToast('Παρακαλώ εισάγετε έναν έγκυρο αριθμό κάρτας 16 ψηφίων.', 'error');
       return;
     }
-    await processBookingSubmission(bookingData);
+    try {
+      await processBookingSubmission(bookingData);
+    } catch (err) {
+      return;
+    }
   }
   
   if (currentStep < 3) {
@@ -175,13 +197,47 @@ function prevStep() {
   }
 }
 
-// Προσομοίωση αποστολής στη βάση και ειδοποίησης
 async function processBookingSubmission(data) {
-  console.log("Αποστολή δεδομένων στη βάση:", data);
-  console.log("Σύστημα Ξενοδοχείου: Δημιουργία κράτησης και αποστολή ειδοποίησης.");
-  // Σε πραγματικό περιβάλλον εδώ θα υπήρχαν τα fetch requests.
-  return new Promise(resolve => setTimeout(resolve, 800));
+  const nights = calcNights();
+  const totalCost = data.price * nights;
+
+  try {
+    const { data: customer, error: custError } = await window.supabase
+      .from('CUSTOMER')
+      .insert([{
+        FirstName: data.first,
+        LastName: data.last,
+        Email: data.email,
+        Phone: data.phone,
+        Country: data.country,
+        IsGroup: false
+      }])
+      .select()
+      .single();
+
+    if (custError) throw custError;
+
+    const { data: reservation, error: resError } = await window.supabase
+      .from('RESERVATION')
+      .insert([{
+        CustomerID: customer.CustomerID,
+        CheckInDate: data.checkin,
+        CheckOutDate: data.checkout,
+        TotalCost: totalCost,
+        Status: 'Confirmed'
+      }])
+      .select()
+      .single();
+
+    if (resError) throw resError;
+
+    data.reservationId = reservation.ReservationID;
+    showToast('Η κράτηση καταχωρήθηκε επιτυχώς!', 'success');
+
+  } catch (err) {
+    showToast('Αποτυχία κράτησης: ' + err.message, 'error');
+    throw err;
+  }
 }
 
-// Εκκίνηση όταν φορτώσει η σελίδα
 document.addEventListener('DOMContentLoaded', initApp);

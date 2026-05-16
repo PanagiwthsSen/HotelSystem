@@ -161,13 +161,13 @@ async function fetchTodayReservations() {
         // Αφίξεις Σήμερα
         const { data: arrivals, error: arrErr } = await window.supabase
             .from('RESERVATION')
-            .select(`ReservationID, Status, CUSTOMER ( FullName ), RESERVATION_ROOM ( RoomNumber )`)
+            .select(`ReservationID, Status, CUSTOMER ( FirstName, LastName ), RESERVATION_ROOM ( RoomNumber )`)
             .eq('CheckInDate', today);
 
         // Αναχωρήσεις Σήμερα
         const { data: departures, error: depErr } = await window.supabase
             .from('RESERVATION')
-            .select(`ReservationID, Status, TotalCost, CUSTOMER ( FullName ), RESERVATION_ROOM ( RoomNumber )`)
+            .select(`ReservationID, Status, TotalCost, CUSTOMER ( FirstName, LastName ), RESERVATION_ROOM ( RoomNumber )`)
             .eq('CheckOutDate', today);
 
         if (arrErr) throw arrErr;
@@ -190,7 +190,8 @@ function renderArrivals(arrivals) {
     tbody.innerHTML = '';
 
     arrivals.forEach(arr => {
-        const customerName = arr.CUSTOMER?.FullName || 'Άγνωστος';
+        const c = arr.CUSTOMER || {};
+        const customerName = (c.FirstName || c.LastName) ? `${c.FirstName || ''} ${c.LastName || ''}`.trim() : 'Άγνωστος';
         const roomNumber = arr.RESERVATION_ROOM?.[0]?.RoomNumber || '-';
         const isCheckedIn = (arr.Status === 'CheckedIn' || arr.Status === 'CheckedOut');
         
@@ -219,7 +220,8 @@ function renderDepartures(departures) {
     tbody.innerHTML = '';
 
     departures.forEach(dep => {
-        const customerName = dep.CUSTOMER?.FullName || 'Άγνωστος';
+        const c = dep.CUSTOMER || {};
+        const customerName = (c.FirstName || c.LastName) ? `${c.FirstName || ''} ${c.LastName || ''}`.trim() : 'Άγνωστος';
         const roomNumber = dep.RESERVATION_ROOM?.[0]?.RoomNumber || '-';
         const isCheckedOut = dep.Status === 'CheckedOut';
 
@@ -317,10 +319,9 @@ async function submitBooking() {
     }
 
     try {
-        const fullName = `${lastName} ${firstName}`;
         const { data: customer, error: custError } = await window.supabase
             .from('CUSTOMER')
-            .insert([{ FullName: fullName, Phone: phone, Email: email, IsGroup: (bookingType === 'group') }])
+            .insert([{ FirstName: firstName, LastName: lastName, Phone: phone, Email: email, IsGroup: (bookingType === 'group') }])
             .select().single();
 
         if (custError) throw custError;

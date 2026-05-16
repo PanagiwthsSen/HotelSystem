@@ -459,7 +459,7 @@ async function fetchStaff() {
         // Τραβάμε μόνο τους ενεργούς (isActive = true) υπαλλήλους
         const { data, error } = await supabase
             .from('EMPLOYEE')
-            .select('FullName, Role, Salary, Leaves, Score')
+            .select('FirstName, LastName, Role, Salary, Leaves, Score')
             .eq('isActive', true)
             .order('Role', { ascending: true });
 
@@ -477,7 +477,7 @@ async function fetchStaff() {
             else if (roleKey === 'admin' || roleKey === 'manager') deptGR = 'Διοίκηση';
 
             return {
-                n: emp.FullName || 'Χωρίς Όνομα',
+                n: `${emp.FirstName || ''} ${emp.LastName || ''}`.trim() || 'Χωρίς Όνομα',
                 dept: deptGR,
                 dbRole: roleKey,
                 since: '2024',
@@ -558,8 +558,8 @@ async function fetchComplaints() {
             .from('COMPLAINT')
             .select(`
                 ComplaintID, Description, Status, CreatedAt,
-                CUSTOMER (FullName),
-                EMPLOYEE (FullName, Role)
+                CUSTOMER (FirstName, LastName),
+                EMPLOYEE (FirstName, LastName, Role)
             `)
             .order('CreatedAt', { ascending: false });
 
@@ -570,8 +570,8 @@ async function fetchComplaints() {
             description: c.Description,
             status: c.Status,
             createdAt: c.CreatedAt,
-            customerName: c.CUSTOMER ? c.CUSTOMER.FullName : 'Άγνωστος Πελάτης',
-            empName: c.EMPLOYEE ? c.EMPLOYEE.FullName : '-',
+            customerName: c.CUSTOMER ? `${c.CUSTOMER.FirstName || ''} ${c.CUSTOMER.LastName || ''}`.trim() || 'Άγνωστος Πελάτης' : 'Άγνωστος Πελάτης',
+            empName: c.EMPLOYEE ? `${c.EMPLOYEE.FirstName || ''} ${c.EMPLOYEE.LastName || ''}`.trim() || '-' : '-',
             empRole: c.EMPLOYEE ? c.EMPLOYEE.Role?.toLowerCase().trim() : null
         }));
 
@@ -952,25 +952,26 @@ async function fetchPayroll() {
 
         const { data, error } = await supabase
             .from('EMPLOYEE')
-            .select('EmpID, FullName, Role, Salary, IBAN, LastPaymentDate')
+            .select('EmpID, FirstName, LastName, Role, Salary, IBAN, LastPaymentDate')
             .eq('isActive', true)
-            .order('FullName', { ascending: true });
+            .order('LastName', { ascending: true });
 
         if (error) throw error;
 
         tbody.innerHTML = data.map(emp => {
             const lastDate = emp.LastPaymentDate ? new Date(emp.LastPaymentDate).toLocaleDateString('el-GR') : 'Ποτέ';
             const ibanFormatted = emp.IBAN ? `<code>${emp.IBAN.substring(0, 4)}...${emp.IBAN.slice(-4)}</code>` : '<span class="pill p-r">Λείπει IBAN</span>';
+            const empName = `${emp.FirstName || ''} ${emp.LastName || ''}`.trim();
             
             return `
                 <tr>
-                    <td><strong>${emp.FullName}</strong></td>
+                    <td><strong>${empName}</strong></td>
                     <td><span class="pill p-b">${emp.Role}</span></td>
                     <td>€${emp.Salary}</td>
                     <td>${ibanFormatted}</td>
                     <td>${lastDate}</td>
                     <td>
-                        <button class="btn btn-dark btn-sm" onclick="payEmployee(this, ${emp.EmpID}, '${emp.FullName}')">
+                        <button class="btn btn-dark btn-sm" onclick="payEmployee(this, ${emp.EmpID}, '${empName}')">
                             Πληρωμή
                         </button>
                     </td>
@@ -1230,8 +1231,8 @@ async function fetchUsers() {
 
         const { data, error } = await supabase
             .from('EMPLOYEE')
-            .select('EmpID, FullName, Username, Role, isActive')
-            .order('FullName', { ascending: true });
+            .select('EmpID, FirstName, LastName, Username, Role, isActive')
+            .order('LastName', { ascending: true });
 
         if (error) throw error;
 
@@ -1242,15 +1243,16 @@ async function fetchUsers() {
             
             const btnText = u.isActive ? 'Απενεργοποίηση' : 'Ενεργοποίηση';
             const btnClass = u.isActive ? 'btn-sm' : 'btn-dark btn-sm';
+            const uName = `${u.FirstName || ''} ${u.LastName || ''}`.trim();
 
             return `
                 <tr>
-                    <td><strong>${u.FullName}</strong></td>
+                    <td><strong>${uName}</strong></td>
                     <td><code>${u.Username || '-'}</code></td>
                     <td><span class="pill p-b">${u.Role}</span></td>
                     <td>${statusHtml}</td>
                     <td>
-                        <button class="btn ${btnClass}" onclick="toggleUserStatus(${u.EmpID}, ${u.isActive}, '${u.FullName}')">
+                        <button class="btn ${btnClass}" onclick="toggleUserStatus(${u.EmpID}, ${u.isActive}, '${uName}')">
                             ${btnText}
                         </button>
                         <button class="btn btn-sm" onclick="triggerAction('Αλλαγή κωδικού για: ${u.Username}', 'warning')">
