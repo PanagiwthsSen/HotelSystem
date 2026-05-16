@@ -319,6 +319,7 @@ async function submitBooking() {
     }
 
     try {
+        if (!await window.showConfirm('Καταχώρηση κράτησης;')) return;
         const { data: customer, error: custError } = await window.supabase
             .from('CUSTOMER')
             .insert([{ FirstName: firstName, LastName: lastName, Phone: phone, Email: email, IsGroup: (bookingType === 'group') }])
@@ -392,6 +393,7 @@ async function confirmCheckin() {
     }
 
     try {
+        if (!await window.showConfirm('Επιβεβαίωση check-in;')) return;
         // 1. Ενημέρωση κράτησης σε CheckedIn
         await window.supabase.from('RESERVATION').update({ Status: 'CheckedIn' }).eq('ReservationID', activeCheckinResId);
         
@@ -413,6 +415,7 @@ async function confirmCheckin() {
 }
 
 async function doCheckout(btn, name, reservationId, roomNumber) {
+    if (!await window.showConfirm(`Επιβεβαίωση check-out για ${name};`)) return;
     try {
         // 1. Ενημέρωση κράτησης σε CheckedOut
         await window.supabase.from('RESERVATION').update({ Status: 'CheckedOut' }).eq('ReservationID', reservationId);

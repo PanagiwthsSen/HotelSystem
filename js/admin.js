@@ -364,6 +364,7 @@ window.savePrices = async function() {
     };
 
     try {
+        if (!await window.showConfirm('Αποθήκευση νέων τιμών δωματίων;')) return;
         // Εκτελούμε 4 updates, ένα για κάθε τύπο δωματίου
         for (const [type, price] of Object.entries(prices)) {
             const { error } = await supabase
@@ -388,7 +389,7 @@ window.savePrices = async function() {
 
 // 3. Επαναφορά στις εργοστασιακές τιμές
 window.resetPrices = async function() {
-    if (!confirm("Επαναφορά όλων των τιμών στις αρχικές ρυθμίσεις;")) return;
+    if (!await window.showConfirm("Επαναφορά όλων των τιμών στις αρχικές ρυθμίσεις;")) return;
 
     const defaults = {
         'Μονόκλινο': 85,
@@ -686,6 +687,7 @@ window.archiveComplaintFromModal = async function(id) {
 
 // Λειτουργία: Επίλυση Παραπόνου (UPDATE στη βάση)
 async function resolveComplaint(btn, id) {
+    if (!await window.showConfirm('Επίλυση παραπόνου;')) return;
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="animation: spin 1s linear infinite;"></i>'; }
     
     try {
@@ -707,6 +709,7 @@ async function resolveComplaint(btn, id) {
 
 // Λειτουργία: Αρχειοθέτηση Παραπόνου (DELETE από τη βάση - Προαιρετικά μπορεί να είναι απλό hide)
 async function archiveComplaint(btn, id) {
+    if (!await window.showConfirm('Οριστική διαγραφή παραπόνου;')) return;
     if (btn) { btn.disabled = true; }
     try {
         const { error } = await supabase
@@ -764,18 +767,13 @@ async function fetchInventory() {
 
         tbody.innerHTML = data.map(item => {
             let statusHtml = '';
-            let btnHtml = '';
 
-            // Λογική για το χρώμα και το κουμπί με βάση το απόθεμα
             if (item.Quantity === 0) {
                 statusHtml = '<span class="pill p-r">Εξαντλήθηκε</span>';
-                btnHtml = `<button class="btn btn-dark btn-sm" onclick="placeOrder(this, '${item.Name}')">Παραγγελία</button>`;
             } else if (item.Quantity <= item.MinThreshold) {
                 statusHtml = '<span class="pill p-a">Οριακό Απόθεμα</span>';
-                btnHtml = `<button class="btn btn-dark btn-sm" onclick="placeOrder(this, '${item.Name}')">Παραγγελία</button>`;
             } else {
                 statusHtml = '<span class="pill p-g">Επαρκές</span>';
-                btnHtml = `<span style="color: var(--text-muted)">-</span>`;
             }
 
             return `
@@ -784,7 +782,11 @@ async function fetchInventory() {
                     <td>${item.Category}</td>
                     <td>${item.Quantity} τεμ. <br><small style="color:var(--text-muted)">(Όριο: ${item.MinThreshold})</small></td>
                     <td>${statusHtml}</td>
-                    <td>${btnHtml}</td>
+                    <td>
+                        <button class="btn btn-sm" onclick="openInventoryModal(${item.ItemID})" title="Επεξεργασία">✏️</button>
+                        <button class="btn btn-sm" onclick="deleteInventoryItem(${item.ItemID},'${item.Name}')" title="Διαγραφή">🗑️</button>
+                        <button class="btn btn-dark btn-sm" onclick="placeOrder(this,'${item.Name}')">Παραγγελία</button>
+                    </td>
                 </tr>
             `;
         }).join('');
@@ -795,16 +797,122 @@ async function fetchInventory() {
     }
 }
 
-// Συνάρτηση Παραγγελίας (Εκτεθειμένη στο window για το Vite)
+// Προσομοίωση Παραγγελίας
 window.placeOrder = function(btn, itemName) {
     btn.disabled = true;
     btn.textContent = "Παραγγέλθηκε";
     btn.classList.replace('btn-dark', 'btn');
-    
-    const statusCell = btn.parentElement.previousElementSibling;
+    const statusCell = btn.closest('tr').querySelector('td:nth-child(4)');
     statusCell.innerHTML = '<span class="pill p-b">Αναμένεται</span>';
-    
     showToast(`Στάλθηκε αυτόματη παραγγελία στον προμηθευτή για: ${itemName}`, "success");
+}
+
+// Άνοιγμα Modal Προσθήκης / Επεξεργασίας
+window.openInventoryModal = async function(itemId) {
+    let item = null;
+    if (itemId) {
+        const { data } = await supabase.from('INVENTORY_ITEM').select('*').eq('ItemID', itemId).single();
+        item = data;
+    }
+
+    const existing = document.querySelector('.inv-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'inv-overlay';
+    overlay.innerHTML = `
+        <div class="inv-modal">
+            <h3>${item ? 'Επεξεργασία' : 'Νέο'} Προϊόντος</h3>
+            <div class="mform-group">
+                <label>Όνομα προϊόντος *</label>
+                <input type="text" id="inv-name" value="${item ? item.Name : ''}">
+            </div>
+            <div class="mform-group">
+                <label>Κατηγορία *</label>
+                <input type="text" id="inv-cat" value="${item ? item.Category : ''}">
+            </div>
+            <div class="mform-group">
+                <label>Ποσότητα *</label>
+                <input type="number" id="inv-qty" min="0" value="${item ? item.Quantity : 0}">
+            </div>
+            <div class="mform-group">
+                <label>Ελάχιστο όριο *</label>
+                <input type="number" id="inv-threshold" min="0" value="${item ? item.MinThreshold : 0}">
+            </div>
+            <div class="modal-actions">
+                <button class="btn" id="inv-cancel">Ακύρωση</button>
+                <button class="btn btn-dark" id="inv-save">${item ? 'Αποθήκευση' : 'Δημιουργία'}</button>
+            </div>
+        </div>
+    `;
+
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#inv-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#inv-save').addEventListener('click', async () => {
+        const name = overlay.querySelector('#inv-name').value.trim();
+        const category = overlay.querySelector('#inv-cat').value.trim();
+        const quantity = parseInt(overlay.querySelector('#inv-qty').value, 10);
+        const threshold = parseInt(overlay.querySelector('#inv-threshold').value, 10);
+
+        if (!name || !category) {
+            showToast('Συμπληρώστε Όνομα και Κατηγορία.', 'error');
+            return;
+        }
+        if (isNaN(quantity) || quantity < 0 || isNaN(threshold) || threshold < 0) {
+            showToast('Οι αριθμοί πρέπει να είναι έγκυροι (0 ή μεγαλύτεροι).', 'error');
+            return;
+        }
+
+        const action = item ? 'ενημέρωση' : 'δημιουργία';
+        if (item && name === item.Name && category === item.Category && quantity === item.Quantity && threshold === item.MinThreshold) {
+            showToast('Δεν υπάρχουν αλλαγές.', 'info');
+            overlay.remove();
+            return;
+        }
+        if (!await window.showConfirm(`${action === 'ενημέρωση' ? 'Ενημέρωση' : 'Δημιουργία'} προϊόντος "${name}";`)) return;
+
+        try {
+            const payload = { Name: name, Category: category, Quantity: quantity, MinThreshold: threshold };
+            let error;
+
+            if (item) {
+                ({ error } = await supabase.from('INVENTORY_ITEM').update(payload).eq('ItemID', item.ItemID));
+            } else {
+                ({ error } = await supabase.from('INVENTORY_ITEM').insert([payload]));
+            }
+
+            if (error) throw error;
+
+            showToast(`Προϊόν "${name}" ${item ? 'ενημερώθηκε' : 'δημιουργήθηκε'} επιτυχώς.`, 'success');
+            overlay.remove();
+            fetchInventory();
+        } catch (err) {
+            showToast('Αποτυχία: ' + err.message, 'error');
+        }
+    });
+
+    overlay.querySelector('#inv-name').focus();
+
+    overlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') overlay.querySelector('#inv-save').click();
+        if (e.key === 'Escape') overlay.remove();
+    });
+}
+
+// Διαγραφή Προϊόντος
+window.deleteInventoryItem = async function(itemId, itemName) {
+    if (!await window.showConfirm(`Διαγραφή "${itemName}"; Η ενέργεια είναι μη αναστρέψιμη.`)) return;
+
+    try {
+        const { error } = await supabase.from('INVENTORY_ITEM').delete().eq('ItemID', itemId);
+        if (error) throw error;
+        showToast(`"${itemName}" διαγράφηκε.`, 'success');
+        fetchInventory();
+    } catch (err) {
+        showToast('Αποτυχία διαγραφής: ' + err.message, 'error');
+    }
 }
 
 // Εκκίνηση Φόρτωσης
@@ -967,11 +1075,11 @@ async function fetchPayroll() {
                 <tr>
                     <td><strong>${empName}</strong></td>
                     <td><span class="pill p-b">${emp.Role}</span></td>
-                    <td>€${emp.Salary}</td>
-                    <td>${ibanFormatted}</td>
+                    <td><span class="editable-cell" data-val="${emp.Salary}" onclick="editPayrollField(this,${emp.EmpID},'Salary')">€${emp.Salary}</span></td>
+                    <td><span class="editable-cell" data-val="${emp.IBAN || ''}" onclick="editPayrollField(this,${emp.EmpID},'IBAN')">${ibanFormatted}</span></td>
                     <td>${lastDate}</td>
                     <td>
-                        <button class="btn btn-dark btn-sm" onclick="payEmployee(this, ${emp.EmpID}, '${empName}')">
+                        <button class="btn btn-dark btn-sm" onclick="payEmployee(this, ${emp.EmpID}, '${empName}', '${emp.IBAN || ''}')">
                             Πληρωμή
                         </button>
                     </td>
@@ -985,9 +1093,67 @@ async function fetchPayroll() {
     }
 }
 
+// Επεξεργασία Μισθού / IBAN με inline input
+window.editPayrollField = function(cell, empId, field) {
+    const currentVal = cell.dataset.val;
+    const isSalary = field === 'Salary';
+    const displayVal = isSalary ? currentVal : (currentVal || '');
+
+    // Store original HTML for restore on Escape
+    const origHtml = cell.innerHTML;
+
+    cell.innerHTML = `<input type="${isSalary ? 'number' : 'text'}" value="${displayVal}" class="edit-inline" style="width:100%;box-sizing:border-box">`;
+    const input = cell.querySelector('input');
+    input.focus();
+    input.select();
+
+    const restore = () => {
+        cell.innerHTML = origHtml;
+        cell.className = 'editable-cell';
+        cell.setAttribute('onclick', `editPayrollField(this,${empId},'${field}')`);
+    };
+
+    const save = async () => {
+        const newVal = input.value.trim();
+        if (isSalary && (newVal === '' || isNaN(parseFloat(newVal)))) {
+            showToast('Ο μισθός πρέπει να είναι έγκυρος αριθμός.', 'error');
+            return;
+        }
+        if (newVal === displayVal) {
+            restore();
+            return;
+        }
+        if (!await window.showConfirm(`Αλλαγή ${isSalary ? 'μισθού' : 'IBAN'} από "${displayVal}" σε "${newVal}";`)) {
+            restore();
+            return;
+        }
+        try {
+            const payload = {};
+            payload[field] = isSalary ? parseFloat(newVal) : newVal;
+            const { error } = await supabase.from('EMPLOYEE').update(payload).eq('EmpID', empId);
+            if (error) throw error;
+            showToast(`${isSalary ? 'Μισθός' : 'IBAN'} ενημερώθηκε επιτυχώς.`, 'success');
+            fetchPayroll();
+        } catch (err) {
+            showToast('Αποτυχία ενημέρωσης: ' + err.message, 'error');
+            restore();
+        }
+    };
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') save();
+        if (e.key === 'Escape') restore();
+    });
+    input.addEventListener('blur', save);
+}
+
 // Λειτουργία Πληρωμής (Ενημέρωση ημερομηνίας στη βάση)
-window.payEmployee = async function(btn, id, name) {
-    if (!confirm(`Επιβεβαίωση πληρωμής για τον/την ${name};`)) return;
+window.payEmployee = async function(btn, id, name, iban) {
+    if (!iban) {
+        showToast(`Ο/Η ${name} δεν έχει καταχωρημένο IBAN. Προσθέστε IBAN πρώτα.`, "error");
+        return;
+    }
+    if (!await window.showConfirm(`Επιβεβαίωση πληρωμής για τον/την ${name};`)) return;
 
     btn.disabled = true;
     btn.innerHTML = '<i class="ti ti-loader" style="animation: spin 1s linear infinite;"></i>';
@@ -1274,7 +1440,7 @@ window.toggleUserStatus = async function(id, currentStatus, name) {
     const newStatus = !currentStatus;
     const actionText = newStatus ? 'ενεργοποιήσετε' : 'απενεργοποιήσετε';
     
-    if (!confirm(`Είστε σίγουροι ότι θέλετε να ${actionText} την πρόσβαση για τον/την ${name};`)) return;
+    if (!await window.showConfirm(`Είστε σίγουροι ότι θέλετε να ${actionText} την πρόσβαση για τον/την ${name};`)) return;
 
     try {
         const { error } = await supabase
@@ -1323,6 +1489,7 @@ window.updateSpecificRooms = async function() {
     const roomNumbers = roomsInput.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 
     try {
+        if (!await window.showConfirm(`Ενημέρωση τιμών για ${roomNumbers.length} δωμάτια;`)) return;
         const { error } = await supabase
             .from('ROOM')
             .update({ BasePrice: priceInput })

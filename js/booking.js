@@ -202,6 +202,7 @@ async function processBookingSubmission(data) {
   const totalCost = data.price * nights;
 
   try {
+    if (!await window.showConfirm('Ολοκλήρωση κράτησης;')) return;
     const { data: customer, error: custError } = await window.supabase
       .from('CUSTOMER')
       .insert([{

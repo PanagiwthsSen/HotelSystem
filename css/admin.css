@@ -184,3 +184,83 @@ input[type=range]{flex:1}
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(100%); opacity: 0; }
 }
+
+/* MODAL ΑΠΟΘΗΚΗΣ */
+.inv-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10000; animation: fadeIn 0.15s ease-out;
+}
+.inv-modal {
+    background: #fff; border-radius: 10px; padding: 24px 28px;
+    width: 400px; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+    animation: scaleIn 0.15s ease-out;
+}
+.inv-modal h3 {
+    font-size: 15px; font-weight: 500; margin-bottom: 14px;
+}
+.inv-modal .mform-group {
+    display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px;
+}
+.inv-modal .mform-group label {
+    font-size: 12px; font-weight: 500; color: var(--text-secondary, #6b7280);
+}
+.inv-modal .mform-group input {
+    width: 100%; padding: 9px 11px; font-size: 13px;
+    border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md);
+    outline: none; box-sizing: border-box;
+}
+.inv-modal .mform-group input:focus {
+    border-color: #A8892A; box-shadow: 0 0 0 3px rgba(168,137,42,0.15);
+}
+.inv-modal .modal-actions {
+    display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* EDITABLE PAYROLL CELLS */
+.editable-cell {
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background 0.12s;
+}
+.editable-cell:hover {
+  background: #f0f0f0;
+}
+.edit-inline {
+  padding: 4px 6px;
+  font-size: 12px;
+  border: 1px solid #A8892A;
+  border-radius: 4px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Inventory table: hide columns progressively, buttons last */
+@media (max-width: 800px) {
+  #inventory-table th:nth-child(2),
+  #inventory-table td:nth-child(2) { display: none; }
+}
+@media (max-width: 550px) {
+  #inventory-table th:nth-child(4),
+  #inventory-table td:nth-child(4) { display: none; }
+}
+
+/* CONFIRM MODAL */
+.confirm-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10001; animation: fadeIn 0.15s ease-out;
+}
+.confirm-modal {
+  background: #fff; border-radius: 10px; padding: 28px 32px;
+  width: 360px; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+  animation: scaleIn 0.15s ease-out; text-align: center;
+}
+.confirm-modal p {
+  font-size: 14px; color: #111827; margin-bottom: 20px; line-height: 1.5;
+}
+.confirm-modal .modal-actions { justify-content: center; }
