@@ -41,7 +41,7 @@ function showToast(message, type = 'success') {
 }
 
 // Γενική συνάρτηση για απλά κουμπιά (π.χ. "Αναφορά", "Εξαγωγή")
-function triggerAction(msg, type) {
+window.triggerAction = function(msg, type) {
     showToast(msg, type);
 }
 
@@ -79,7 +79,7 @@ setInterval(updateLiveTime, 60000);
 updateLiveTime();
 
 let adminNotifCount = 4;
-function dismissAdminNotif(el) {
+window.dismissAdminNotif = function(el) {
     el.style.opacity = '0';
     setTimeout(() => {
         el.remove();
@@ -214,24 +214,33 @@ fetchRooms();
 /* ==============================================================
    ΚΟΥΜΠΙΑ: ΔΥΝΑΜΙΚΗ ΤΙΜΟΛΟΓΗΣΗ
    ============================================================== */
+// Συνάρτηση που ενημερώνει τα νούμερα δίπλα από τα sliders καθώς τα κουνάς
+
 function updateLivePrices() {
-    const valM = document.getElementById('price-m').value;
-    const valD = document.getElementById('price-d').value;
-    const valF = document.getElementById('price-f').value;
-    const valS = document.getElementById('price-s').value;
+    const sliders = [
+        { id: 'price-m', display: 'val-m' },
+        { id: 'price-d', display: 'val-d' },
+        { id: 'price-f', display: 'val-f' },
+        { id: 'price-s', display: 'val-s' }
+    ];
 
-    document.getElementById('val-m').textContent = `€${valM}`;
-    document.getElementById('val-d').textContent = `€${valD}`;
-    document.getElementById('val-f').textContent = `€${valF}`;
-    document.getElementById('val-s').textContent = `€${valS}`;
-
-    const baseD = parseInt(valD);
-    document.getElementById('calc-summer').textContent = `€${Math.round(baseD * 1.6)}/βράδυ`;
-    document.getElementById('calc-xmas').textContent = `€${Math.round(baseD * 1.4)}/βράδυ`;
-    document.getElementById('calc-easter').textContent = `€${Math.round(baseD * 1.3)}/βράδυ`;
-    document.getElementById('calc-low').textContent = `€${Math.round(baseD * 0.85)}/βράδυ`;
+    sliders.forEach(s => {
+        const sliderEl = document.getElementById(s.id);
+        const displayEl = document.getElementById(s.display);
+        
+        if (sliderEl && displayEl) {
+            if (!sliderEl.dataset.listenerActive) {
+                sliderEl.addEventListener('input', () => {
+                    displayEl.textContent = '€' + sliderEl.value;
+                });
+                sliderEl.dataset.listenerActive = "true";
+            }
+        }
+    });
 }
-if(document.getElementById('price-m')) updateLivePrices();
+
+// Την καλούμε αμέσως μόλις φορτώσει το script
+updateLivePrices();
 
 function checkDynamicPricing(occPct) {
     const statusLow = document.getElementById('status-low');
@@ -239,28 +248,183 @@ function checkDynamicPricing(occPct) {
     if(!statusLow || !pricingAlert) return;
 
     if (occPct < 60) {
-        statusLow.className = 'pill p-r'; statusLow.textContent = 'ΕΝΕΡΓΟ';
+        statusLow.className = 'pill p-g'; statusLow.textContent = 'Ενεργό';
         pricingAlert.className = 'ns ns-e';
-        pricingAlert.innerHTML = `<i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>ΠΡΟΣΟΧΗ:</strong> Πληρότητα ${occPct}% (<60%). Εφαρμόζεται αυτόματη έκπτωση Ζ% (15%) σε όλες τις τιμές.</div>`;
+        pricingAlert.innerHTML = `<i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>ΠΡΟΣΟΧΗ:</strong> Πληρότητα ${occPct}% (<60%). Εφαρμόζεται αυτόματη έκπτωση 15% σε όλες τις τιμές.</div>`;
     } else {
-        statusLow.className = 'pill p-b'; statusLow.textContent = 'Αυτόματο';
+        statusLow.className = 'pill p-r'; statusLow.textContent = 'Ανενεργό';
         pricingAlert.className = 'ns ns-w';
-        pricingAlert.innerHTML = `<i class="ti ti-info-circle" aria-hidden="true"></i><div>Τιμές καλοκαιρινής περιόδου ενεργές. Αν η πληρότητα πέσει <60%, εφαρμόζεται έκπτωση Ζ%.</div>`;
+        pricingAlert.innerHTML = `<i class="ti ti-info-circle" aria-hidden="true"></i><div>Τιμές καλοκαιρινής περιόδου ενεργές. Αν η πληρότητα πέσει <60%, εφαρμόζεται έκπτωση 15%.</div>`;
+    }
+
+    updateSeasonality();
+}
+
+/* ==============================================================
+   ΣΥΝΤΕΛΕΣΤΕΣ ΕΠΟΧΙΚΟΤΗΤΑΣ
+   ============================================================== */
+
+const SEASONS = {
+    summer: { months: [6, 7, 8], label: 'Καλοκαίρι (Ιούν–Αύγ)' },
+    xmas: { months: [12], label: 'Χριστούγεννα' },
+    easter: { months: [3, 4], label: 'Πάσχα' }
+};
+
+function getCurrentSeason() {
+    const month = new Date().getMonth() + 1;
+    for (const [key, season] of Object.entries(SEASONS)) {
+        if (season.months.includes(month)) return key;
+    }
+    return null;
+}
+
+function updateSeasonality() {
+    const basePrice = parseInt(document.getElementById('price-d').value) || 140;
+    const activeSeason = getCurrentSeason();
+
+    ['summer', 'xmas', 'easter', 'low'].forEach(season => {
+        const multEl = document.getElementById(`mult-${season}`);
+        const priceEl = document.getElementById(`calc-${season}`);
+        const statusEl = document.getElementById(`status-${season}`);
+        if (!multEl || !priceEl || !statusEl) return;
+
+        const multiplier = parseFloat(multEl.value) || 1;
+        const calculatedPrice = Math.round(basePrice * multiplier);
+        priceEl.textContent = `€${calculatedPrice}/βράδυ`;
+
+        if (season !== 'low') {
+            const isActive = season === activeSeason;
+            statusEl.className = isActive ? 'pill p-g' : 'pill p-r';
+            statusEl.textContent = isActive ? 'Ενεργό' : 'Ανενεργό';
+        }
+    });
+}
+
+if(document.getElementById('mult-summer')) updateSeasonality();
+
+// Ακούμε αλλαγές στα multipliers και στο base price slider
+document.addEventListener('input', (e) => {
+    if (e.target.matches('.mult-input') || e.target.id === 'price-d') {
+        updateSeasonality();
+    }
+});
+
+/* ==============================================================
+   ΔΥΝΑΜΙΚΗ ΤΙΜΟΛΟΓΗΣΗ (ΣΥΝΔΕΣΗ ΜΕ SUPABASE)
+   ============================================================== */
+
+// 1. Φόρτωση των τρεχουσών τιμών από τη βάση κατά την εκκίνηση
+async function loadPrices() {
+    try {
+        // Παίρνουμε ένα δείγμα τιμής για κάθε τύπο δωματίου
+        const { data, error } = await supabase
+            .from('ROOM')
+            .select('RoomType, BasePrice');
+
+        if (error) throw error;
+
+        // Δημιουργούμε ένα μοναδικό λεξικό τιμών ανά τύπο
+        const priceMap = {};
+        data.forEach(r => {
+            if (!priceMap[r.RoomType]) priceMap[r.RoomType] = r.BasePrice;
+        });
+
+        // Ενημερώνουμε τα sliders και τα displays αν υπάρχουν τιμές στη βάση
+        const setPrice = (roomType, sliderId, displayId) => {
+            if (priceMap[roomType]) {
+                document.getElementById(sliderId).value = priceMap[roomType];
+                document.getElementById(displayId).textContent = '€' + priceMap[roomType];
+            }
+        };
+        setPrice('Μονόκλινο', 'price-m', 'val-m');
+        setPrice('Δίκλινο', 'price-d', 'val-d');
+        setPrice('Φαρδύκλινο', 'price-f', 'val-f');
+        setPrice('Σουίτα', 'price-s', 'val-s');
+
+        updateLivePrices();
+        updateSeasonality();
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης τιμών:", err.message);
     }
 }
 
-function savePrices() {
-    showToast("Οι νέες τιμές πόρτας αποθηκεύτηκαν επιτυχώς!", "success");
-}
+// 2. Αποθήκευση των νέων τιμών στη βάση (UPDATE)
+window.savePrices = async function() {
+    const btn = document.querySelector('button[onclick="savePrices()"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ti ti-loader" style="animation: spin 1s linear infinite;"></i> Αποθήκευση...';
+    }
 
-function resetPrices() {
-    document.getElementById('price-m').value = 85;
-    document.getElementById('price-d').value = 140;
-    document.getElementById('price-f').value = 175;
-    document.getElementById('price-s').value = 380;
-    updateLivePrices();
-    showToast("Οι τιμές επανήλθαν στις εργοστασιακές ρυθμίσεις.", "info");
-}
+    const prices = {
+        'Μονόκλινο': document.getElementById('price-m').value,
+        'Δίκλινο': document.getElementById('price-d').value,
+        'Φαρδύκλινο': document.getElementById('price-f').value,
+        'Σουίτα': document.getElementById('price-s').value
+    };
+
+    try {
+        // Εκτελούμε 4 updates, ένα για κάθε τύπο δωματίου
+        for (const [type, price] of Object.entries(prices)) {
+            const { error } = await supabase
+                .from('ROOM')
+                .update({ BasePrice: price })
+                .eq('RoomType', type);
+
+            if (error) throw error;
+        }
+
+        showToast("Οι νέες τιμές αποθηκεύτηκαν σε όλα τα δωμάτια!", "success");
+    } catch (err) {
+        console.error("Σφάλμα ενημέρωσης τιμών:", err.message);
+        showToast("Αποτυχία ενημέρωσης βάσης δεδομένων.", "error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Αποθήκευση Τιμών';
+        }
+    }
+};
+
+// 3. Επαναφορά στις εργοστασιακές τιμές
+window.resetPrices = async function() {
+    if (!confirm("Επαναφορά όλων των τιμών στις αρχικές ρυθμίσεις;")) return;
+
+    const defaults = {
+        'Μονόκλινο': 85,
+        'Δίκλινο': 140,
+        'Φαρδύκλινο': 175,
+        'Σουίτα': 380
+    };
+
+    try {
+        for (const [type, price] of Object.entries(defaults)) {
+            const { error } = await supabase
+                .from('ROOM')
+                .update({ BasePrice: price })
+                .eq('RoomType', type);
+
+            if (error) throw error;
+        }
+
+        document.getElementById('price-m').value = 85;
+        document.getElementById('val-m').textContent = '€85';
+        document.getElementById('price-d').value = 140;
+        document.getElementById('val-d').textContent = '€140';
+        document.getElementById('price-f').value = 175;
+        document.getElementById('val-f').textContent = '€175';
+        document.getElementById('price-s').value = 380;
+        document.getElementById('val-s').textContent = '€380';
+
+        showToast("Οι τιμές επαναφέρθηκαν επιτυχώς.", "info");
+    } catch (err) {
+        console.error(err);
+        showToast("Σφάλμα κατά την επαναφορά.", "error");
+    }
+};
+
+// Καλούμε τη φόρτωση τιμών αν είμαστε στο σωστό view
+if(document.getElementById('price-m')) loadPrices();
 
 
 /* ==============================================================
@@ -283,6 +447,8 @@ function assignRoom(btn, roomNum) {
    ΚΟΥΜΠΙΑ: ΠΡΟΣΩΠΙΚΟ & ΠΑΡΑΠΟΝΑ
    ============================================================== */
 let staffData = [];
+let complaintsData = [];
+let currentComplaintFilter = 'all';
 
 // 1. Fetch δεδομένων από τη βάση
 async function fetchStaff() {
@@ -367,10 +533,12 @@ function renderStaff(filter){
 }
 
 // Λειτουργία των Tabs
-function stTab(f, el){
+window.stTab = function(f, el){
     document.querySelectorAll('#v-staff .tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
+    currentComplaintFilter = f;
     renderStaff(f);
+    renderComplaints(f);
 }
 
 // Ξεκινάει το fetch αν βρισκόμαστε στο σωστό σημείο
@@ -381,60 +549,33 @@ if(document.getElementById('staff-body')) fetchStaff();
    ============================================================== */
 async function fetchComplaints() {
     try {
-        // Βεβαιώσου ότι στο HTML σου, το <tbody> των παραπόνων έχει id="complaints-body"
         const tbody = document.getElementById('complaints-body');
         if (!tbody) return; 
 
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση παραπόνων...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση παραπόνων...</td></tr>';
 
-        // Τραβάμε τα παράπονα και κάνουμε JOIN τους πίνακες CUSTOMER & EMPLOYEE για να πάρουμε τα ονόματά τους
         const { data, error } = await supabase
             .from('COMPLAINT')
             .select(`
                 ComplaintID, Description, Status, CreatedAt,
                 CUSTOMER (FullName),
-                EMPLOYEE (FullName)
+                EMPLOYEE (FullName, Role)
             `)
             .order('CreatedAt', { ascending: false });
 
         if (error) throw error;
 
-        if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Δεν υπάρχουν παράπονα στο αρχείο.</td></tr>';
-            return;
-        }
+        complaintsData = data.map(c => ({
+            id: c.ComplaintID,
+            description: c.Description,
+            status: c.Status,
+            createdAt: c.CreatedAt,
+            customerName: c.CUSTOMER ? c.CUSTOMER.FullName : 'Άγνωστος Πελάτης',
+            empName: c.EMPLOYEE ? c.EMPLOYEE.FullName : '-',
+            empRole: c.EMPLOYEE ? c.EMPLOYEE.Role?.toLowerCase().trim() : null
+        }));
 
-        // Χτίσιμο του HTML με βάση τα δεδομένα
-        tbody.innerHTML = data.map(c => {
-            const custName = c.CUSTOMER ? c.CUSTOMER.FullName : 'Άγνωστος Πελάτης';
-            const empName = c.EMPLOYEE ? c.EMPLOYEE.FullName : '-';
-            
-            // Μορφοποίηση ημερομηνίας
-            const dateObj = new Date(c.CreatedAt);
-            const dateStr = dateObj.toLocaleDateString('el-GR') + ' ' + dateObj.toLocaleTimeString('el-GR', {hour: '2-digit', minute:'2-digit'});
-            
-            let statusHtml = '';
-            let btnHtml = '';
-
-            // Ανάλογα με το Status, βγάζουμε τα σωστά κουμπιά και χρώματα
-            if (c.Status === 'pending') {
-                statusHtml = '<span class="pill p-r">Εκκρεμεί</span>';
-                btnHtml = `<button class="btn btn-dark btn-sm" onclick="resolveComplaint(this, ${c.ComplaintID})">Επίλυση</button>`;
-            } else {
-                statusHtml = '<span class="pill p-g">Επιλύθηκε</span>';
-                btnHtml = `<button class="btn btn-sm" onclick="archiveComplaint(this, ${c.ComplaintID})">Αρχείο</button>`;
-            }
-
-            return `
-                <tr id="comp-row-${c.ComplaintID}">
-                    <td>${dateStr}</td>
-                    <td><strong>${custName}</strong></td>
-                    <td>${c.Description} <br><small style="color:var(--text-muted)">Καταχωρήθηκε από: ${empName}</small></td>
-                    <td>${statusHtml}</td>
-                    <td>${btnHtml}</td>
-                </tr>
-            `;
-        }).join('');
+        renderComplaints(currentComplaintFilter);
 
     } catch (err) {
         console.error("Σφάλμα φόρτωσης παραπόνων:", err.message);
@@ -442,10 +583,110 @@ async function fetchComplaints() {
     }
 }
 
+function renderComplaints(filter) {
+    const tbody = document.getElementById('complaints-body');
+    if (!tbody) return;
+
+    const filteredData = filter === 'all'
+        ? complaintsData
+        : complaintsData.filter(c => {
+            if (filter === 'reception') return c.empRole === 'receptionist';
+            if (filter === 'clean') return c.empRole === 'maid';
+            if (filter === 'restaurant') return c.empRole === 'minibar' || c.empRole === 'restaurant';
+            return false;
+        });
+
+    if (filteredData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Δεν βρέθηκαν παράπονα για αυτό το τμήμα.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filteredData.map(c => {
+        const dateObj = new Date(c.createdAt);
+        const dateStr = dateObj.toLocaleDateString('el-GR') + ' ' + dateObj.toLocaleTimeString('el-GR', {hour: '2-digit', minute:'2-digit'});
+
+        const statusHtml = c.status === 'pending'
+            ? '<span class="pill p-r">Εκκρεμεί</span>'
+            : '<span class="pill p-g">Επιλύθηκε</span>';
+
+        return `
+            <tr id="comp-row-${c.id}">
+                <td>${dateStr}</td>
+                <td><strong>${c.empName}</strong></td>
+                <td><strong>${c.customerName}</strong></td>
+                <td>${c.description}</td>
+                <td>${statusHtml}</td>
+                <td><button class="btn btn-sm" onclick="viewComplaint(${c.id})">Προβολή</button></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+/* ==============================================================
+   ΠΑΡΑΠΟΝΑ — MODAL ΠΡΟΒΟΛΗΣ
+   ============================================================== */
+
+window.viewComplaint = function(id) {
+    const c = complaintsData.find(x => x.id === id);
+    if (!c) return;
+
+    const dateObj = new Date(c.createdAt);
+    const dateStr = dateObj.toLocaleDateString('el-GR') + ' ' + dateObj.toLocaleTimeString('el-GR', {hour: '2-digit', minute:'2-digit'});
+
+    const statusLabel = c.status === 'pending' ? 'Εκκρεμεί' : 'Επιλύθηκε';
+    const statusClass = c.status === 'pending' ? 'pill p-r' : 'pill p-g';
+
+    document.getElementById('modal-body').innerHTML = `
+        <div class="field">
+            <div class="field-label">Ημερομηνία</div>
+            <div class="field-value">${dateStr}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">Υπάλληλος</div>
+            <div class="field-value"><strong>${c.empName}</strong></div>
+        </div>
+        <div class="field">
+            <div class="field-label">Πελάτης</div>
+            <div class="field-value"><strong>${c.customerName}</strong></div>
+        </div>
+        <div class="field">
+            <div class="field-label">Κατάσταση</div>
+            <div class="field-value"><span class="${statusClass}">${statusLabel}</span></div>
+        </div>
+        <div class="field">
+            <div class="field-label">Περιγραφή</div>
+            <div class="desc-box">${c.description}</div>
+        </div>
+    `;
+
+    const isPending = c.status === 'pending';
+    document.getElementById('modal-footer').innerHTML = isPending
+        ? `<button class="btn btn-dark" onclick="resolveComplaintFromModal(${c.id})">Επίλυση</button>
+           <button class="btn" onclick="closeComplaintModal()">Κλείσιμο</button>`
+        : `<button class="btn" onclick="archiveComplaintFromModal(${c.id})">Αρχειοθέτηση</button>
+           <button class="btn" onclick="closeComplaintModal()">Κλείσιμο</button>`;
+
+    document.getElementById('complaint-modal').style.display = 'flex';
+};
+
+window.closeComplaintModal = function(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('complaint-modal').style.display = 'none';
+};
+
+window.resolveComplaintFromModal = async function(id) {
+    await resolveComplaint(null, id);
+    closeComplaintModal();
+};
+
+window.archiveComplaintFromModal = async function(id) {
+    await archiveComplaint(null, id);
+    closeComplaintModal();
+};
+
 // Λειτουργία: Επίλυση Παραπόνου (UPDATE στη βάση)
 async function resolveComplaint(btn, id) {
-    btn.disabled = true;
-    btn.innerHTML = '<i class="ti ti-loader" style="animation: spin 1s linear infinite;"></i>';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="animation: spin 1s linear infinite;"></i>'; }
     
     try {
         const { error } = await supabase
@@ -460,14 +701,13 @@ async function resolveComplaint(btn, id) {
     } catch (err) {
         console.error(err);
         showToast("Σφάλμα κατά την ενημέρωση.", "error");
-        btn.disabled = false;
-        btn.textContent = 'Επίλυση';
+        if (btn) { btn.disabled = false; btn.textContent = 'Επίλυση'; }
     }
 }
 
 // Λειτουργία: Αρχειοθέτηση Παραπόνου (DELETE από τη βάση - Προαιρετικά μπορεί να είναι απλό hide)
 async function archiveComplaint(btn, id) {
-    btn.disabled = true;
+    if (btn) { btn.disabled = true; }
     try {
         const { error } = await supabase
             .from('COMPLAINT')
@@ -484,10 +724,12 @@ async function archiveComplaint(btn, id) {
             row.style.opacity = '0';
             setTimeout(() => row.remove(), 300);
         }
+        // Αφαίρεση και από το τοπικό array για να μην επανεμφανιστεί
+        complaintsData = complaintsData.filter(c => c.id !== id);
     } catch (err) {
         console.error(err);
         showToast("Σφάλμα κατά τη διαγραφή.", "error");
-        btn.disabled = false;
+        if (btn) { btn.disabled = false; }
     }
 }
 
@@ -775,7 +1017,7 @@ if(document.getElementById('payroll-body')) fetchPayroll();
 /* ==============================================================
    ΚΟΥΜΠΙΑ: BACKUP SYSTEM
    ============================================================== */
-function runBackup(btn) {
+window.runBackup = function(btn) {
     btn.disabled = true;
     btn.innerHTML = '<i class="ti ti-loader" aria-hidden="true" style="animation: spin 1s linear infinite;"></i> Σε εξέλιξη...';
     showToast("Εκκίνηση χειροκίνητου Backup. Παρακαλώ περιμένετε...", "info");
@@ -799,26 +1041,110 @@ function runBackup(btn) {
 
 // Απλό animation για το κουμπί backup
 const style = document.createElement('style');
-style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
+style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } }
+.mult-input{width:60px;padding:4px 6px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-body);color:var(--text-main);font-weight:500;text-align:center;font-size:13px}
+.mult-input:focus{outline:2px solid var(--accent)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-content{background:var(--color-background-primary);border-radius:12px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;border-bottom:1px solid var(--border-color)}
+.modal-title{font-weight:600;font-size:1.1rem}
+.modal-close{cursor:pointer;font-size:1.5rem;color:var(--text-muted);line-height:1;padding:0 4px}
+.modal-close:hover{color:var(--text-main)}
+.modal-body{padding:1.5rem;line-height:1.7}
+.modal-body .field{margin-bottom:12px}
+.modal-body .field-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.modal-body .field-value{font-size:14px;color:var(--text-main)}
+.modal-body .desc-box{padding:12px;background:var(--bg-body);border-radius:8px;margin-top:4px;font-size:14px;line-height:1.6;white-space:pre-wrap}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:1rem 1.5rem;border-top:1px solid var(--border-color)}`;
 document.head.appendChild(style);
 
 
 /* ==============================================================
-   ΓΡΑΦΗΜΑ ΕΣΟΔΩΝ (CHART.JS)
+   ΓΡΑΦΗΜΑ ΕΣΟΔΩΝ & ΕΞΑΓΩΓΗ ΔΕΔΟΜΕΝΩΝ (CSV)
    ============================================================== */
 let revChart;
-function buildRevChart() {
+
+// 1. Αρχικοποίηση Ημερομηνιών (Προεπιλογή: Τρέχων Μήνας)
+function initRevenueDates() {
+    const startInput = document.getElementById('rev-start-date');
+    const endInput = document.getElementById('rev-end-date');
+    if (!startInput || !endInput) return;
+
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const today = now.toISOString().split('T')[0];
+
+    startInput.value = firstDay;
+    endInput.value = today;
+
+    // Listeners για αυτόματη ανανέωση όταν αλλάζουν χειροκίνητα οι ημερομηνίες
+    [startInput, endInput].forEach(input => {
+        input.addEventListener('change', () => fetchRevenue());
+    });
+}
+
+// 2. Fetch δεδομένων από τη βάση
+async function fetchRevenue() {
+    try {
+        const startDate = document.getElementById('rev-start-date').value;
+        const endDate = document.getElementById('rev-end-date').value;
+
+        const { data, error } = await supabase
+            .from('RECEIPT')
+            .select('PaymentDate, Amount, Category')
+            .gte('PaymentDate', startDate)
+            .lte('PaymentDate', endDate)
+            .order('PaymentDate', { ascending: true });
+
+        if (error) throw error;
+
+        const groupedData = {};
+        data.forEach(receipt => {
+            const dateObj = new Date(receipt.PaymentDate);
+            const dateStr = dateObj.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit' });
+            
+            if (!groupedData[dateStr]) {
+                groupedData[dateStr] = { 'Διαμονή': 0, 'Εστιατόριο': 0, 'Λοιπά': 0 };
+            }
+            
+            const cat = receipt.Category || 'Λοιπά';
+            if (groupedData[dateStr][cat] !== undefined) {
+                groupedData[dateStr][cat] += Number(receipt.Amount);
+            }
+        });
+
+        const labels = Object.keys(groupedData);
+        buildRevChart(
+            labels, 
+            labels.map(date => groupedData[date]['Διαμονή']), 
+            labels.map(date => groupedData[date]['Εστιατόριο']), 
+            labels.map(date => groupedData[date]['Λοιπά'])
+        );
+
+        // Ενημέρωση του συνολικού ποσού στην κάρτα
+        const total = data.reduce((sum, r) => sum + Number(r.Amount), 0);
+        if(document.getElementById('rev-total')) document.getElementById('rev-total').textContent = `€${total.toLocaleString('el-GR')}`;
+
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης εσόδων:", err.message);
+        showToast("Αποτυχία φόρτωσης δεδομένων εσόδων.", "error");
+    }
+}
+
+// 3. Σχεδιασμός του γραφήματος
+function buildRevChart(labels, diamoni, estiatorio, loipa) {
     const ctx = document.getElementById('rev-chart');
-    if (!ctx || revChart) return;
+    if (!ctx) return;
+    if (revChart) revChart.destroy();
     
     revChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: ['01/05','02/05','03/05','04/05','05/05','06/05','07/05','08/05','Σήμερα'],
+            labels: labels,
             datasets: [
-                {label: 'Διαμονή', data: [9200, 10100, 8900, 11400, 12800, 13100, 12400, 11900, 10500], backgroundColor: '#1D9E75'},
-                {label: 'Εστιατόριο', data: [1800, 2100, 1950, 2400, 2800, 3100, 2900, 2500, 2100], backgroundColor: '#378ADD'},
-                {label: 'Λοιπά', data: [560, 590, 600, 770, 890, 1000, 870, 740, 820], backgroundColor: '#EF9F27'}
+                {label: 'Διαμονή', data: diamoni, backgroundColor: '#1D9E75'},
+                {label: 'Εστιατόριο', data: estiatorio, backgroundColor: '#378ADD'},
+                {label: 'Λοιπά', data: loipa, backgroundColor: '#EF9F27'}
             ]
         },
         options: {
@@ -831,10 +1157,57 @@ function buildRevChart() {
         }
     });
 }
+
+// 4. Εξαγωγή σε CSV με διόρθωση Ελληνικών (BOM)
+window.exportRevenueToCSV = async function() {
+    const startDate = document.getElementById('rev-start-date').value;
+    const endDate = document.getElementById('rev-end-date').value;
+
+    const { data, error } = await supabase
+        .from('RECEIPT')
+        .select('PaymentDate, Amount, Category')
+        .gte('PaymentDate', startDate)
+        .lte('PaymentDate', endDate)
+        .order('PaymentDate', { ascending: true });
+
+    if (error || !data.length) {
+        showToast("Δεν βρέθηκαν δεδομένα για εξαγωγή.", "error");
+        return;
+    }
+
+    let csvContent = "Ημερομηνία,Κατηγορία,Ποσό (€)\n";
+    data.forEach(r => {
+        csvContent += `${r.PaymentDate},${r.Category},${r.Amount}\n`;
+    });
+
+    // Προσθήκη BOM (\uFEFF) για σωστή ανάγνωση Ελληνικών από το Excel
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Revenue_Report_${startDate}_to_${endDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+// 5. Σύνδεση με το μενού (Sidebar Click)
+document.querySelectorAll('.sb-item').forEach(el => {
+    el.addEventListener('click', () => {
+        if (el.dataset.v === 'revenue') {
+            // Φορτώνουμε τα δεδομένα αμέσως μόλις γίνει το κλικ
+            setTimeout(fetchRevenue, 100); 
+        }
+    });
+});
+
+// Εκκίνηση ημερομηνιών κατά το φόρτωμα της σελίδας
+initRevenueDates();
+
 /* ==============================================================
    ΛΕΙΤΟΥΡΓΙΑ ΑΠΟΣΥΝΔΕΣΗΣ (LOGOUT)
    ============================================================== */
-function logout() {
+window.logout = function() {
     // 1. Διαγραφή των δεδομένων του χρήστη από το localStorage
     localStorage.removeItem('hotel_user');
     
@@ -845,10 +1218,89 @@ function logout() {
     window.location.href = "/pages/login.html";
 }
 
+/* ==============================================================
+   ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
+   ============================================================== */
+async function fetchUsers() {
+    try {
+        const tbody = document.getElementById('users-body');
+        if (!tbody) return;
+
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση χρηστών...</td></tr>';
+
+        const { data, error } = await supabase
+            .from('EMPLOYEE')
+            .select('EmpID, FullName, Username, Role, isActive')
+            .order('FullName', { ascending: true });
+
+        if (error) throw error;
+
+        tbody.innerHTML = data.map(u => {
+            const statusHtml = u.isActive 
+                ? '<span class="pill p-g">Ενεργός</span>' 
+                : '<span class="pill p-r">Απενεργοποιημένος</span>';
+            
+            const btnText = u.isActive ? 'Απενεργοποίηση' : 'Ενεργοποίηση';
+            const btnClass = u.isActive ? 'btn-sm' : 'btn-dark btn-sm';
+
+            return `
+                <tr>
+                    <td><strong>${u.FullName}</strong></td>
+                    <td><code>${u.Username || '-'}</code></td>
+                    <td><span class="pill p-b">${u.Role}</span></td>
+                    <td>${statusHtml}</td>
+                    <td>
+                        <button class="btn ${btnClass}" onclick="toggleUserStatus(${u.EmpID}, ${u.isActive}, '${u.FullName}')">
+                            ${btnText}
+                        </button>
+                        <button class="btn btn-sm" onclick="triggerAction('Αλλαγή κωδικού για: ${u.Username}', 'warning')">
+                            <i class="ti ti-key"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Σφάλμα χρηστών:", err.message);
+        showToast("Αποτυχία φόρτωσης λίστας χρηστών.", "error");
+    }
+}
+
+// Λειτουργία: Ενεργοποίηση / Απενεργοποίηση Χρήστη
+window.toggleUserStatus = async function(id, currentStatus, name) {
+    const newStatus = !currentStatus;
+    const actionText = newStatus ? 'ενεργοποιήσετε' : 'απενεργοποιήσετε';
+    
+    if (!confirm(`Είστε σίγουροι ότι θέλετε να ${actionText} την πρόσβαση για τον/την ${name};`)) return;
+
+    try {
+        const { error } = await supabase
+            .from('EMPLOYEE')
+            .update({ isActive: newStatus })
+            .eq('EmpID', id);
+
+        if (error) throw error;
+
+        showToast(`Ο χρήστης ${name} ενημερώθηκε επιτυχώς!`, "success");
+        fetchUsers(); // Ανανέωση πίνακα
+    } catch (err) {
+        console.error(err);
+        showToast("Σφάλμα κατά την ενημέρωση του χρήστη.", "error");
+    }
+};
+
+// Εκκίνηση Φόρτωσης όταν ανοίγει το Tab των Χρηστών
+document.querySelectorAll('.sb-item').forEach(el => {
+    el.addEventListener('click', () => {
+        if (el.dataset.v === 'users') fetchUsers();
+    });
+});
+
 // Σύνδεση του κουμπιού με τη συνάρτηση
 const logoutBtn = document.getElementById('logout-btn');
 if (logoutBtn) {
-    logoutBtn.addEventListener('click', logout);
+    logoutBtn.addEventListener('click', window.logout);
 }
 
 document.querySelectorAll('.sb-item').forEach(el => {
@@ -856,4 +1308,28 @@ document.querySelectorAll('.sb-item').forEach(el => {
         if (el.dataset.v === 'revenue') setTimeout(buildRevChart, 50);
     });
 });
+
+window.updateSpecificRooms = async function() {
+    const roomsInput = document.getElementById('specific-room-ids').value;
+    const priceInput = document.getElementById('specific-price').value;
+
+    if (!roomsInput || !priceInput) {
+        showToast("Παρακαλώ συμπληρώστε δωμάτια και τιμή.", "warning");
+        return;
+    }
+
+    const roomNumbers = roomsInput.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+
+    try {
+        const { error } = await supabase
+            .from('ROOM')
+            .update({ BasePrice: priceInput })
+            .in('RoomNumber', roomNumbers);
+
+        if (error) throw error;
+        showToast(`Ενημερώθηκαν ${roomNumbers.length} δωμάτια!`, "success");
+    } catch (err) {
+        showToast("Σφάλμα ενημέρωσης.", "error");
+    }
+};
 

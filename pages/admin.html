@@ -104,44 +104,72 @@
 
   <div class="view" id="v-revenue">
     <div class="g4">
-      <div class="sc"><div class="sc-lbl">Σύνολο Μήνα</div><div class="sc-val" id="rev-total">€128.220</div><div class="sc-sub sc-up">+11% vs Προηγ.</div></div>
+      <div class="sc"><div class="sc-lbl">Σύνολο Επιλεγμένης Περιόδου</div><div class="sc-val" id="rev-total">€0</div><div class="sc-sub sc-up">+11% vs Προηγ.</div></div>
       <div class="sc"><div class="sc-lbl">Μ.Ο. ημέρας</div><div class="sc-val">€14.247</div><div class="sc-sub">9 ημέρες δεδομένα</div></div>
       <div class="sc"><div class="sc-lbl">Υψηλότερη ημέρα</div><div class="sc-val">€17.200</div><div class="sc-sub">06/05 Τετάρτη</div></div>
       <div class="sc"><div class="sc-lbl">Χαμηλότερη ημέρα</div><div class="sc-val">€11.450</div><div class="sc-sub">03/05 Κυριακή</div></div>
     </div>
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-chart-bar" aria-hidden="true"></i>Ημερήσια Έσοδα Μήνα</div>
-        <div style="display:flex;gap:5px">
-          <button class="btn btn-sm btn-dark" onclick="triggerAction('Λήψη αρχείου Revenue_Report.csv...', 'success')"><i class="ti ti-download" aria-hidden="true"></i> Εξαγωγή</button>
+      <div class="card-hd">
+        <div class="card-hd-l"><i class="ti ti-chart-bar" aria-hidden="true"></i>Ημερήσια Έσοδα</div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap: wrap;">
+          <div style="display:flex; gap:5px; align-items:center;">
+            <label style="font-size:11px; color:var(--text-muted)">Από:</label>
+            <input type="date" id="rev-start-date" class="btn btn-sm" style="background:var(--bg-body); border:1px solid var(--border-color);">
+          </div>
+          <div style="display:flex; gap:5px; align-items:center;">
+            <label style="font-size:11px; color:var(--text-muted)">Έως:</label>
+            <input type="date" id="rev-end-date" class="btn btn-sm" style="background:var(--bg-body); border:1px solid var(--border-color);">
+          </div>
+          <button class="btn btn-sm btn-dark" onclick="exportRevenueToCSV()">
+            <i class="ti ti-download" aria-hidden="true"></i> Εξαγωγή CSV
+          </button>
         </div>
       </div>
-      <div style="position:relative;width:100%;height:180px"><canvas id="rev-chart"></canvas></div>
+      <div style="position:relative;width:100%;height:220px"><canvas id="rev-chart"></canvas></div>
     </div>
   </div>
 
   <div class="view" id="v-pricing">
     <div class="ns ns-w" id="pricing-alert"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Τιμές καλοκαιρινής περιόδου ενεργές. Αν η πληρότητα πέσει κάτω από 60%, εφαρμόζεται αυτόματη έκπτωση Ζ%.</div></div>
+    
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-adjustments" aria-hidden="true"></i>Τιμές Πόρτας — Δυναμική Τιμολόγηση</div></div>
-      <div class="price-dial"><span class="dial-lbl">Μονόκλινο (βάση)</span><input type="range" id="price-m" min="50" max="200" value="85" step="1" oninput="updateLivePrices()"><span class="dial-val" id="val-m">€85</span></div>
-      <div class="price-dial"><span class="dial-lbl">Δίκλινο (βάση)</span><input type="range" id="price-d" min="80" max="300" value="140" step="1" oninput="updateLivePrices()"><span class="dial-val" id="val-d">€140</span></div>
-      <div class="price-dial"><span class="dial-lbl">Φαρδύκλινο (βάση)</span><input type="range" id="price-f" min="100" max="350" value="175" step="1" oninput="updateLivePrices()"><span class="dial-val" id="val-f">€175</span></div>
-      <div class="price-dial"><span class="dial-lbl">Σουίτα (βάση)</span><input type="range" id="price-s" min="200" max="600" value="380" step="1" oninput="updateLivePrices()"><span class="dial-val" id="val-s">€380</span></div>
+      <div class="price-dial"><span class="dial-lbl">Μονόκλινο (βάση)</span><input type="range" id="price-m" min="50" max="200" value="85" step="1"><span class="dial-val" id="val-m">€85</span></div>
+      <div class="price-dial"><span class="dial-lbl">Δίκλινο (βάση)</span><input type="range" id="price-d" min="80" max="300" value="140" step="1"><span class="dial-val" id="val-d">€140</span></div>
+      <div class="price-dial"><span class="dial-lbl">Φαρδύκλινο (βάση)</span><input type="range" id="price-f" min="100" max="350" value="175" step="1"><span class="dial-val" id="val-f">€175</span></div>
+      <div class="price-dial"><span class="dial-lbl">Σουίτα (βάση)</span><input type="range" id="price-s" min="200" max="600" value="380" step="1"><span class="dial-val" id="val-s">€380</span></div>
     </div>
+
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-calendar-event" aria-hidden="true"></i>Συντελεστές Εποχικότητας</div></div>
       <table>
         <thead><tr><th style="width:30%">Περίοδος</th><th style="width:20%">Πολλαπλ.</th><th style="width:30%">Τιμή Πόρτας (Δίκλινο)</th><th style="width:20%">Κατάσταση</th></tr></thead>
         <tbody>
-          <tr><td>Καλοκαίρι (Ιούν–Αύγ)</td><td style="font-weight:500">×1.6</td><td id="calc-summer">€224/βράδυ</td><td><span class="pill p-g">Ενεργό</span></td></tr>
-          <tr><td>Χριστούγεννα</td><td style="font-weight:500">×1.4</td><td id="calc-xmas">€196/βράδυ</td><td><span class="pill p-gr">Ανενεργό</span></td></tr>
-          <tr><td>Πάσχα</td><td style="font-weight:500">×1.3</td><td id="calc-easter">€182/βράδυ</td><td><span class="pill p-gr">Ανενεργό</span></td></tr>
-          <tr><td>Πληρ. &lt;60% (Ζ=-15%)</td><td style="font-weight:500">×0.85</td><td id="calc-low">€119/βράδυ</td><td><span class="pill" id="status-low">Αυτόματο</span></td></tr>
+          <tr><td>Καλοκαίρι (Ιούν–Αύγ)</td><td><input type="number" id="mult-summer" class="mult-input" value="1.6" step="0.1" min="0" max="5"></td><td id="calc-summer">€224/βράδυ</td><td><span class="pill p-g" id="status-summer">Ενεργό</span></td></tr>
+          <tr><td>Χριστούγεννα</td><td><input type="number" id="mult-xmas" class="mult-input" value="1.4" step="0.1" min="0" max="5"></td><td id="calc-xmas">€196/βράδυ</td><td><span class="pill p-r" id="status-xmas">Ανενεργό</span></td></tr>
+          <tr><td>Πάσχα</td><td><input type="number" id="mult-easter" class="mult-input" value="1.3" step="0.1" min="0" max="5"></td><td id="calc-easter">€182/βράδυ</td><td><span class="pill p-r" id="status-easter">Ανενεργό</span></td></tr>
+          <tr><td>Πληρ. &lt;60% (Ζ=-15%)</td><td><input type="number" id="mult-low" class="mult-input" value="0.85" step="0.05" min="0" max="2"></td><td id="calc-low">€119/βράδυ</td><td><span class="pill p-r" id="status-low">Ανενεργό</span></td></tr>
         </tbody>
       </table>
       <div style="margin-top:10px;display:flex;gap:7px">
         <button class="btn btn-dark" onclick="savePrices()"><i class="ti ti-device-floppy" aria-hidden="true"></i> Αποθήκευση τιμών</button>
         <button class="btn" onclick="resetPrices()"><i class="ti ti-refresh" aria-hidden="true"></i> Επαναφορά</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-home-cog" aria-hidden="true"></i>Εξειδικευμένη Τιμολόγηση (Ανά Δωμάτιο)</div></div>
+      <div style="padding: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+        <div class="form-group">
+          <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 5px;">Αριθμοί Δωματίων (π.χ. 101, 105)</label>
+          <input type="text" id="specific-room-ids" placeholder="π.χ. 101, 105, 210" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-body); color: var(--text-main);">
+        </div>
+        <div class="form-group">
+          <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 5px;">Νέα Τιμή (€)</label>
+          <input type="number" id="specific-price" placeholder="150" style="padding: 8px; width: 100px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-body); color: var(--text-main);">
+        </div>
+        <button class="btn btn-dark" onclick="updateSpecificRooms()">Εφαρμογή</button>
       </div>
     </div>
   </div>
@@ -157,25 +185,13 @@
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-grid-dots" aria-hidden="true"></i>Ζωντανός Χάρτης 510 δωματίων</div></div>
       <div style="display:grid;grid-template-columns:repeat(20,1fr);gap:3px;margin-bottom:15px;max-height:400px;overflow-y:auto;padding-right:5px;" id="rmap"></div>
     </div>
-    <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-list" aria-hidden="true"></i>Διαθέσιμα δωμάτια</div></div>
-      <table>
-        <thead><tr><th style="width:16%">Αρ.</th><th style="width:22%">Τύπος</th><th style="width:12%">Όροφος</th><th style="width:20%">Τιμή</th><th style="width:16%">Κατάσταση</th><th style="width:14%">Εκχώρηση</th></tr></thead>
-        <tbody>
-          <tr><td>M-102</td><td>Μονόκλινο</td><td>1ος</td><td>€85/βρ.</td><td><span class="pill p-g">Έτοιμο</span></td><td><button class="btn btn-sm btn-dark" onclick="assignRoom(this, 'M-102')">Εκχώρηση</button></td></tr>
-          <tr><td>Δ-218</td><td>Δίκλινο</td><td>2ος</td><td>€140/βρ.</td><td><span class="pill p-g">Έτοιμο</span></td><td><button class="btn btn-sm btn-dark" onclick="assignRoom(this, 'Δ-218')">Εκχώρηση</button></td></tr>
-          <tr><td>Φ-315</td><td>Φαρδύκλινο</td><td>3ος</td><td>€175/βρ.</td><td><span class="pill p-b">Έτοιμο 13:00</span></td><td><button class="btn btn-sm" onclick="assignRoom(this, 'Φ-315')">Εκχώρηση</button></td></tr>
-          <tr><td>Δ-409</td><td>Δίκλινο</td><td>4ος</td><td>€140/βρ.</td><td><span class="pill p-a">Υπό καθ.</span></td><td><button class="btn btn-sm" disabled style="opacity:0.4">Αναμ.</button></td></tr>
-        </tbody>
-      </table>
-    </div>
   </div>
 
   <div class="view" id="v-staff">
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-users" aria-hidden="true"></i>Ιστορικό & Αξιολόγηση Προσωπικού</div></div>
       <div class="tab-row">
-        <div class="tab active" onclick="stTab('all',this)">Όλοι (68)</div>
+        <div class="tab active" onclick="stTab('all',this)">Όλοι</div>
         <div class="tab" onclick="stTab('reception',this)">Υποδοχή</div>
         <div class="tab" onclick="stTab('clean',this)">Καθαριότητα</div>
         <div class="tab" onclick="stTab('restaurant',this)">Εστιατόριο</div>
@@ -189,36 +205,20 @@
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-message-report" aria-hidden="true"></i>Παράπονα Πελατών</div></div>
       <table id="complaints-table">
         <thead>
-          <tr>
-            <th style="width:14%">Ημερ.</th>
-            <th style="width:24%">Υπάλληλος / Πελάτης</th> <th style="width:38%">Παράπονο</th>
-            <th style="width:14%">Κατάσταση</th>
-            <th style="width:10%"></th>
-          </tr>
+          <tr><th style="width:13%">Ημερ.</th><th style="width:18%">Υπάλληλος</th><th style="width:18%">Πελάτης</th><th style="width:28%">Παράπονο</th><th style="width:13%">Κατάσταση</th><th style="width:10%"></th></tr>
         </thead>
-        <tbody id="complaints-body">
-          
-        </tbody>
+        <tbody id="complaints-body"></tbody>
       </table>
     </div>
   </div>
 
   <div class="view" id="v-restaurant">
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-package" aria-hidden="true"></i>Αποθέματα & Ελάχιστα Επίπεδα</div><button class="btn btn-sm btn-dark" onclick="triggerAction('Άνοιγμα φόρμας νέας μαζικής παραγγελίας...', 'info')"><i class="ti ti-plus" aria-hidden="true"></i> Νέα Παραγγελία</button></div>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-package" aria-hidden="true"></i>Αποθέματα & Ελάχιστα Επίπεδα</div></div>
       <table id="inventory-table">
-      <thead>
-        <tr>
-          <th>Προϊόν</th>
-          <th>Κατηγορία</th>
-          <th>Απόθεμα</th>
-          <th>Κατάσταση</th>
-          <th>Ενέργεια</th>
-        </tr>
-      </thead>
-    <tbody id="inventory-body">
-    </tbody>
-</table>
+        <thead><tr><th>Προϊόν</th><th>Κατηγορία</th><th>Απόθεμα</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
+        <tbody id="inventory-body"></tbody>
+      </table>
     </div>
   </div>
 
@@ -226,31 +226,18 @@
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-building-store" aria-hidden="true"></i>Ενοικιαζόμενα Καταστήματα</div></div>
       <table id="rentals-table">
-        <thead>
-          <tr>
-            <th>Κατάστημα / Επιχείρηση</th>
-            <th>Ενοικιαστής</th>
-            <th>Μηνιαίο Μίσθωμα</th>
-            <th>Κατάσταση Πληρωμής</th>
-            <th>Ενέργειες</th>
-          </tr>
-        </thead>
-      <tbody id="rentals-body">
-    </tbody>
-</table>
+        <thead><tr><th>Κατάστημα</th><th>Ενοικιαστής</th><th>Μηνιαίο Μίσθωμα</th><th>Κατάσταση Πληρωμής</th><th>Ενέργειες</th></tr></thead>
+        <tbody id="rentals-body"></tbody>
+      </table>
     </div>
   </div>
 
   <div class="view" id="v-users">
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-lock" aria-hidden="true"></i>Χρήστες & Δικαιώματα Πρόσβασης</div><button class="btn btn-sm btn-dark" onclick="triggerAction('Φόρμα δημιουργίας νέου χρήστη...', 'info')"><i class="ti ti-plus" aria-hidden="true"></i> Νέος χρήστης</button></div>
-      <table>
-        <thead><tr><th style="width:24%">Χρήστης</th><th style="width:20%">Ρόλος</th><th style="width:36%">Πρόσβαση</th><th style="width:10%">Κατάσταση</th><th style="width:10%"></th></tr></thead>
-        <tbody>
-          <tr><td>Ιδιοκτήτης</td><td><span class="pill p-b">Admin</span></td><td>Πλήρης πρόσβαση σε όλα</td><td><span class="pill p-g">Ενεργός</span></td><td><i class="ti ti-crown" aria-hidden="true" style="color:#A8892A;font-size:14px"></i></td></tr>
-          <tr><td>Αναστασίου Κ.</td><td><span class="pill p-t">Ρεσεψιονίστ</span></td><td>Κρατήσεις, δωμάτια, C/I, C/O</td><td><span class="pill p-g">Ενεργός</span></td><td><button class="btn btn-sm" onclick="triggerAction('Επεξεργασία Αναστασίου Κ.', 'info')"><i class="ti ti-edit" aria-hidden="true"></i></button></td></tr>
-          <tr><td>Μαρία Κ.</td><td><span class="pill p-a">Καμαριέρα</span></td><td>Κατάσταση δωματίων, mini-bar</td><td><span class="pill p-g">Ενεργός</span></td><td><button class="btn btn-sm" onclick="triggerAction('Επεξεργασία Μαρία Κ.', 'info')"><i class="ti ti-edit" aria-hidden="true"></i></button></td></tr>
-        </tbody>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-users-lock" aria-hidden="true"></i>Διαχείριση Πρόσβασης & Ρόλων</div></div>
+      <table id="users-table">
+        <thead><tr><th>Ονοματεπώνυμο</th><th>Username</th><th>Ρόλος Συστήματος</th><th>Κατάσταση</th><th>Ενέργειες</th></tr></thead>
+        <tbody id="users-body"></tbody>
       </table>
     </div>
   </div>
@@ -259,76 +246,56 @@
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-database" aria-hidden="true"></i>Ιστορικό Backup</div><button class="btn btn-sm btn-dark" id="btn-run-backup" onclick="runBackup(this)"><i class="ti ti-player-play" aria-hidden="true"></i> Εκτέλεση τώρα</button></div>
       <table id="backup-table">
-        <thead><tr><th style="width:18%">Ημερ.</th><th style="width:16%">Ώρα</th><th style="width:20%">Μέσο</th><th style="width:16%">Μέγεθος</th><th style="width:16%">Κατάσταση</th><th style="width:14%">Επαλ.</th></tr></thead>
+        <thead><tr><th>Ημερ.</th><th>Ώρα</th><th>Μέσο</th><th>Μέγεθος</th><th>Κατάσταση</th><th>Επαλ.</th></tr></thead>
         <tbody>
           <tr><td>Σήμερα</td><td>08:03</td><td>X:\backup</td><td>4.2 GB</td><td><span class="pill p-g">Επιτυχές</span></td><td><span class="pill p-g">OK</span></td></tr>
-          <tr><td>Χθες</td><td>08:01</td><td>X:\backup</td><td>4.1 GB</td><td><span class="pill p-g">Επιτυχές</span></td><td><span class="pill p-g">OK</span></td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
   <div class="view" id="v-vehicles">
-  <div class="card">
-    
-    <div class="card-hd">
-      <div class="card-hd-l">
-        <i class="ti ti-car" aria-hidden="true"></i> Στόλος Οχημάτων
-      </div>
-      <button class="btn btn-sm btn-dark" onclick="triggerAction('Λήψη αναφοράς στόλου...', 'success')">Αναφορά</button>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-car" aria-hidden="true"></i> Στόλος Οχημάτων</div></div>
+      <table id="vehicles-table">
+        <thead><tr><th style="width:35%">Όχημα / Μοντέλο</th><th style="width:20%">Πινακίδα</th><th style="width:25%">Κατάσταση</th><th style="width:20%">Ενέργεια</th></tr></thead>
+        <tbody id="vehicles-body"></tbody>
+      </table>
     </div>
-
-    <table id="vehicles-table">
-      <thead>
-        <tr>
-          <th style="width:35%">Όχημα / Μοντέλο</th>
-          <th style="width:20%">Πινακίδα</th>
-          <th style="width:25%">Κατάσταση</th>
-          <th style="width:20%">Ενέργεια</th>
-        </tr>
-      </thead>
-      <tbody id="vehicles-body">
-        </tbody>
-    </table>
-    
   </div>
-</div>
+
   <div class="view" id="v-gardens"><div class="card"><div class="card-hd">Κήποι</div></div></div>
-<div class="view" id="v-payroll">
-  <div class="card">
-    <div class="card-hd">
-      <div class="card-hd-l">
-        <i class="ti ti-cash-banknote" aria-hidden="true"></i> Τρέχουσα Μισθοδοσία
-      </div>
-      <button class="btn btn-sm btn-dark" onclick="triggerAction('Εξαγωγή αρχείου τράπεζας (SEPA)...', 'info')">Εξαγωγή SEPA</button>
-    </div>
 
-    <table id="payroll-table">
-      <thead>
-        <tr>
-          <th>Υπάλληλος</th>
-          <th>Ρόλος / Τμήμα</th>
-          <th>Μηνιαίος Μισθός</th>
-          <th>IBAN Λογαριασμού</th>
-          <th>Τελ. Πληρωμή</th>
-          <th>Ενέργεια</th>
-        </tr>
-      </thead>
-      <tbody id="payroll-body">
-        </tbody>
-    </table>
+  <div class="view" id="v-payroll">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-cash-banknote" aria-hidden="true"></i> Τρέχουσα Μισθοδοσία</div></div>
+      <table id="payroll-table">
+        <thead><tr><th>Υπάλληλος</th><th>Ρόλος / Τμήμα</th><th>Μηνιαίος Μισθός</th><th>IBAN Λογαριασμού</th><th>Τελ. Πληρωμή</th><th>Ενέργεια</th></tr></thead>
+        <tbody id="payroll-body"></tbody>
+      </table>
+    </div>
   </div>
-</div>
+  
   </div>
 </div>
 </div>
 
 <div id="toast-container" class="toast-container"></div>
 
+<div id="complaint-modal" class="modal-overlay" style="display:none" onclick="closeComplaintModal(event)">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">Παράπονο</span>
+      <span class="modal-close" onclick="closeComplaintModal()">&times;</span>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script type="module" src="../js/admin.js"></script>
 <script type="module" src="../js/supabase-config.js"></script>
-
 
 </body>
 </html>
