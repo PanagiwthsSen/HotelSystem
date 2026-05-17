@@ -1,19 +1,27 @@
 import { supabase } from './supabase-config.js';
 
-// ΠΡΟΣΘΗΚΗ ΣΤΗΝ ΑΡΧΗ ΤΟΥ admin.js
-const userData = localStorage.getItem('hotel_user');
-if (!userData) {
-    // Αν δεν υπάρχει καν χρήστης στη μνήμη, πήγαινε στο login
+// Έλεγχος πρόσβασης: επαληθεύει τον ρόλο από τη βάση πριν φορτωθεί οτιδήποτε
+const appReady = (async () => {
+  const userData = localStorage.getItem('hotel_user');
+  if (!userData) { window.location.href = "/pages/login.html"; return false; }
+
+  const user = JSON.parse(userData);
+  const { data, error } = await supabase
+    .from('EMPLOYEE')
+    .select('Role, isActive')
+    .eq('EmpID', user.id)
+    .maybeSingle();
+
+  const role = data?.Role?.toLowerCase().trim() || '';
+  const allowed = !error && data?.isActive && (role === 'admin' || role === 'manager');
+
+  if (!allowed) {
+    alert("Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη σελίδα!");
     window.location.href = "/pages/login.html";
-} else {
-    const user = JSON.parse(userData);
-    const role = user.Role.toLowerCase().trim();
-    // Αν είναι συνδεδεμένος αλλά ΔΕΝ είναι admin ή manager, πέτα τον έξω
-    if (role !== 'admin' && role !== 'manager') {
-        alert("Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη σελίδα!");
-        window.location.href = "/pages/login.html";
-    }
-}
+    return false;
+  }
+  return true;
+})();
 /* ==============================================================
    TOAST NOTIFICATION SYSTEM (ΖΩΝΤΑΝΕΣ ΕΙΔΟΠΟΙΗΣΕΙΣ)
    ============================================================== */
@@ -75,9 +83,6 @@ function updateLiveTime() {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
     document.getElementById('live-time').innerHTML = now.toLocaleDateString('el-GR', options) + " · Βάρδια: Admin";
 }
-setInterval(updateLiveTime, 60000);
-updateLiveTime();
-
 let adminNotifCount = 4;
 window.dismissAdminNotif = function(el) {
     el.style.opacity = '0';
@@ -123,9 +128,10 @@ async function fetchRooms() {
             
             // Έξυπνο mapping: Πιάνουμε διάφορες εκδοχές των λέξεων (π.χ. 'occupied', 'occ', 'cleaning')
             if (dbStatus.includes('occup') || dbStatus === 'occ') uiState = 'occ';
-            else if (dbStatus.includes('clean') || dbStatus === 'dirty') uiState = 'dirty';
-            else if (dbStatus.includes('ready') || dbStatus === 'clean') uiState = 'clean';
-            else if (dbStatus.includes('avail') || dbStatus === 'free') uiState = 'free';
+            else if (dbStatus === 'dirty') uiState = 'dirty';
+            else if (dbStatus.includes('cleaning')) uiState = 'dirty';
+            else if (dbStatus === 'clean') uiState = 'clean';
+            else uiState = 'free';
 
             return {
                 id: room.RoomNumber,
@@ -144,26 +150,27 @@ async function fetchRooms() {
 }
 
 // 4. Ζωγραφίζει τα κουτάκια (UI)
-function renderMap() {
+function renderMap(filter) {
     const rmap = document.getElementById('rmap');
     if (!rmap) return;
     rmap.innerHTML = '';
     
     if (hotelRooms.length === 0) {
         rmap.innerHTML = '<p style="color: var(--text-muted);">Δεν βρέθηκαν δωμάτια στη βάση.</p>';
-        calculateLiveStats(); // Μηδενίζει τα στατιστικά
+        calculateLiveStats();
         return;
     }
 
     hotelRooms.forEach(r => {
+        if (filter && filter !== 'all' && r.state !== filter) return;
         const d = document.createElement('div');
         d.className = 'rc rc-' + r.state;
         d.textContent = r.id; 
         
         let stateGr = 'Ελεύθερο';
         if (r.state === 'occ') stateGr = 'Κατειλημμένο';
-        else if (r.state === 'dirty') stateGr = 'Υπό Καθαρισμό';
-        else if (r.state === 'clean') stateGr = 'Έτοιμο';
+        else if (r.state === 'dirty') stateGr = 'Βρώμικο';
+        else if (r.state === 'clean') stateGr = 'Υπό Καθαρισμό';
 
         d.title = `${r.type} ${r.id} | ${stateGr}`;
         rmap.appendChild(d);
@@ -171,6 +178,12 @@ function renderMap() {
     
     calculateLiveStats();
 }
+
+window.filterRooms = function(f, el) {
+    document.querySelectorAll('#v-rooms .active-filter').forEach(b => b.classList.remove('active-filter'));
+    if (el) el.classList.add('active-filter');
+    renderMap(f);
+};
 
 // 5. Δυναμικός Υπολογισμός Στατιστικών (δεν χρησιμοποιούμε πια το "510" καρφωτά)
 let currentOcc = 0, currentFree = 0, currentDirty = 0, currentClean = 0;
@@ -180,9 +193,9 @@ function calculateLiveStats() {
     
     hotelRooms.forEach(r => {
         if (r.state === 'occ') currentOcc++;
-        else if (r.state === 'free') currentFree++;
         else if (r.state === 'dirty') currentDirty++;
         else if (r.state === 'clean') currentClean++;
+        else currentFree++;
     });
     
     const occPct = Math.round((currentOcc / totalRooms) * 100);
@@ -207,8 +220,6 @@ function calculateLiveStats() {
     if (typeof checkDynamicPricing === "function") checkDynamicPricing(occPct);
 }
 
-// Εκκίνηση φόρτωσης όταν τρέξει το script
-fetchRooms();
 
 
 /* ==============================================================
@@ -238,9 +249,6 @@ function updateLivePrices() {
         }
     });
 }
-
-// Την καλούμε αμέσως μόλις φορτώσει το script
-updateLivePrices();
 
 function checkDynamicPricing(occPct) {
     const statusLow = document.getElementById('status-low');
@@ -299,8 +307,6 @@ function updateSeasonality() {
         }
     });
 }
-
-if(document.getElementById('mult-summer')) updateSeasonality();
 
 // Ακούμε αλλαγές στα multipliers και στο base price slider
 document.addEventListener('input', (e) => {
@@ -424,10 +430,6 @@ window.resetPrices = async function() {
     }
 };
 
-// Καλούμε τη φόρτωση τιμών αν είμαστε στο σωστό view
-if(document.getElementById('price-m')) loadPrices();
-
-
 /* ==============================================================
    ΚΟΥΜΠΙΑ: ΔΩΜΑΤΙΑ (ΕΚΧΩΡΗΣΗ)
    ============================================================== */
@@ -541,9 +543,6 @@ window.stTab = function(f, el){
     renderStaff(f);
     renderComplaints(f);
 }
-
-// Ξεκινάει το fetch αν βρισκόμαστε στο σωστό σημείο
-if(document.getElementById('staff-body')) fetchStaff();
 
 /* ==============================================================
    ΠΑΡΑΠΟΝΑ ΠΕΛΑΤΩΝ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
@@ -736,8 +735,6 @@ async function archiveComplaint(btn, id) {
     }
 }
 
-// Κλήση της συνάρτησης όταν υπάρχει το αντίστοιχο element
-if(document.getElementById('complaints-body')) fetchComplaints();
 // Κάνουμε τις συναρτήσεις διαθέσιμες στο HTML (απαραίτητο για ES Modules)
 window.resolveComplaint = resolveComplaint;
 window.archiveComplaint = archiveComplaint;
@@ -915,9 +912,6 @@ window.deleteInventoryItem = async function(itemId, itemName) {
     }
 }
 
-// Εκκίνηση Φόρτωσης
-if(document.getElementById('inventory-body')) fetchInventory();
-
 /* ==============================================================
    ΟΧΗΜΑΤΑ & ΜΕΤΑΦΟΡΕΣ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
    ============================================================== */
@@ -978,10 +972,6 @@ async function fetchVehicles() {
         showToast("Αποτυχία φόρτωσης στόλου οχημάτων.", "error");
     }
 }
-
-// Εκκίνηση Φόρτωσης
-if(document.getElementById('vehicles-body')) fetchVehicles();
-
 
 /* ==============================================================
    ΕΝΟΙΚΙΑΖΟΜΕΝΑ ΚΑΤΑΣΤΗΜΑΤΑ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
@@ -1044,9 +1034,6 @@ window.sendNotice = function(btn, type) {
         showToast("Η φιλική υπενθύμιση εστάλη στον ενοικιαστή.", "success");
     }
 };
-
-// Εκκίνηση Φόρτωσης
-if(document.getElementById('rentals-body')) fetchRentals();
 
 /* ==============================================================
    ΜΙΣΘΟΔΟΣΙΑ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
@@ -1177,9 +1164,6 @@ window.payEmployee = async function(btn, id, name, iban) {
         btn.textContent = "Πληρωμή";
     }
 };
-
-// Εκκίνηση Φόρτωσης
-if(document.getElementById('payroll-body')) fetchPayroll();
 
 /* ==============================================================
    ΚΟΥΜΠΙΑ: BACKUP SYSTEM
@@ -1368,9 +1352,6 @@ document.querySelectorAll('.sb-item').forEach(el => {
     });
 });
 
-// Εκκίνηση ημερομηνιών κατά το φόρτωμα της σελίδας
-initRevenueDates();
-
 /* ==============================================================
    ΛΕΙΤΟΥΡΓΙΑ ΑΠΟΣΥΝΔΕΣΗΣ (LOGOUT)
    ============================================================== */
@@ -1421,7 +1402,7 @@ async function fetchUsers() {
                         <button class="btn ${btnClass}" onclick="toggleUserStatus(${u.EmpID}, ${u.isActive}, '${uName}')">
                             ${btnText}
                         </button>
-                        <button class="btn btn-sm" onclick="triggerAction('Αλλαγή κωδικού για: ${u.Username}', 'warning')">
+                        <button class="btn btn-sm" onclick="changePassword(${u.EmpID}, '${u.Username || uName}')">
                             <i class="ti ti-key"></i>
                         </button>
                     </td>
@@ -1437,6 +1418,12 @@ async function fetchUsers() {
 
 // Λειτουργία: Ενεργοποίηση / Απενεργοποίηση Χρήστη
 window.toggleUserStatus = async function(id, currentStatus, name) {
+    const currentUser = JSON.parse(localStorage.getItem('hotel_user') || '{}');
+    if (id === currentUser.id) {
+        showToast("Δεν μπορείτε να απενεργοποιήσετε τον δικό σας λογαριασμό.", "error");
+        return;
+    }
+
     const newStatus = !currentStatus;
     const actionText = newStatus ? 'ενεργοποιήσετε' : 'απενεργοποιήσετε';
     
@@ -1458,6 +1445,98 @@ window.toggleUserStatus = async function(id, currentStatus, name) {
     }
 };
 
+// Λειτουργία: Αλλαγή Κωδικού Χρήστη
+window.changePassword = function(empId, username) {
+    const existing = document.querySelector('.pw-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'pw-overlay';
+    overlay.innerHTML = `
+        <div class="pw-modal">
+            <div class="pw-head">
+                <i class="ti ti-lock"></i>
+                <span>Αλλαγή Κωδικού — ${username}</span>
+                <span class="pw-close" id="pw-close">&times;</span>
+            </div>
+            <div class="pw-body">
+                <div class="pw-field">
+                    <label>Νέος κωδικός</label>
+                    <div class="pw-input-wrap">
+                        <input type="password" id="pw-new" placeholder="••••••••" autocomplete="new-password">
+                        <span class="pw-eye" id="pw-eye-new" title="Εμφάνιση/Απόκρυψη"><i class="ti ti-eye"></i></span>
+                    </div>
+                </div>
+                <div class="pw-field">
+                    <label>Επιβεβαίωση κωδικού</label>
+                    <div class="pw-input-wrap">
+                        <input type="password" id="pw-confirm" placeholder="••••••••" autocomplete="new-password">
+                        <span class="pw-eye" id="pw-eye-confirm" title="Εμφάνιση/Απόκρυψη"><i class="ti ti-eye"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="pw-foot">
+                <button class="btn" id="pw-cancel">Ακύρωση</button>
+                <button class="btn btn-dark" id="pw-save"><i class="ti ti-check"></i> Αποθήκευση</button>
+            </div>
+        </div>
+    `;
+
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.querySelector('#pw-close').addEventListener('click', close);
+    overlay.querySelector('#pw-cancel').addEventListener('click', close);
+
+    overlay.querySelector('#pw-save').addEventListener('click', async () => {
+        const pw = overlay.querySelector('#pw-new').value;
+        const confirm = overlay.querySelector('#pw-confirm').value;
+
+        if (!pw || pw.length < 3) {
+            showToast('Ο κωδικός πρέπει να έχει τουλάχιστον 3 χαρακτήρες.', 'error');
+            return;
+        }
+        if (pw !== confirm) {
+            showToast('Οι κωδικοί δεν ταιριάζουν.', 'error');
+            return;
+        }
+        if (!await window.showConfirm(`Αλλαγή κωδικού για ${username};`)) return;
+
+        try {
+            const { error } = await supabase
+                .from('EMPLOYEE')
+                .update({ Password: pw })
+                .eq('EmpID', empId);
+
+            if (error) throw error;
+            showToast(`Ο κωδικός για ${username} ενημερώθηκε.`, 'success');
+            overlay.remove();
+            fetchUsers();
+        } catch (err) {
+            showToast('Αποτυχία αλλαγής κωδικού: ' + err.message, 'error');
+        }
+    });
+
+    overlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') overlay.querySelector('#pw-save').click();
+        if (e.key === 'Escape') overlay.remove();
+    });
+
+    overlay.querySelector('#pw-new').focus();
+
+    const toggleVisibility = (inputId, eyeId) => {
+        overlay.querySelector(eyeId).addEventListener('click', () => {
+            const input = overlay.querySelector(inputId);
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            overlay.querySelector(eyeId).innerHTML = isPassword ? '<i class="ti ti-eye-off"></i>' : '<i class="ti ti-eye"></i>';
+        });
+    };
+    toggleVisibility('#pw-new', '#pw-eye-new');
+    toggleVisibility('#pw-confirm', '#pw-eye-confirm');
+};
+
 // Εκκίνηση Φόρτωσης όταν ανοίγει το Tab των Χρηστών
 document.querySelectorAll('.sb-item').forEach(el => {
     el.addEventListener('click', () => {
@@ -1465,16 +1544,30 @@ document.querySelectorAll('.sb-item').forEach(el => {
     });
 });
 
-// Σύνδεση του κουμπιού με τη συνάρτηση
-const logoutBtn = document.getElementById('logout-btn');
-if (logoutBtn) {
-    logoutBtn.addEventListener('click', window.logout);
-}
-
-document.querySelectorAll('.sb-item').forEach(el => {
+// Όλες οι κλήσεις αρχικοποίησης τρέχουν ΜΟΝΟ αφού επαληθευτεί ο ρόλος από τη βάση
+appReady.then(ok => {
+  if (!ok) return;
+  document.querySelector('.app').style.display = 'flex';
+  document.querySelectorAll('.sb-item').forEach(el => {
     el.addEventListener('click', () => {
-        if (el.dataset.v === 'revenue') setTimeout(buildRevChart, 50);
+      if (el.dataset.v === 'revenue') setTimeout(buildRevChart, 50);
     });
+  });
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) logoutBtn.addEventListener('click', window.logout);
+  setInterval(updateLiveTime, 60000);
+  updateLiveTime();
+  fetchRooms();
+  updateLivePrices();
+  if (document.getElementById('mult-summer')) updateSeasonality();
+  if (document.getElementById('price-m')) loadPrices();
+  if (document.getElementById('staff-body')) fetchStaff();
+  if (document.getElementById('complaints-body')) fetchComplaints();
+  if (document.getElementById('inventory-body')) fetchInventory();
+  if (document.getElementById('vehicles-body')) fetchVehicles();
+  if (document.getElementById('rentals-body')) fetchRentals();
+  if (document.getElementById('payroll-body')) fetchPayroll();
+  initRevenueDates();
 });
 
 window.updateSpecificRooms = async function() {

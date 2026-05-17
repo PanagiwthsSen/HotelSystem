@@ -58,7 +58,7 @@
           <div class="sc"><div class="sc-lbl">Πληρότητα σήμερα</div><div class="sc-val" id="dash-occ-val">--%</div><div class="sc-sub" id="dash-occ-sub">-- / -- δωμάτια</div><div class="prog"><div class="prog-fill" id="dash-occ-bar" style="width:0%;background:#1D9E75"></div></div></div>
           <div class="sc"><div class="sc-lbl">Αφίξεις Ημέρας</div><div class="sc-val" id="dash-arr-count">--</div><div class="sc-sub">Σημερινές κρατήσεις</div></div>
           <div class="sc"><div class="sc-lbl">Αναχωρήσεις Ημέρας</div><div class="sc-val" id="dash-dep-count">--</div><div class="sc-sub">Προς Check-out</div></div>
-          <div class="sc"><div class="sc-lbl">Ελεύθερα & Έτοιμα</div><div class="sc-val sc-up" id="dash-free-val">--</div><div class="sc-sub">Διαθέσιμα για Walk-in</div></div>
+          <div class="sc"><div class="sc-lbl">Ελεύθερα</div><div class="sc-val sc-up" id="dash-free-val">--</div><div class="sc-sub">Διαθέσιμα για Walk-in</div></div>
         </div>
 
         <div class="g2">
@@ -87,15 +87,16 @@
         <div class="g4">
           <div class="sc"><div class="sc-lbl">Κατειλημμένα</div><div class="sc-val sc-dn" id="stat-occ">--</div><div class="prog"><div class="prog-fill" id="stat-occ-bar" style="width:0%;background:#D85A30"></div></div></div>
           <div class="sc"><div class="sc-lbl">Ελεύθερα</div><div class="sc-val sc-up" id="stat-free">--</div></div>
-          <div class="sc"><div class="sc-lbl">Υπό καθαρισμό</div><div class="sc-val" style="color:#EF9F27" id="stat-dirty">--</div></div>
-          <div class="sc"><div class="sc-lbl">Έτοιμα (Καθαρά)</div><div class="sc-val" style="color:#378ADD" id="stat-clean">--</div></div>
+          <div class="sc"><div class="sc-lbl">Βρώμικο</div><div class="sc-val" style="color:#EF9F27" id="stat-dirty">--</div></div>
+          <div class="sc"><div class="sc-lbl">Υπό Καθαρισμό</div><div class="sc-val" style="color:#378ADD" id="stat-clean">--</div></div>
         </div>
         <div class="card">
           <div class="card-hd"><div class="card-hd-l"><i class="ti ti-grid-dots" aria-hidden="true"></i>Χάρτης Δωματίων</div>
             <div style="display:flex;gap:5px">
               <button class="btn btn-sm active-filter" data-filter="all" onclick="filterRooms('all',this)">Όλα</button>
               <button class="btn btn-sm" data-filter="free" onclick="filterRooms('free',this)">Ελεύθερα</button>
-              <button class="btn btn-sm" data-filter="clean" onclick="filterRooms('clean',this)">Έτοιμα</button>
+              <button class="btn btn-sm" data-filter="dirty" onclick="filterRooms('dirty',this)">Βρώμικο</button>
+              <button class="btn btn-sm" data-filter="clean" onclick="filterRooms('clean',this)">Υπό Καθαρισμό</button>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:repeat(20,1fr);gap:3px;margin-bottom:15px;max-height:400px;overflow-y:auto;padding-right:5px;" id="rmap"></div>
@@ -122,12 +123,16 @@
               </select>
             </div>
             <div class="fg"><label>Τύπος Δωματίου</label>
-              <select id="nb-rtype" onchange="updatePrice()">
+              <select id="nb-rtype" onchange="updatePrice(); fetchAvailableRooms();">
                 <option value="85">Μονόκλινο</option>
                 <option value="140" selected>Δίκλινο</option>
                 <option value="175">Φαρδύκλινο</option>
                 <option value="380">Σουίτα</option>
               </select>
+            </div>
+            <div class="fg" style="grid-column: span 2;">
+              <label>Διαθέσιμα Δωμάτια</label>
+              <div id="avail-rooms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:4px;min-height:36px;"></div>
             </div>
             
             <div class="fg"><label>Άφιξη</label><input type="date" id="nb-in" value="2026-05-15" oninput="updatePrice()"></div>
@@ -153,7 +158,7 @@
         <div class="card">
           <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door-enter" aria-hidden="true"></i>Αφίξεις Ημέρας (Check-in)</div></div>
           <table id="arrivals-table">
-            <thead><tr><th>Πελάτης</th><th>Τύπος</th><th>Προκαταβολή</th><th>Δωμάτιο</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
+            <thead><tr><th>Πελάτης</th><th>Τύπος</th><th>Δωμάτιο</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -198,17 +203,28 @@
   </div>
 </div>
 
-<div id="checkin-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
-  <div class="card" style="width: 400px; background: var(--color-bg); padding: 25px; border-radius: 12px;">
-    <h3><i class="ti ti-key"></i> Εκχώρηση Δωματίου</h3>
-    <p>Πελάτης: <strong id="modal-cust-name"></strong></p>
-    <div class="fg">
-        <label>Διαθέσιμο δωμάτιο:</label>
-        <select id="modal-room-select" style="width:100%; padding:8px;"></select>
+<div id="checkin-modal" class="confirm-overlay" style="display:none">
+  <div class="pw-modal">
+    <div class="pw-head">
+      <i class="ti ti-key"></i>
+      <span>Εκχώρηση Δωματίου</span>
+      <span class="pw-close" onclick="closeModal()">&times;</span>
     </div>
-    <div style="display:flex; gap:10px; margin-top:25px;">
-        <button class="btn btn-dark" style="flex:1" onclick="confirmCheckin()">Επιβεβαίωση</button>
-        <button class="btn" style="flex:1" onclick="closeModal()">Ακύρωση</button>
+    <div class="pw-body">
+      <p style="margin-bottom:16px;font-size:13px;color:#6B7280;">
+        Πελάτης: <strong id="modal-cust-name" style="color:#111827;"></strong>
+      </p>
+      <div id="modal-room-wrap" class="pw-field">
+        <label for="modal-room-select">Διαθέσιμο δωμάτιο:</label>
+        <select id="modal-room-select" style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-family:inherit;"></select>
+      </div>
+      <div id="modal-assigned-wrap" style="display:none;padding:10px 12px;border-radius:6px;background:#F3F4F6;font-size:13px;">
+        Θα γίνει check-in στο δωμάτιο <strong id="modal-assigned-val"></strong>
+      </div>
+    </div>
+    <div class="pw-foot">
+      <button class="btn" onclick="closeModal()">Ακύρωση</button>
+      <button class="btn btn-dark" onclick="confirmCheckin()"><i class="ti ti-check"></i> Επιβεβαίωση</button>
     </div>
   </div>
 </div>
@@ -217,7 +233,6 @@
 
 <script type="module" src="../js/supabase-config.js"></script>
 <script src="../js/receptionist.js"></script>
-<script src="../js/login.js"></script>
 <script type="module" src="../js/app.js"></script>
 
 </body>

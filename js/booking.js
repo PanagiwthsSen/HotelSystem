@@ -160,8 +160,9 @@ async function nextStep() {
     const last = document.getElementById('f-last').value.trim();
     const first = document.getElementById('f-first').value.trim();
     const email = document.getElementById('f-email').value.trim();
-    if (!last || !first || !email) {
-      showToast('Παρακαλώ συμπληρώστε τα υποχρεωτικά πεδία (Όνομα, Επώνυμο, Email).', 'error');
+    const phone = document.getElementById('f-phone').value.trim();
+    if (!last || !first || !email || !phone) {
+      showToast('Παρακαλώ συμπληρώστε τα υποχρεωτικά πεδία (Όνομα, Επώνυμο, Email, Τηλέφωνο).', 'error');
       return;
     }
     bookingData.last = last;

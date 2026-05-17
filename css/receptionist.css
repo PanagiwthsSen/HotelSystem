@@ -129,7 +129,7 @@ tr:last-child td{border-bottom:none}
 .rc-occ   { background: #D85A30; } /* Κατειλημμένο - Κόκκινο */
 .rc-free  { background: #1D9E75; } /* Ελεύθερο χωρίς καθαριότητα - Πράσινο/Κίτρινο βάση req */
 .rc-dirty { background: #EF9F27; color: #fff; } /* Προσεχώς άδειο/Υπό καθαρισμό - Πορτοκαλί */
-.rc-clean { background: #378ADD; } /* Έτοιμο - Μπλε/Πράσινο */
+.rc-clean { background: #378ADD; } /* Υπό Καθαρισμό */
 
 .active-filter { background: #0A1628 !important; color: #fff !important; }
 
@@ -178,4 +178,57 @@ tr:last-child td{border-bottom:none}
 @keyframes fadeOut {
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(100%); opacity: 0; }
+}
+
+/* SHARED MODAL STYLES */
+.pw-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 22px 28px 0; font-size: 16px; font-weight: 600; color: #111827;
+}
+.pw-head i { color: #A8892A; font-size: 22px; }
+.pw-head .pw-close {
+  margin-left: auto; cursor: pointer; font-size: 22px;
+  color: #9CA3AF; line-height: 1; padding: 0 4px;
+}
+.pw-head .pw-close:hover { color: #111827; }
+.pw-foot {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 16px 28px 22px; border-top: 1px solid #F3F4F6;
+}
+.pw-foot .btn-dark {
+  background: #A8892A; border-color: #A8892A; color: #fff;
+}
+.pw-foot .btn-dark:hover { background: #927820; border-color: #927820; }
+
+/* CONFIRM MODAL */
+.confirm-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10001; animation: fadeIn 0.2s ease-out;
+}
+.confirm-modal {
+  background: #fff; border-radius: 14px; width: 420px; max-width: 90vw;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.2); overflow: hidden;
+  animation: scaleIn 0.2s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.pw-modal {
+  background: #fff; border-radius: 14px; width: 420px; max-width: 90vw;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.2); overflow: hidden;
+  animation: scaleIn 0.2s ease-out;
+}
+.pw-body { padding: 20px 28px 24px; }
+
+/* ROOM SELECTION CARDS */
+.room-opt {
+  border: 1px solid #D1D5DB; border-radius: 8px; padding: 8px 6px;
+  cursor: pointer; font-size: 12px; text-align: center;
+  transition: all 0.12s; background: #fff;
+}
+.room-opt:hover { border-color: #A8892A; background: #FFFBEB; }
+.room-opt.selected {
+  border-color: #A8892A; background: #FFFBEB;
+  box-shadow: 0 0 0 2px rgba(168,137,42,0.25);
 }

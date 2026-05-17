@@ -23,10 +23,14 @@ window.showConfirm = function(message) {
     overlay.className = 'confirm-overlay';
     overlay.innerHTML = `
       <div class="confirm-modal">
-        <p>${message}</p>
-        <div class="modal-actions">
+        <div class="pw-head">
+          <i class="ti ti-alert-triangle"></i>
+          <span>${message}</span>
+          <span class="pw-close" id="confirm-no">&times;</span>
+        </div>
+        <div class="pw-foot">
           <button class="btn" id="confirm-no">Ακύρωση</button>
-          <button class="btn btn-dark" id="confirm-yes">Ναι</button>
+          <button class="btn btn-dark" id="confirm-yes"><i class="ti ti-check"></i> Ναι</button>
         </div>
       </div>
     `;
