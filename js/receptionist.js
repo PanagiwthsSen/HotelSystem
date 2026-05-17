@@ -27,6 +27,7 @@ function showToast(message, type = 'success') {
    ============================================================== */
 const viewTitles = {
     dash: 'Επισκόπηση', rooms: 'Κατάσταση Δωματίων', 'new-booking': 'Νέα Κράτηση',
+    'room-search': 'Αναζήτηση Δωματίων',
     arrivals: 'Αφίξεις (Check-in)', departures: 'Αναχωρήσεις (Check-out)', 
     minibar: 'Χρεώσεις Mini-bar', policies: 'Πολιτική Ξενοδοχείου'
 };
@@ -59,10 +60,10 @@ let selectedRoom = null;
 
 function mapDbStatusToUI(dbStatus) {
     switch (dbStatus) {
-        case 'Occupied': case 'occ': return 'occ';
-        case 'Available': case 'free': return 'free'; 
-        case 'Cleaning': case 'dirty': return 'dirty';
-        case 'Clean': case 'clean': return 'clean'; 
+        case 'occ': return 'occ';
+        case 'free': return 'free';
+        case 'dirty': return 'dirty';
+        case 'clean': return 'clean';
         default: return 'free';
     }
 }
@@ -355,32 +356,24 @@ async function submitBooking() {
 
         if (custError) throw custError;
 
-        const { data: reservation, error: resError } = await window.supabase
-            .from('RESERVATION')
-            .insert([{
-                CustomerID: customer.CustomerID,
-                CheckInDate: checkIn,
-                CheckOutDate: checkOut,
-                TotalCost: totalCost,
-                Status: 'Confirmed'
-            }])
-            .select()
-            .single();
+        const { data: result, error: rpcError } = await window.supabase
+            .rpc('book_room_atomic', {
+                p_customer_id: customer.CustomerID,
+                p_check_in: checkIn,
+                p_check_out: checkOut,
+                p_total_cost: totalCost,
+                p_status: 'Confirmed',
+                p_room_number: selectedRoom
+            });
 
-        if (resError) throw resError;
-
-        const { error: rrError } = await window.supabase
-            .from('RESERVATION_ROOM')
-            .insert([{ ReservationID: reservation.ReservationID, RoomNumber: selectedRoom }]);
-
-        if (rrError) throw rrError;
-
-        const { error: roomError } = await window.supabase
-            .from('ROOM')
-            .update({ Status: 'Occupied' })
-            .eq('RoomNumber', selectedRoom);
-
-        if (roomError) throw roomError;
+        if (rpcError) {
+            if (rpcError.message && rpcError.message.includes('ROOM_ALREADY_BOOKED')) {
+                showToast('Η κράτηση απέτυχε: Το δωμάτιο μόλις κρατήθηκε από άλλον χρήστη.', 'error');
+            } else {
+                throw rpcError;
+            }
+            return;
+        }
 
         showToast(`Η κράτηση καταχωρήθηκε! Εκχωρήθηκε το δωμάτιο ${selectedRoom}.`, 'success');
         selectedRoom = null;
@@ -388,7 +381,6 @@ async function submitBooking() {
         fetchRoomsAndRender();
         navTo('dash');
         
-        // Καθαρισμός φόρμας
         document.getElementById('nb-first').value = '';
         document.getElementById('nb-last').value = '';
         
@@ -398,31 +390,86 @@ async function submitBooking() {
 }
 
 async function fetchAvailableRooms() {
+    const checkIn = document.getElementById('nb-in').value;
+    const checkOut = document.getElementById('nb-out').value;
     const rtypeEl = document.getElementById('nb-rtype');
-    if (!rtypeEl) return;
+    if (!checkIn || !checkOut || !rtypeEl) {
+        showToast('Επιλέξτε πρώτα ημερομηνίες άφιξης και αναχώρησης.', 'error');
+        return;
+    }
+    if (new Date(checkIn) >= new Date(checkOut)) {
+        showToast('Η ημερομηνία αναχώρησης πρέπει να είναι μετά την άφιξη.', 'error');
+        return;
+    }
+
     const typeMap = { 85: 'Μονόκλινο', 140: 'Δίκλινο', 175: 'Φαρδύκλινο', 380: 'Σουίτα' };
     const roomType = typeMap[parseInt(rtypeEl.value)];
 
     try {
-        const { data, error } = await window.supabase
+        const { data: overlapping, error: olErr } = await window.supabase
+            .from('RESERVATION')
+            .select('ReservationID')
+            .lt('CheckInDate', checkOut)
+            .gt('CheckOutDate', checkIn)
+            .not('Status', 'in', '("Cancelled","CheckedOut")');
+
+        if (olErr) throw olErr;
+
+        let busyRoomNumbers = [];
+        if (overlapping && overlapping.length > 0) {
+            const ids = overlapping.map(r => r.ReservationID);
+            const { data: busyRooms, error: brErr } = await window.supabase
+                .from('RESERVATION_ROOM')
+                .select('RoomNumber')
+                .in('ReservationID', ids);
+            if (brErr) throw brErr;
+            busyRoomNumbers = (busyRooms || []).map(r => r.RoomNumber);
+        }
+
+        const { data: allRooms, error: allErr } = await window.supabase
             .from('ROOM')
-            .select('RoomNumber, Status')
-            .eq('RoomType', roomType)
-            .in('Status', ['Available', 'free', 'Clean', 'clean', 'Cleaning', 'dirty']);
+            .select('*')
+            .eq('RoomType', roomType);
 
-        if (error) throw error;
+        if (allErr) throw allErr;
 
-        const rooms = data && data.length > 0 ? data
-            : hotelRooms.filter(r => r.type === roomType && (r.state === 'free' || r.state === 'clean' || r.state === 'dirty'))
-                        .map(r => ({ RoomNumber: r.id }));
+        const available = (allRooms || []).filter(r =>
+            !busyRoomNumbers.includes(r.RoomNumber) &&
+            ['free', 'clean', 'dirty', 'occ'].includes(r.Status)
+        );
 
-        renderAvailableRooms(rooms);
+        // Query checkout dates for 'occ' rooms
+        let checkoutMap = {};
+        const occNums = available.filter(r => r.Status === 'occ').map(r => r.RoomNumber);
+        if (occNums.length > 0) {
+            const { data: rrData } = await window.supabase
+                .from('RESERVATION_ROOM')
+                .select('RoomNumber, ReservationID')
+                .in('RoomNumber', occNums);
+            if (rrData && rrData.length > 0) {
+                const ids = rrData.map(r => r.ReservationID);
+                const { data: resData } = await window.supabase
+                    .from('RESERVATION')
+                    .select('ReservationID, CheckOutDate')
+                    .in('ReservationID', ids)
+                    .not('Status', 'in', '("Cancelled","CheckedOut")');
+                if (resData) {
+                    const map = {};
+                    resData.forEach(r => map[r.ReservationID] = r.CheckOutDate);
+                    rrData.forEach(rr => { if (map[rr.ReservationID]) checkoutMap[rr.RoomNumber] = map[rr.ReservationID]; });
+                }
+            }
+        }
+        const section = document.getElementById('nb-room-section');
+        if (section) section.style.display = 'block';
+        renderAvailableRooms(available, checkoutMap);
+
     } catch (err) {
-        console.error("Σφάλμα φόρτωσης δωματίων:", err.message);
+        showToast('Σφάλμα αναζήτησης: ' + err.message, 'error');
     }
 }
 
-function renderAvailableRooms(rooms) {
+function renderAvailableRooms(rooms, checkoutMap = {}) {
     const container = document.getElementById('avail-rooms');
     if (!container) return;
 
@@ -437,8 +484,11 @@ function renderAvailableRooms(rooms) {
         const state = typeof r.Status === 'string'
             ? mapDbStatusToUI(r.Status)
             : (hotelRooms.find(h => h.id == r.RoomNumber)?.state || 'free');
-        const label = state === 'free' ? 'Ελεύθερο' : state === 'dirty' ? 'Βρώμικο' : 'Υπό Καθαρισμό';
-        const color = state === 'free' ? '#1D9E75' : state === 'dirty' ? '#EF9F27' : '#378ADD';
+        let label, color;
+        if (state === 'free') { label = 'Ελεύθερο'; color = '#1D9E75'; }
+        else if (state === 'dirty') { label = 'Βρώμικο'; color = '#EF9F27'; }
+        else if (state === 'clean') { label = 'Υπό Καθαρισμό'; color = '#378ADD'; }
+        else { label = 'Εως ' + new Date(checkoutMap[r.RoomNumber]).toLocaleDateString('el-GR'); color = '#D85A30'; }
         return `
         <div class="room-opt${selectedRoom === r.RoomNumber ? ' selected' : ''}"
              onclick="selectRoom(${r.RoomNumber}, this)"
@@ -454,8 +504,6 @@ window.selectRoom = function(roomNum, el) {
     if (el) el.classList.add('selected');
     selectedRoom = roomNum;
 };
-
-if(document.getElementById('nb-rtype')) updatePrice();
 
 /* ==============================================================
    PRO CHECK-IN (WITH MODAL) & CHECK-OUT LOGIC
@@ -535,10 +583,10 @@ async function confirmCheckin() {
         await window.supabase.from('RESERVATION').update({ Status: 'CheckedIn' }).eq('ReservationID', activeCheckinResId);
 
         if (activeCheckinRoom) {
-            await window.supabase.from('ROOM').update({ Status: 'Occupied' }).eq('RoomNumber', selectedRoom);
+            await window.supabase.from('ROOM').update({ Status: 'occ' }).eq('RoomNumber', selectedRoom);
         } else {
             await window.supabase.from('RESERVATION_ROOM').insert([{ ReservationID: activeCheckinResId, RoomNumber: selectedRoom }]);
-            await window.supabase.from('ROOM').update({ Status: 'Occupied' }).eq('RoomNumber', selectedRoom);
+            await window.supabase.from('ROOM').update({ Status: 'occ' }).eq('RoomNumber', selectedRoom);
         }
 
         showToast(`Το Check-in ολοκληρώθηκε! Εκχωρήθηκε το δωμάτιο ${selectedRoom}.`, 'success');
@@ -558,9 +606,9 @@ async function doCheckout(btn, name, reservationId, roomNumber) {
         // 1. Ενημέρωση κράτησης σε CheckedOut
         await window.supabase.from('RESERVATION').update({ Status: 'CheckedOut' }).eq('ReservationID', reservationId);
         
-        // 2. Αν υπάρχει δωμάτιο, το κάνουμε "Cleaning" (Υπό καθαρισμό / dirty)
+        // 2. Αν υπάρχει δωμάτιο, το κάνουμε "dirty" (Υπό καθαρισμό)
         if (roomNumber && roomNumber !== '-') {
-            await window.supabase.from('ROOM').update({ Status: 'Cleaning' }).eq('RoomNumber', roomNumber);
+            await window.supabase.from('ROOM').update({ Status: 'dirty' }).eq('RoomNumber', roomNumber);
         }
 
         showToast(`Επιτυχές Check-out! Το δωμάτιο ${roomNumber} στάλθηκε για καθάρισμα.`, 'success');
@@ -574,15 +622,262 @@ async function doCheckout(btn, name, reservationId, roomNumber) {
 }
 
 /* ==============================================================
+   ROOM SEARCH & BOOKING (v-room-search)
+   ============================================================== */
+let rsState = { checkIn: null, checkOut: null, selectedRoom: null, roomPrice: 0, roomType: '' };
+let rsSort = { field: null, asc: true };
+
+function sortRooms(field) {
+    if (rsSort.field === field) { rsSort.asc = !rsSort.asc; }
+    else { rsSort.field = field; rsSort.asc = true; }
+    renderSearchResults(rsState.availableRooms);
+}
+
+window.searchAvailableRooms = async function () {
+    const checkIn = document.getElementById('rs-checkin').value;
+    const checkOut = document.getElementById('rs-checkout').value;
+
+    if (!checkIn || !checkOut) {
+        showToast('Επιλέξτε ημερομηνίες άφιξης και αναχώρησης.', 'error');
+        return;
+    }
+    if (new Date(checkIn) >= new Date(checkOut)) {
+        showToast('Η ημερομηνία αναχώρησης πρέπει να είναι μετά την άφιξη.', 'error');
+        return;
+    }
+
+    try {
+        // Query 1: overlapping active reservation IDs (overlap formula)
+        const { data: overlapping, error: olErr } = await window.supabase
+            .from('RESERVATION')
+            .select('ReservationID')
+            .lt('CheckInDate', checkOut)
+            .gt('CheckOutDate', checkIn)
+            .not('Status', 'in', '("Cancelled","CheckedOut")');
+
+        if (olErr) throw olErr;
+
+        // Collect busy room numbers
+        let busyRoomNumbers = [];
+        if (overlapping && overlapping.length > 0) {
+            const ids = overlapping.map(r => r.ReservationID);
+            const { data: busyRooms, error: brErr } = await window.supabase
+                .from('RESERVATION_ROOM')
+                .select('RoomNumber')
+                .in('ReservationID', ids);
+
+            if (brErr) throw brErr;
+            busyRoomNumbers = (busyRooms || []).map(r => r.RoomNumber);
+        }
+
+        // Query 2: all rooms NOT busy and with bookable status
+        const { data: allRooms, error: allErr } = await window.supabase
+            .from('ROOM')
+            .select('*');
+
+        if (allErr) throw allErr;
+
+        const available = (allRooms || []).filter(r =>
+            !busyRoomNumbers.includes(r.RoomNumber) &&
+            ['free', 'clean', 'dirty', 'occ'].includes(r.Status)
+        );
+
+        // Query checkout dates for 'occ' rooms
+        let checkoutMap = {};
+        const occNums = available.filter(r => r.Status === 'occ').map(r => r.RoomNumber);
+        if (occNums.length > 0) {
+            const { data: rrData } = await window.supabase
+                .from('RESERVATION_ROOM')
+                .select('RoomNumber, ReservationID')
+                .in('RoomNumber', occNums);
+            if (rrData && rrData.length > 0) {
+                const ids = rrData.map(r => r.ReservationID);
+                const { data: resData } = await window.supabase
+                    .from('RESERVATION')
+                    .select('ReservationID, CheckOutDate')
+                    .in('ReservationID', ids)
+                    .not('Status', 'in', '("Cancelled","CheckedOut")');
+                if (resData) {
+                    const map = {};
+                    resData.forEach(r => map[r.ReservationID] = r.CheckOutDate);
+                    rrData.forEach(rr => { if (map[rr.ReservationID]) checkoutMap[rr.RoomNumber] = map[rr.ReservationID]; });
+                }
+            }
+        }
+        rsState.checkoutMap = checkoutMap;
+        rsState.availableRooms = available;
+        rsState.checkIn = checkIn;
+        rsState.checkOut = checkOut;
+        renderSearchResults(available);
+
+    } catch (err) {
+        showToast('Σφάλμα αναζήτησης: ' + err.message, 'error');
+    }
+};
+
+function renderSearchResults(rooms) {
+    const card = document.getElementById('rs-results-card');
+    const tbody = document.querySelector('#rs-results-table tbody');
+    const count = document.getElementById('rs-count');
+    if (!card || !tbody) return;
+
+    card.style.display = 'block';
+
+    if (!rooms || rooms.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--color-text-secondary);padding:20px;">Δεν βρέθηκαν διαθέσιμα δωμάτια για τις επιλεγμένες ημερομηνίες.</td></tr>';
+        count.textContent = '0 διαθέσιμα';
+        return;
+    }
+
+    const sorted = [...rooms];
+    if (rsSort.field) {
+        const f = rsSort.field;
+        sorted.sort((a, b) => {
+            let va = a[f], vb = b[f];
+            if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb || '').toLowerCase(); }
+            const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+            return rsSort.asc ? cmp : -cmp;
+        });
+    }
+
+    document.querySelectorAll('#rs-results-table th[data-sort]').forEach(th => {
+        const arrow = th.querySelector('.sort-arrow');
+        if (th.dataset.sort === rsSort.field) {
+            arrow.textContent = rsSort.asc ? ' ▲' : ' ▼';
+        } else {
+            arrow.textContent = '';
+        }
+    });
+
+    count.textContent = sorted.length + ' διαθέσιμα';
+    tbody.innerHTML = sorted.map(r => {
+        const st = r.Status;
+        const label = st === 'free' ? 'Ελεύθερο' : st === 'dirty' ? 'Βρώμικο' : st === 'clean' ? 'Υπό Καθαρισμό' : 'Εως ' + new Date(rsState.checkoutMap[r.RoomNumber]).toLocaleDateString('el-GR');
+        const cls = st === 'free' ? 'p-g' : st === 'dirty' ? 'p-a' : st === 'clean' ? 'p-b' : 'p-r';
+        return `<tr>
+            <td><strong>${r.RoomNumber}</strong></td>
+            <td>${r.RoomType}</td>
+            <td>€${r.BasePrice}</td>
+            <td><span class="pill ${cls}">${label}</span></td>
+            <td>
+                <button class="btn btn-sm btn-dark" onclick="openRsBookingModal('${r.RoomNumber}', '${r.RoomType}', ${r.BasePrice})">
+                    <i class="ti ti-calendar-plus"></i> Book Now
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+window.openRsBookingModal = function (roomNum, roomType, basePrice) {
+    rsState.selectedRoom = roomNum;
+    rsState.roomType = roomType;
+    rsState.roomPrice = basePrice;
+
+    const nights = Math.max(1, Math.round((new Date(rsState.checkOut) - new Date(rsState.checkIn)) / 86400000));
+    const total = basePrice * nights;
+
+    document.getElementById('rs-modal-room').textContent = '— Δωμάτιο ' + roomNum;
+    document.getElementById('rs-modal-room-type').textContent = roomType;
+    document.getElementById('rs-modal-nights').textContent = nights;
+    document.getElementById('rs-modal-rate').textContent = '€' + basePrice;
+    document.getElementById('rs-modal-total').textContent = '€' + total;
+
+    document.getElementById('rs-booking-modal').style.display = 'flex';
+};
+
+function closeRsModal() {
+    document.getElementById('rs-booking-modal').style.display = 'none';
+}
+
+window.confirmRsBooking = async function () {
+    const firstName = document.getElementById('rs-modal-first').value.trim();
+    const lastName = document.getElementById('rs-modal-last').value.trim();
+    const phone = document.getElementById('rs-modal-phone').value.trim();
+    const email = document.getElementById('rs-modal-email').value.trim();
+    const bookingType = document.getElementById('rs-modal-btype').value;
+
+    if (!firstName || !lastName || !phone || !email) {
+        showToast('Παρακαλώ συμπληρώστε Όνομα, Επώνυμο, Τηλέφωνο και Email.', 'error');
+        return;
+    }
+
+    if (!await window.showConfirm('Επιβεβαίωση κράτησης δωματίου ' + rsState.selectedRoom + ';')) return;
+
+    try {
+        // 1. Insert customer (non-critical, safe to do first)
+        const { data: customer, error: custErr } = await window.supabase
+            .from('CUSTOMER')
+            .insert([{
+                FirstName: firstName,
+                LastName: lastName,
+                Phone: phone,
+                Email: email,
+                IsGroup: (bookingType === 'group')
+            }])
+            .select()
+            .single();
+
+        if (custErr) throw custErr;
+
+        const nights = Math.max(1, Math.round((new Date(rsState.checkOut) - new Date(rsState.checkIn)) / 86400000));
+        const totalCost = rsState.roomPrice * nights;
+
+        // 2. Atomic booking via RPC (re-checks availability inside transaction)
+        const { data: result, error: rpcError } = await window.supabase
+            .rpc('book_room_atomic', {
+                p_customer_id: customer.CustomerID,
+                p_check_in: rsState.checkIn,
+                p_check_out: rsState.checkOut,
+                p_total_cost: totalCost,
+                p_status: 'Confirmed',
+                p_room_number: rsState.selectedRoom
+            });
+
+        if (rpcError) {
+            if (rpcError.message && rpcError.message.includes('ROOM_ALREADY_BOOKED')) {
+                showToast('Η κράτηση απέτυχε: Το δωμάτιο μόλις κρατήθηκε από άλλον χρήστη.', 'error');
+            } else {
+                throw rpcError;
+            }
+            return;
+        }
+
+        showToast('Η κράτηση ολοκληρώθηκε! Δωμάτιο ' + rsState.selectedRoom + ' ανατέθηκε.', 'success');
+        closeRsModal();
+
+        // Refresh dashboard & room data
+        fetchTodayReservations();
+        fetchRoomsAndRender();
+        searchAvailableRooms();
+
+    } catch (err) {
+        showToast('Αποτυχία κράτησης: ' + err.message, 'error');
+    }
+};
+
+/* ==============================================================
    INITIALIZATION
    ============================================================== */
 document.addEventListener('DOMContentLoaded', () => {
-    // Δίνουμε 500ms για να σιγουρευτούμε ότι το supabase-config.js φόρτωσε το window.supabase
     setTimeout(() => {
         if(window.supabase) {
             fetchRoomsAndRender();
             fetchTodayReservations();
-            if(document.getElementById('nb-rtype')) fetchAvailableRooms();
+
+            // Set default dates: today & today + 3 days
+            const today = new Date();
+            const plus3 = new Date(today);
+            plus3.setDate(plus3.getDate() + 3);
+            const fmt = d => d.toISOString().split('T')[0];
+            const nbIn = document.getElementById('nb-in');
+            const nbOut = document.getElementById('nb-out');
+            if (nbIn) nbIn.value = fmt(today);
+            if (nbOut) nbOut.value = fmt(plus3);
+            const rsIn = document.getElementById('rs-checkin');
+            const rsOut = document.getElementById('rs-checkout');
+            if (rsIn) rsIn.value = fmt(today);
+            if (rsOut) rsOut.value = fmt(plus3);
+            if (document.getElementById('nb-rtype')) updatePrice();
         } else {
             showToast('Αποτυχία σύνδεσης με τη βάση (Supabase is missing)', 'error');
         }

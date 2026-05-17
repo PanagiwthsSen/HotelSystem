@@ -67,3 +67,14 @@ async function processBookingSubmission(bookingData) {
     console.error("Σφάλμα δικτύου:", error);
   }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date();
+  const plus3 = new Date(today);
+  plus3.setDate(plus3.getDate() + 3);
+  const fmt = d => d.toISOString().split('T')[0];
+  const si = document.getElementById('s-in');
+  const so = document.getElementById('s-out');
+  if (si) si.value = fmt(today);
+  if (so) so.value = fmt(plus3);
+});

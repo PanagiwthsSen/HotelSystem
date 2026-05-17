@@ -25,6 +25,7 @@
       
       <div class="sb-group">Διαχείριση Κρατήσεων</div>
       <div class="sb-item" data-v="new-booking"><i class="ti ti-calendar-plus" aria-hidden="true"></i>Νέα Κράτηση</div>
+      <div class="sb-item" data-v="room-search"><i class="ti ti-search" aria-hidden="true"></i>Αναζήτηση Δωματίων</div>
       <div class="sb-item" data-v="arrivals"><i class="ti ti-door-enter" aria-hidden="true"></i>Αφίξεις (Check-in)</div>
       <div class="sb-item" data-v="departures"><i class="ti ti-door-exit" aria-hidden="true"></i>Αναχωρήσεις (Check-out)</div>
       
@@ -106,14 +107,38 @@
       <div class="view" id="v-new-booking">
         <div class="card">
           <div class="card-hd"><div class="card-hd-l"><i class="ti ti-calendar-plus" aria-hidden="true"></i>Καταχώρηση Κράτησης</div></div>
-          <div class="ns ns-w"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Ο αριθμός δωματίου προσδιορίζεται κατά την άφιξη.</div></div>
-          
+          <div class="ns ns-w"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Επιλέξτε ημερομηνίες και πατήστε «Αναζήτηση» για να δείτε διαθέσιμα δωμάτια.</div></div>
+
           <div class="form-grid" style="margin-top:15px;">
+            <div class="fg"><label>Ημερομηνία Άφιξης *</label><input type="date" id="nb-in" onchange="updatePrice()"></div>
+            <div class="fg"><label>Ημερομηνία Αναχώρησης *</label><input type="date" id="nb-out" onchange="updatePrice()"></div>
+            <div style="display:flex;align-items:flex-end;">
+              <button class="btn btn-dark" onclick="fetchAvailableRooms()"><i class="ti ti-search"></i> Αναζήτηση Δωματίων</button>
+            </div>
+          </div>
+
+          <div id="nb-room-section" style="display:none;">
+            <div class="form-grid">
+              <div class="fg"><label>Τύπος Δωματίου</label>
+                <select id="nb-rtype" onchange="updatePrice(); fetchAvailableRooms();">
+                  <option value="85">Μονόκλινο</option>
+                  <option value="140" selected>Δίκλινο</option>
+                  <option value="175">Φαρδύκλινο</option>
+                  <option value="380">Σουίτα</option>
+                </select>
+              </div>
+            </div>
+            <div class="fg" style="margin-bottom:15px;">
+              <label>Διαθέσιμα Δωμάτια</label>
+              <div id="avail-rooms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:4px;min-height:36px;"></div>
+            </div>
+          </div>
+
+          <div class="form-grid">
             <div class="fg"><label>Επώνυμο *</label><input type="text" id="nb-last" placeholder="π.χ. Παπαδόπουλος"></div>
             <div class="fg"><label>Όνομα *</label><input type="text" id="nb-first" placeholder="π.χ. Γεώργιος"></div>
             <div class="fg"><label>Τηλέφωνο</label><input type="tel" id="nb-phone" placeholder="+30..."></div>
             <div class="fg"><label>Email</label><input type="email" id="nb-email" placeholder="mail@example.com"></div>
-            
             <div class="fg"><label>Τύπος Κράτησης</label>
               <select id="nb-btype" onchange="updatePrepay()">
                 <option value="phone" selected>Τηλεφωνική (20% Προκαταβολή)</option>
@@ -122,23 +147,8 @@
                 <option value="walkin">Walk-in (Άμεση Πληρωμή)</option>
               </select>
             </div>
-            <div class="fg"><label>Τύπος Δωματίου</label>
-              <select id="nb-rtype" onchange="updatePrice(); fetchAvailableRooms();">
-                <option value="85">Μονόκλινο</option>
-                <option value="140" selected>Δίκλινο</option>
-                <option value="175">Φαρδύκλινο</option>
-                <option value="380">Σουίτα</option>
-              </select>
-            </div>
-            <div class="fg" style="grid-column: span 2;">
-              <label>Διαθέσιμα Δωμάτια</label>
-              <div id="avail-rooms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:4px;min-height:36px;"></div>
-            </div>
-            
-            <div class="fg"><label>Άφιξη</label><input type="date" id="nb-in" value="2026-05-15" oninput="updatePrice()"></div>
-            <div class="fg"><label>Αναχώρηση</label><input type="date" id="nb-out" value="2026-05-18" oninput="updatePrice()"></div>
           </div>
-          
+
           <div class="prepay-box" id="prepay-box"><i class="ti ti-info-circle" aria-hidden="true"></i> Προκαταβολή — <strong id="prepay-amt">--</strong></div>
           <div class="sum-box">
             <div class="sum-row"><span>Δωμάτιο</span><span id="sp-room">Δίκλινο</span></div>
@@ -146,11 +156,44 @@
             <div class="sum-row"><span>Τιμή</span><span id="sp-sub">€140 × 3</span></div>
             <div class="sum-row tot"><span>Συνολικό Κόστος</span><span id="sp-total">€420</span></div>
           </div>
-          
+
           <div style="display:flex;gap:7px;margin-top:15px;">
             <button class="btn btn-dark" onclick="submitBooking()">Καταχώρηση</button>
             <button class="btn" onclick="location.reload()">Καθαρισμός</button>
           </div>
+        </div>
+      </div>
+
+      <div class="view" id="v-room-search">
+        <div class="card">
+          <div class="card-hd"><div class="card-hd-l"><i class="ti ti-search" aria-hidden="true"></i>Αναζήτηση & Κράτηση Δωματίων</div></div>
+          <div class="ns ns-w"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Επιλέξτε ημερομηνίες για να δείτε διαθέσιμα δωμάτια.</div></div>
+          <div class="form-grid" style="margin-top:15px;">
+            <div class="fg"><label>Ημερομηνία Άφιξης *</label><input type="date" id="rs-checkin"></div>
+            <div class="fg"><label>Ημερομηνία Αναχώρησης *</label><input type="date" id="rs-checkout"></div>
+          </div>
+          <div style="display:flex;gap:7px;margin-bottom:15px;">
+            <button class="btn btn-dark" onclick="searchAvailableRooms()"><i class="ti ti-search"></i> Αναζήτηση</button>
+          </div>
+        </div>
+
+        <div class="card" id="rs-results-card" style="display:none;">
+          <div class="card-hd">
+            <div class="card-hd-l"><i class="ti ti-building" aria-hidden="true"></i>Διαθέσιμα Δωμάτια</div>
+            <span style="font-size:12px;color:var(--color-text-secondary);" id="rs-count"></span>
+          </div>
+          <table id="rs-results-table">
+            <thead>
+              <tr>
+                <th style="width:12%;cursor:pointer;user-select:none" onclick="sortRooms('RoomNumber')" data-sort="RoomNumber">Αριθμός<span class="sort-arrow"></span></th>
+                <th style="width:20%;cursor:pointer;user-select:none" onclick="sortRooms('RoomType')" data-sort="RoomType">Τύπος<span class="sort-arrow"></span></th>
+                <th style="width:18%;cursor:pointer;user-select:none" onclick="sortRooms('BasePrice')" data-sort="BasePrice">Τιμή / Διαν.<span class="sort-arrow"></span></th>
+                <th style="width:15%;cursor:pointer;user-select:none" onclick="sortRooms('Status')" data-sort="Status">Κατάσταση<span class="sort-arrow"></span></th>
+                <th style="width:20%">Ενέργεια</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
       </div>
 
@@ -225,6 +268,44 @@
     <div class="pw-foot">
       <button class="btn" onclick="closeModal()">Ακύρωση</button>
       <button class="btn btn-dark" onclick="confirmCheckin()"><i class="ti ti-check"></i> Επιβεβαίωση</button>
+    </div>
+  </div>
+</div>
+
+<div id="rs-booking-modal" class="confirm-overlay" style="display:none;">
+  <div class="pw-modal" style="width:520px;">
+    <div class="pw-head">
+      <i class="ti ti-calendar-plus"></i>
+      <span>Κράτηση Δωματίου <span id="rs-modal-room" style="font-weight:400;font-size:13px;color:var(--color-text-secondary);"></span></span>
+      <span class="pw-close" onclick="closeRsModal()">&times;</span>
+    </div>
+    <div class="pw-body">
+      <div class="form-grid">
+        <div class="fg"><label>Επώνυμο *</label><input type="text" id="rs-modal-last" placeholder="π.χ. Παπαδόπουλος"></div>
+        <div class="fg"><label>Όνομα *</label><input type="text" id="rs-modal-first" placeholder="π.χ. Γεώργιος"></div>
+        <div class="fg"><label>Τηλέφωνο *</label><input type="tel" id="rs-modal-phone" placeholder="+30..."></div>
+        <div class="fg"><label>Email *</label><input type="email" id="rs-modal-email" placeholder="mail@example.com"></div>
+        <div class="fg"><label>Τύπος Κράτησης</label>
+          <select id="rs-modal-btype">
+            <option value="phone">Τηλεφωνική (20% Προκαταβολή)</option>
+            <option value="prepaid">Προπληρωμένη (50% Προπληρωμή)</option>
+            <option value="group">Γκρουπ (Ειδική Προκαταβολή)</option>
+            <option value="walkin">Walk-in (Άμεση Πληρωμή)</option>
+          </select>
+        </div>
+        <div class="fg" style="grid-column:span 2;">
+          <div class="sum-box" style="margin-bottom:0;">
+            <div class="sum-row"><span>Δωμάτιο</span><span id="rs-modal-room-type"></span></div>
+            <div class="sum-row"><span>Διανυκτερεύσεις</span><span id="rs-modal-nights"></span></div>
+            <div class="sum-row"><span>Τιμή / Διαν.</span><span id="rs-modal-rate"></span></div>
+            <div class="sum-row tot"><span>Σύνολο</span><span id="rs-modal-total"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pw-foot">
+      <button class="btn" onclick="closeRsModal()">Ακύρωση</button>
+      <button class="btn btn-dark" onclick="confirmRsBooking()"><i class="ti ti-check"></i> Επιβεβαίωση Κράτησης</button>
     </div>
   </div>
 </div>
