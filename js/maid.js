@@ -1,4 +1,8 @@
 // js/maid.js
+const loader = document.getElementById('app-loader');
+if (loader) loader.style.display = 'none';
+document.querySelector('.app').style.display = 'flex';
+
 const vTitles={overview:'Επισκόπηση Βάρδιας',rooms:'Δωμάτια Βάρδιας',minibar:'Mini-bar',linen:'Ιματισμός — Αποστολή & Παραλαβή',stock:'Αποθεματικό',report:'Αναφορά Βάρδιας'};
 
 function navTo(id){

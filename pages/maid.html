@@ -6,10 +6,20 @@
     <title>Σελίδα Καμαριέρας — Διαχείριση δωματίων, ιματισμού και mini-bar</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <link rel="stylesheet" href="/css/maid.css">
+    <style>.app{display:none}</style>
 </head>
 <body>
 
 <h2 class="sr-only">Σελίδα καμαριέρας — Διαχείριση δωματίων, ιματισμού και mini-bar</h2>
+
+<div id="app-loader" class="app-loader">
+  <div class="loader-box">
+    <div class="loader-logo">Grand Kavala</div>
+    <div class="loader-sub">Σελίδα Καμαριέρας</div>
+    <div class="loader-spin"><i class="ti ti-loader"></i></div>
+    <div class="loader-msg">Φόρτωση...</div>
+  </div>
+</div>
 
 <div class="app">
 <aside class="sb">
@@ -18,14 +28,14 @@
     <div class="sb-role"><span class="sb-dot"></span>Καμαριέρα</div>
   </div>
   <nav class="sb-nav">
-    <div class="sb-sec">Κύριο</div>
+      <div class="sb-group">Κύριο</div>
     <div class="sb-item active" data-v="overview"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Επισκόπηση</div>
     <div class="sb-item" data-v="rooms"><i class="ti ti-door" aria-hidden="true"></i>Δωμάτια Βάρδιας<span class="sb-badge" id="badge-rooms">12</span></div>
     <div class="sb-item" data-v="minibar"><i class="ti ti-fridge" aria-hidden="true"></i>Mini-bar<span class="sb-badge" id="badge-mb">4</span></div>
-    <div class="sb-sec">Ιματισμός</div>
+    <div class="sb-group">Ιματισμός</div>
     <div class="sb-item" data-v="linen"><i class="ti ti-shirt" aria-hidden="true"></i>Αποστολή & Παραλαβή</div>
     <div class="sb-item" data-v="stock"><i class="ti ti-package" aria-hidden="true"></i>Αποθεματικό</div>
-    <div class="sb-sec">Άλλα</div>
+    <div class="sb-group">Άλλα</div>
     <div class="sb-item" data-v="report"><i class="ti ti-notes" aria-hidden="true"></i>Αναφορά Βάρδιας</div>
   </nav>
   <div class="sb-foot">
@@ -47,7 +57,7 @@
     </div>
     <div class="tb-r">
       <span class="badge b-teal">Ολοκλ. <span id="done-count">3</span>/15</span>
-      <span class="badge b-amber">Εκκρεμή <span id="pend-count">12</span></span>
+      <span class="badge b-gold">Εκκρεμή <span id="pend-count">12</span></span>
       <span class="badge b-red">Mini-bar <span id="mb-count">4</span> εκκρ.</span>
     </div>
   </div>
