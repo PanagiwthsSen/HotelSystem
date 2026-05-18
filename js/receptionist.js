@@ -200,6 +200,10 @@ async function fetchTodayReservations() {
         
         const liveArrBadge = document.getElementById('live-arr-badge');
         if(liveArrBadge) liveArrBadge.textContent = `Αφίξεις: ${arrList.length}`;
+        const dashArrCount = document.getElementById('dash-arr-count');
+        if (dashArrCount) dashArrCount.textContent = arrList.length;
+        const dashDepCount = document.getElementById('dash-dep-count');
+        if (dashDepCount) dashDepCount.textContent = depList.length;
 
     } catch (err) {
         console.error("Σφάλμα κρατήσεων:", err.message);
@@ -237,6 +241,23 @@ function renderArrivals(arrivals) {
         `;
         tbody.appendChild(tr);
     });
+
+    // Dashboard mini-table
+    const dashBody = document.getElementById('dash-arrivals-body');
+    if (dashBody) {
+        if (arrivals.length === 0) {
+            dashBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">Δεν υπάρχουν αφίξεις σήμερα</td></tr>';
+        } else {
+            dashBody.innerHTML = arrivals.slice(0, 5).map(arr => {
+                const c = arr.CUSTOMER || {};
+                const name = (c.FirstName || c.LastName) ? `${c.FirstName || ''} ${c.LastName || ''}`.trim() : 'Άγνωστος';
+                const room = arr._roomNumber || '—';
+                const isCheckedIn = (arr.Status === 'CheckedIn' || arr.Status === 'CheckedOut');
+                const statusHtml = isCheckedIn ? '<span class="pill p-g">Check-In</span>' : '<span class="pill p-a">Εκκρεμεί</span>';
+                return `<tr><td><strong>${name}</strong></td><td>${room}</td><td>${statusHtml}</td></tr>`;
+            }).join('');
+        }
+    }
 }
 
 function renderDepartures(departures) {
@@ -267,6 +288,23 @@ function renderDepartures(departures) {
         `;
         tbody.appendChild(tr);
     });
+
+    // Dashboard mini-table
+    const dashBody = document.getElementById('dash-departures-body');
+    if (dashBody) {
+        if (departures.length === 0) {
+            dashBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">Δεν υπάρχουν αναχωρήσεις σήμερα</td></tr>';
+        } else {
+            dashBody.innerHTML = departures.slice(0, 5).map(dep => {
+                const c = dep.CUSTOMER || {};
+                const name = (c.FirstName || c.LastName) ? `${c.FirstName || ''} ${c.LastName || ''}`.trim() : 'Άγνωστος';
+                const room = dep._roomNumber || '—';
+                const isCheckedOut = dep.Status === 'CheckedOut';
+                const statusHtml = isCheckedOut ? '<span class="pill p-g">Check-Out</span>' : '<span class="pill p-a">Εκκρεμεί</span>';
+                return `<tr><td><strong>${name}</strong></td><td>${room}</td><td>${statusHtml}</td></tr>`;
+            }).join('');
+        }
+    }
 }
 
 /* ==============================================================
@@ -856,30 +894,58 @@ window.confirmRsBooking = async function () {
 };
 
 /* ==============================================================
+   SEARCH / FILTER FOR ARRIVALS & DEPARTURES
+   ============================================================== */
+function normalizeGreek(str) {
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/ς/g, 'σ');
+}
+
+function filterArrivals() {
+    const q = normalizeGreek(document.getElementById('arrivals-search').value);
+    document.querySelectorAll('#v-arrivals table tbody tr').forEach(row => {
+        const name = normalizeGreek(row.cells[0]?.textContent || '');
+        const room = normalizeGreek(row.cells[2]?.textContent || '');
+        row.style.display = (name.includes(q) || room.includes(q)) ? '' : 'none';
+    });
+}
+function filterDepartures() {
+    const q = normalizeGreek(document.getElementById('departures-search').value);
+    document.querySelectorAll('#v-departures table tbody tr').forEach(row => {
+        const name = normalizeGreek(row.cells[0]?.textContent || '');
+        const room = normalizeGreek(row.cells[1]?.textContent || '');
+        row.style.display = (name.includes(q) || room.includes(q)) ? '' : 'none';
+    });
+}
+
+/* ==============================================================
    INITIALIZATION
    ============================================================== */
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        if(window.supabase) {
-            fetchRoomsAndRender();
-            fetchTodayReservations();
+document.addEventListener('DOMContentLoaded', async () => {
+    while (!window.supabase) await new Promise(r => setTimeout(r, 50));
 
-            // Set default dates: today & today + 3 days
-            const today = new Date();
-            const plus3 = new Date(today);
-            plus3.setDate(plus3.getDate() + 3);
-            const fmt = d => d.toISOString().split('T')[0];
-            const nbIn = document.getElementById('nb-in');
-            const nbOut = document.getElementById('nb-out');
-            if (nbIn) nbIn.value = fmt(today);
-            if (nbOut) nbOut.value = fmt(plus3);
-            const rsIn = document.getElementById('rs-checkin');
-            const rsOut = document.getElementById('rs-checkout');
-            if (rsIn) rsIn.value = fmt(today);
-            if (rsOut) rsOut.value = fmt(plus3);
-            if (document.getElementById('nb-rtype')) updatePrice();
-        } else {
-            showToast('Αποτυχία σύνδεσης με τη βάση (Supabase is missing)', 'error');
-        }
-    }, 500);
+    const loader = document.getElementById('app-loader');
+    if (loader) loader.style.display = 'none';
+    document.querySelector('.app').style.display = 'flex';
+
+    fetchRoomsAndRender();
+    fetchTodayReservations();
+
+    // Set default dates: today & today + 3 days
+    const today = new Date();
+    const plus3 = new Date(today);
+    plus3.setDate(plus3.getDate() + 3);
+    const fmt = d => d.toISOString().split('T')[0];
+    const nbIn = document.getElementById('nb-in');
+    const nbOut = document.getElementById('nb-out');
+    if (nbIn) nbIn.value = fmt(today);
+    if (nbOut) nbOut.value = fmt(plus3);
+    const rsIn = document.getElementById('rs-checkin');
+    const rsOut = document.getElementById('rs-checkout');
+    if (rsIn) rsIn.value = fmt(today);
+    if (rsOut) rsOut.value = fmt(plus3);
+    if (document.getElementById('nb-rtype')) updatePrice();
 });

@@ -116,3 +116,16 @@ body {
   0% { opacity: 0; transform: translate(-50%, -40%) scale(0.9); }
   100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
+
+/* LOADING SCREEN */
+.app-loader {
+  position: fixed; inset: 0; z-index: 999999;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff;
+}
+.loader-box { text-align: center; }
+.loader-logo { font-size: 26px; font-weight: 700; color: #0A1628; letter-spacing: -0.5px; }
+.loader-sub { font-size: 13px; color: #A8892A; margin-bottom: 24px; }
+.loader-spin i { font-size: 34px; color: #A8892A; animation: spin 1s linear infinite; display: inline-block; }
+.loader-msg { font-size: 13px; color: #6b7280; margin-top: 12px; }
+@keyframes spin { 100% { transform: rotate(360deg); } }

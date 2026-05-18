@@ -32,6 +32,10 @@ let bookingData = {
 };
 
 function initApp() {
+  const loader = document.getElementById('app-loader');
+  if (loader) loader.style.display = 'none';
+  document.querySelector('.site').style.display = 'block';
+
   const params = new URLSearchParams(window.location.search);
   bookingData.room = params.get('room') || (params.get('type') === 'suite' ? 'Σουίτα' : 'Επιλεγμένο Δωμάτιο');
   bookingData.price = parseFloat(params.get('price')) || 140;

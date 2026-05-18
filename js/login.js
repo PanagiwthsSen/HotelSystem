@@ -1,6 +1,10 @@
 import { supabase } from './supabase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    const loader = document.getElementById('app-loader');
+    if (loader) loader.style.display = 'none';
+    document.querySelector('.login-container').style.display = 'block';
+
     // Έλεγχος αν ο χρήστης είναι ήδη συνδεδεμένος
     const savedUser = localStorage.getItem('hotel_user');
     if (savedUser) {

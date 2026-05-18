@@ -233,3 +233,28 @@ tr:last-child td{border-bottom:none}
   border-color: #A8892A; background: #FFFBEB;
   box-shadow: 0 0 0 2px rgba(168,137,42,0.25);
 }
+
+/* LOADING SCREEN */
+.app-loader {
+  position: fixed; inset: 0; z-index: 999999;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-background-primary);
+}
+.loader-box { text-align: center; }
+.loader-logo { font-size: 26px; font-weight: 700; color: #0A1628; letter-spacing: -0.5px; }
+.loader-sub { font-size: 13px; color: #A8892A; margin-bottom: 24px; }
+.loader-spin i { font-size: 34px; color: #A8892A; animation: spin 1s linear infinite; display: inline-block; }
+.loader-msg { font-size: 13px; color: var(--color-text-secondary); margin-top: 12px; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* SEARCH INPUT */
+.search-input {
+  padding: 6px 10px; border: 1px solid var(--color-border-secondary);
+  border-radius: 6px; font-size: 12px; font-family: inherit;
+  max-width: 220px; background: var(--color-background-primary);
+  color: var(--color-text-primary); outline: none;
+}
+.search-input:focus {
+  border-color: #A8892A;
+  box-shadow: 0 0 0 2px rgba(168,137,42,0.15);
+}

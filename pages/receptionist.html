@@ -7,10 +7,20 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <link rel="stylesheet" href="/css/receptionist.css">
+    <style>.app{display:none}</style>
 </head>
 <body>
 
 <h2 class="sr-only">Πίνακας ελέγχου Υποδοχής — Grand Kavala</h2>
+
+<div id="app-loader" class="app-loader">
+  <div class="loader-box">
+    <div class="loader-logo">Grand Kavala</div>
+    <div class="loader-sub">Σύστημα Υποδοχής</div>
+    <div class="loader-spin"><i class="ti ti-loader"></i></div>
+    <div class="loader-msg">Φόρτωση συστήματος...</div>
+  </div>
+</div>
 
 <div class="app">
   <aside class="sb">
@@ -67,8 +77,8 @@
             <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door-enter" aria-hidden="true"></i>Άμεσες Αφίξεις</div><button class="btn btn-sm" onclick="navTo('arrivals')">Διαχείριση →</button></div>
             <div id="v-arrivals-mini">
                 <table>
-                  <thead><tr><th style="width:35%">Πελάτης</th><th style="width:25%">Κατάσταση</th></tr></thead>
-                  <tbody></tbody>
+                  <thead><tr><th style="width:38%">Πελάτης</th><th style="width:22%">Δωμάτιο</th><th style="width:40%">Κατάσταση</th></tr></thead>
+                  <tbody id="dash-arrivals-body"></tbody>
                 </table>
             </div>
           </div>
@@ -76,8 +86,8 @@
             <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door-exit" aria-hidden="true"></i>Εκκρεμείς Αναχωρήσεις</div><button class="btn btn-sm" onclick="navTo('departures')">Διαχείριση →</button></div>
             <div id="v-departures-mini">
                 <table>
-                  <thead><tr><th style="width:30%">Πελάτης</th><th style="width:25%">Mini-bar</th></tr></thead>
-                  <tbody></tbody>
+                  <thead><tr><th style="width:38%">Πελάτης</th><th style="width:22%">Δωμάτιο</th><th style="width:40%">Κατάσταση</th></tr></thead>
+                  <tbody id="dash-departures-body"></tbody>
                 </table>
             </div>
           </div>
@@ -199,7 +209,10 @@
 
       <div class="view" id="v-arrivals">
         <div class="card">
-          <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door-enter" aria-hidden="true"></i>Αφίξεις Ημέρας (Check-in)</div></div>
+          <div class="card-hd">
+            <div class="card-hd-l"><i class="ti ti-door-enter" aria-hidden="true"></i>Αφίξεις Ημέρας (Check-in)</div>
+            <input type="text" id="arrivals-search" class="search-input" placeholder="Αναζήτηση" oninput="filterArrivals()">
+          </div>
           <table id="arrivals-table">
             <thead><tr><th>Πελάτης</th><th>Τύπος</th><th>Δωμάτιο</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
             <tbody></tbody>
@@ -209,7 +222,10 @@
 
       <div class="view" id="v-departures">
         <div class="card">
-          <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door-exit" aria-hidden="true"></i>Αναχωρήσεις & Έκδοση Απόδειξης</div></div>
+          <div class="card-hd">
+            <div class="card-hd-l"><i class="ti ti-door-exit" aria-hidden="true"></i>Αναχωρήσεις & Έκδοση Απόδειξης</div>
+            <input type="text" id="departures-search" class="search-input" placeholder="Αναζήτηση" oninput="filterDepartures()">
+          </div>
           <table>
             <thead><tr><th>Πελάτης</th><th>Δωμ.</th><th>Mini-bar</th><th>Υπόλοιπο</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
             <tbody></tbody>

@@ -220,6 +220,181 @@ function calculateLiveStats() {
     if (typeof checkDynamicPricing === "function") checkDynamicPricing(occPct);
 }
 
+/* ==============================================================
+   LIVE ARRIVALS & DEPARTURES DASHBOARD (ΑΠΟ SUPABASE)
+   ============================================================== */
+async function fetchDashboardBookings() {
+    const today = new Date().toISOString().split('T')[0];
+
+    const arrivalsBody = document.getElementById('arrivals-body');
+    const departuresBody = document.getElementById('departures-body');
+
+    if (!arrivalsBody && !departuresBody) return;
+
+    // Show loading state
+    if (arrivalsBody) arrivalsBody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:1rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Φόρτωση...</td></tr>';
+    if (departuresBody) departuresBody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:1rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Φόρτωση...</td></tr>';
+
+    try {
+        const [arrivalsRes, departuresRes] = await Promise.all([
+            supabase
+                .from('RESERVATION')
+                .select(`
+                    ReservationID, Status,
+                    CUSTOMER (FirstName, LastName),
+                    RESERVATION_ROOM (RoomNumber)
+                `)
+                .eq('CheckInDate', today)
+                .neq('Status', 'Cancelled'),
+            supabase
+                .from('RESERVATION')
+                .select(`
+                    ReservationID, Status,
+                    CUSTOMER (FirstName, LastName),
+                    RESERVATION_ROOM (RoomNumber)
+                `)
+                .eq('CheckOutDate', today)
+                .neq('Status', 'Cancelled')
+        ]);
+
+        if (arrivalsRes.error) throw arrivalsRes.error;
+        if (departuresRes.error) throw departuresRes.error;
+
+        renderBookingTable('arrivals-body', arrivalsRes.data, 'arrival');
+        renderBookingTable('departures-body', departuresRes.data, 'departure');
+
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης αφίξεων/αναχωρήσεων:", err.message);
+        showToast("Αποτυχία φόρτωσης αφίξεων/αναχωρήσεων από τη βάση.", "error");
+        if (arrivalsBody) arrivalsBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:1rem;">Σφάλμα φόρτωσης</td></tr>';
+        if (departuresBody) departuresBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:1rem;">Σφάλμα φόρτωσης</td></tr>';
+    }
+}
+
+function renderBookingTable(tbodyId, data, type) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+
+    if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:1rem;">Δεν υπάρχουν ${type === 'arrival' ? 'αφίξεις' : 'αναχωρήσεις'} σήμερα</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = data.map(res => {
+        const customer = res.CUSTOMER || {};
+        const name = `${customer.FirstName || ''} ${customer.LastName || ''}`.trim() || 'Άγνωστος Πελάτης';
+        const roomData = res.RESERVATION_ROOM;
+        let rooms = '—';
+        if (roomData) {
+            const roomArr = Array.isArray(roomData) ? roomData : [roomData];
+            rooms = roomArr.map(r => r.RoomNumber).filter(Boolean).join(', ') || '—';
+        }
+
+        let statusLabel, statusClass;
+        switch (res.Status) {
+            case 'CheckedIn':
+                statusLabel = 'Check-In';
+                statusClass = 'p-g';
+                break;
+            case 'CheckedOut':
+                statusLabel = 'Check-Out';
+                statusClass = 'p-gr';
+                break;
+            case 'Confirmed':
+                statusLabel = 'Επιβεβαιωμένη';
+                statusClass = 'p-b';
+                break;
+            default:
+                statusLabel = res.Status || '—';
+                statusClass = 'p-a';
+        }
+
+        return `<tr><td><strong>${name}</strong></td><td>${rooms}</td><td><span class="pill ${statusClass}">${statusLabel}</span></td></tr>`;
+    }).join('');
+}
+
+/* ==============================================================
+   ALL ARRIVALS / DEPARTURES MODAL (ΑΠΟ SUPABASE)
+   ============================================================== */
+async function fetchAndShowBookings(type) {
+    const today = new Date().toISOString().split('T')[0];
+    const isArrival = type === 'arrival';
+    const title = isArrival ? 'Αφίξεις Σήμερα' : 'Αναχωρήσεις Σήμερα';
+    const dateField = isArrival ? 'CheckInDate' : 'CheckOutDate';
+
+    document.getElementById('bookings-modal-title').textContent = title;
+    document.getElementById('bookings-modal-body').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση...</td></tr>';
+    document.getElementById('bookings-modal').style.display = 'flex';
+
+    try {
+        const { data, error } = await supabase
+            .from('RESERVATION')
+            .select(`
+                ReservationID, CheckInDate, CheckOutDate, TotalCost, Status,
+                CUSTOMER (FirstName, LastName),
+                RESERVATION_ROOM (RoomNumber)
+            `)
+            .eq(dateField, today)
+            .neq('Status', 'Cancelled')
+            .order(dateField, { ascending: true });
+
+        if (error) throw error;
+
+        const tbody = document.getElementById('bookings-modal-body');
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν ${isArrival ? 'αφίξεις' : 'αναχωρήσεις'} σήμερα</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = data.map(res => {
+            const customer = res.CUSTOMER || {};
+            const name = `${customer.FirstName || ''} ${customer.LastName || ''}`.trim() || 'Άγνωστος Πελάτης';
+
+            const roomData = res.RESERVATION_ROOM;
+            let rooms = '—';
+            if (roomData) {
+                const roomArr = Array.isArray(roomData) ? roomData : [roomData];
+                rooms = roomArr.map(r => r.RoomNumber).filter(Boolean).join(', ') || '—';
+            }
+
+            const dateVal = res[dateField];
+            const timeStr = dateVal
+                ? new Date(dateVal).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })
+                : '—';
+
+            const amount = res.TotalCost ? `€${Number(res.TotalCost).toLocaleString('el-GR')}` : '—';
+
+            let statusLabel, statusClass;
+            switch (res.Status) {
+                case 'CheckedIn':  statusLabel = 'Check-In';   statusClass = 'p-g'; break;
+                case 'CheckedOut': statusLabel = 'Check-Out';  statusClass = 'p-gr'; break;
+                case 'Confirmed':  statusLabel = 'Επιβεβαιωμένη'; statusClass = 'p-b'; break;
+                default:           statusLabel = res.Status || '—'; statusClass = 'p-a';
+            }
+
+            return `<tr>
+                <td><strong>${name}</strong></td>
+                <td>${rooms}</td>
+                <td>${timeStr}</td>
+                <td>${amount}</td>
+                <td><span class="pill ${statusClass}">${statusLabel}</span></td>
+            </tr>`;
+        }).join('');
+
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης λίστας:", err.message);
+        document.getElementById('bookings-modal-body').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">Σφάλμα φόρτωσης δεδομένων</td></tr>';
+    }
+}
+
+window.showAllArrivals = function() { fetchAndShowBookings('arrival'); };
+window.showAllDepartures = function() { fetchAndShowBookings('departure'); };
+
+window.closeBookingsModal = function(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('bookings-modal').style.display = 'none';
+};
 
 
 /* ==============================================================
@@ -1537,16 +1712,19 @@ window.changePassword = function(empId, username) {
     toggleVisibility('#pw-confirm', '#pw-eye-confirm');
 };
 
-// Εκκίνηση Φόρτωσης όταν ανοίγει το Tab των Χρηστών
+// Εκκίνηση Φόρτωσης όταν ανοίγουν τα Tabs
 document.querySelectorAll('.sb-item').forEach(el => {
     el.addEventListener('click', () => {
         if (el.dataset.v === 'users') fetchUsers();
+        if (el.dataset.v === 'staff') { fetchStaff(); fetchComplaints(); }
     });
 });
 
 // Όλες οι κλήσεις αρχικοποίησης τρέχουν ΜΟΝΟ αφού επαληθευτεί ο ρόλος από τη βάση
 appReady.then(ok => {
   if (!ok) return;
+  const loader = document.getElementById('app-loader');
+  if (loader) loader.style.display = 'none';
   document.querySelector('.app').style.display = 'flex';
   document.querySelectorAll('.sb-item').forEach(el => {
     el.addEventListener('click', () => {
@@ -1563,6 +1741,7 @@ appReady.then(ok => {
   if (document.getElementById('price-m')) loadPrices();
   if (document.getElementById('staff-body')) fetchStaff();
   if (document.getElementById('complaints-body')) fetchComplaints();
+  if (document.getElementById('arrivals-body')) fetchDashboardBookings();
   if (document.getElementById('inventory-body')) fetchInventory();
   if (document.getElementById('vehicles-body')) fetchVehicles();
   if (document.getElementById('rentals-body')) fetchRentals();
