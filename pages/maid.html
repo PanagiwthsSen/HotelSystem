@@ -7,6 +7,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <link rel="stylesheet" href="/css/maid.css">
     <style>.app{display:none}</style>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="../js/export.js" defer></script>
 </head>
 <body>
 
@@ -108,12 +112,17 @@
 
   <div class="view" id="v-rooms">
     <div class="toast" id="room-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i><span id="room-toast-msg">Κατάσταση δωματίου ενημερώθηκε!</span></div>
-    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-      <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('all',this)">Όλα (15)</button>
-      <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('urgent',this)">Επείγον (3)</button>
-      <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('pending',this)">Εκκρεμή (9)</button>
-      <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('done',this)">Ολοκλ. (3)</button>
+    
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('all',this)">Όλα (15)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('urgent',this)">Επείγον (3)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('pending',this)">Εκκρεμή (9)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('done',this)">Ολοκλ. (3)</button>
+        </div>
+        <button class="btn btn-sm btn-dark" onclick="exportToPDF('room-list', 'GrandKavala_Maid_Schedule')"><i class="ti ti-file-download" aria-hidden="true"></i> Πρόγραμμα (PDF)</button>
     </div>
+
     <div class="room-list" id="room-list"></div>
   </div>
 
@@ -223,7 +232,7 @@
 
   <div class="view" id="v-report">
     <div class="toast" id="rep-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Αναφορά βάρδιας εστάλη στη διοίκηση!</div>
-    <div class="card">
+    <div class="card" id="maid-report-area">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-notes" aria-hidden="true"></i>Αναφορά Βάρδιας — 9/5/2026</div></div>
       <div class="g3" style="margin-bottom:12px">
         <div class="sc"><div class="sc-lbl">Δωμάτια ολοκλ.</div><div class="sc-val" id="rpt-done">3</div></div>
@@ -238,7 +247,7 @@
       </div>
       <div style="display:flex;gap:7px;margin-top:4px">
         <button class="btn btn-dark" onclick="submitReport()"><i class="ti ti-send" aria-hidden="true"></i> Αποστολή Αναφοράς</button>
-        <button class="btn"><i class="ti ti-printer" aria-hidden="true"></i> Εκτύπωση</button>
+        <button class="btn" onclick="exportToPDF('maid-report-area', 'GrandKavala_Maid_Report')"><i class="ti ti-printer" aria-hidden="true"></i> Εκτύπωση (PDF)</button>
       </div>
 
       <div style="margin-top:14px;border-top:0.5px solid var(--color-border-tertiary);padding-top:12px">

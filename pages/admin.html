@@ -8,6 +8,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <link rel="stylesheet" href="../css/admin.css">
     <style>.app { display: none; }</style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="../js/export.js" defer></script>
 </head>
 <body>
 
@@ -245,7 +249,10 @@
 
   <div class="view" id="v-users">
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-users-lock" aria-hidden="true"></i>Διαχείριση Πρόσβασης & Ρόλων</div></div>
+      <div class="card-hd">
+        <div class="card-hd-l"><i class="ti ti-users-lock" aria-hidden="true"></i>Διαχείριση Πρόσβασης & Ρόλων</div>
+        <button class="btn btn-sm btn-dark" onclick="exportToExcel('users-table', 'GrandKavala_Admin_Users')"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Εξαγωγή (Excel)</button>
+      </div>
       <table id="users-table">
         <thead><tr><th>Ονοματεπώνυμο</th><th>Username</th><th>Ρόλος Συστήματος</th><th>Κατάσταση</th><th>Ενέργειες</th></tr></thead>
         <tbody id="users-body"></tbody>

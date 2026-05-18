@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Διαχειριστής εξωτερικού προσωπικού</title>
   <link rel="stylesheet" href="/css/manager.css">
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="../js/export.js" defer></script>
 </head>
 <body>
 
@@ -52,7 +56,6 @@
 
   <div class="content">
 
-  <!-- OVERVIEW -->
   <div class="view active" id="v-overview">
     <div class="g4">
       <div class="sc"><div class="sc-lbl">Οχήματα σε δρομολόγιο</div><div class="sc-val">2</div><div class="sc-sub">από 6 σύνολο</div></div>
@@ -97,7 +100,6 @@
     </div>
   </div>
 
-  <!-- FLEET -->
   <div class="view" id="v-fleet">
     <div class="g3">
       <div class="sc"><div class="sc-lbl">Σύνολο οχημάτων</div><div class="sc-val">6</div></div>
@@ -105,8 +107,14 @@
       <div class="sc"><div class="sc-lbl">Επείγ. συντήρηση</div><div class="sc-val sc-r">2</div></div>
     </div>
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-bus" aria-hidden="true"></i>Στόλος Οχημάτων</div><button class="btn btn-sm btn-dark" onclick="navTo('maintenance')"><i class="ti ti-tool" aria-hidden="true"></i> Συντήρηση</button></div>
-      <table>
+      <div class="card-hd">
+        <div class="card-hd-l"><i class="ti ti-bus" aria-hidden="true"></i>Στόλος Οχημάτων</div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-sm btn-dark" onclick="exportToExcel('fleet-table', 'GrandKavala_Fleet_Report')"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Εξαγωγή (Excel)</button>
+          <button class="btn btn-sm btn-dark" onclick="navTo('maintenance')"><i class="ti ti-tool" aria-hidden="true"></i> Συντήρηση</button>
+        </div>
+      </div>
+      <table id="fleet-table">
         <thead><tr><th style="width:16%">Πινακίδα</th><th style="width:20%">Τύπος</th><th style="width:16%">Χιλ/τρα</th><th style="width:20%">ΚΤΕΟ / Service</th><th style="width:14%">Κόστος/μήνα</th><th style="width:14%">Κατάσταση</th></tr></thead>
         <tbody>
           <tr style="background:#FFF6F6"><td style="font-weight:500">ΚΑΒ-1234</td><td>Λεωφ. 20θ.</td><td>142.800</td><td><span class="pill p-r">ΚΤΕΟ σε 5 ημ.</span></td><td>€340</td><td><span class="pill p-b">Δρομολ.</span></td></tr>
@@ -120,7 +128,6 @@
     </div>
   </div>
 
-  <!-- ROUTES -->
   <div class="view" id="v-routes">
     <div class="toast" id="route-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Δρομολόγιο καταχωρήθηκε!</div>
     <div class="card">
@@ -162,7 +169,6 @@
     </div>
   </div>
 
-  <!-- DRIVERS -->
   <div class="view" id="v-drivers">
     <div class="toast" id="drv-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Διαθεσιμότητα οδηγού ενημερώθηκε!</div>
     <div class="card">
@@ -239,7 +245,6 @@
     </div>
   </div>
 
-  <!-- MAINTENANCE -->
   <div class="view" id="v-maintenance">
     <div class="toast" id="maint-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Συντήρηση καταχωρήθηκε!</div>
     <div class="ns ns-e"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>ΚΑΒ-1234:</strong> ΚΤΕΟ λήγει 14/05/2026 — 5 ημέρες. Κλείστε ραντεβού αμέσως.</div></div>
@@ -273,7 +278,6 @@
     </div>
   </div>
 
-  <!-- COSTS -->
   <div class="view" id="v-costs">
     <div class="g3">
       <div class="sc"><div class="sc-lbl">Κόστος λειτ. Απρ.</div><div class="sc-val">€1.840</div><div class="sc-sub">Σύνολο στόλου</div></div>
@@ -281,8 +285,11 @@
       <div class="sc"><div class="sc-lbl">Έσοδα μεταφορών</div><div class="sc-val sc-g">€1.240</div><div class="sc-sub">Χρεώσεις πελατών</div></div>
     </div>
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-coin" aria-hidden="true"></i>Κόστος Λειτουργίας ανά Όχημα — Απρίλιος 2026</div><button class="btn btn-sm btn-dark"><i class="ti ti-download" aria-hidden="true"></i> Εξαγωγή</button></div>
-      <table>
+      <div class="card-hd">
+        <div class="card-hd-l"><i class="ti ti-coin" aria-hidden="true"></i>Κόστος Λειτουργίας ανά Όχημα — Απρίλιος 2026</div>
+        <button class="btn btn-sm btn-dark" onclick="exportToExcel('costs-table', 'GrandKavala_Costs_Report')"><i class="ti ti-download" aria-hidden="true"></i> Εξαγωγή (Excel)</button>
+      </div>
+      <table id="costs-table">
         <thead><tr><th style="width:18%">Όχημα</th><th style="width:16%">Καύσιμα</th><th style="width:16%">Συντήρηση</th><th style="width:16%">Ασφάλεια</th><th style="width:14%">Λοιπά</th><th style="width:20%">Σύνολο / μήνα</th></tr></thead>
         <tbody>
           <tr><td>ΚΑΒ-1234</td><td>€180</td><td>€80</td><td>€55</td><td>€25</td><td><strong>€340</strong></td></tr>
@@ -311,7 +318,6 @@
     </div>
   </div>
 
-  <!-- GARDENS -->
   <div class="view" id="v-gardens">
     <div class="toast" id="grd-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Πρόγραμμα ενημερώθηκε!</div>
     <div class="card">
@@ -341,7 +347,6 @@
     </div>
   </div>
 
-  <!-- MATERIALS -->
   <div class="view" id="v-materials">
     <div class="toast" id="mat-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Αναφορά ελλείψεων εστάλη στη διοίκηση!</div>
     <div class="ns ns-e"><i class="ti ti-package" aria-hidden="true"></i><div><strong>Σπόροι γκαζόν:</strong> 5 kg διαθέσιμα — ελάχ. απόθεμα 10 kg. Άμεση παραγγελία απαραίτητη.</div></div>
