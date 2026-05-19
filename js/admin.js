@@ -81,23 +81,7 @@ document.querySelectorAll('.sb-item').forEach(el => {
 function updateLiveTime() {
     const now = new Date();
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-    document.getElementById('live-time').innerHTML = now.toLocaleDateString('el-GR', options) + " · Βάρδια: Admin";
-}
-let adminNotifCount = 4;
-window.dismissAdminNotif = function(el) {
-    el.style.opacity = '0';
-    setTimeout(() => {
-        el.remove();
-        adminNotifCount--;
-        if (adminNotifCount > 0) {
-            document.getElementById('notif-count').textContent = adminNotifCount;
-            document.getElementById('dash-action-val').textContent = adminNotifCount;
-        } else {
-            document.getElementById('notif-badge').style.display = 'none';
-            document.getElementById('dash-action-val').textContent = 0;
-            document.getElementById('dash-action-val').classList.replace('sc-dn', 'sc-up');
-        }
-    }, 300);
+    document.getElementById('live-time').innerHTML = now.toLocaleDateString('el-GR', options);
 }
 
 
@@ -465,6 +449,9 @@ function updateSeasonality() {
     const basePrice = parseInt(document.getElementById('price-d').value) || 140;
     const activeSeason = getCurrentSeason();
 
+    const seasonTextEl = document.getElementById('season-text');
+    if (seasonTextEl) seasonTextEl.textContent = SEASONS[activeSeason]?.label?.split(' (')[0] || 'Κανονική περίοδος';
+
     ['summer', 'xmas', 'easter', 'low'].forEach(season => {
         const multEl = document.getElementById(`mult-${season}`);
         const priceEl = document.getElementById(`calc-${season}`);
@@ -664,6 +651,10 @@ async function fetchStaff() {
                 score: emp.Score !== null ? `⭐${emp.Score}` : '⭐-'       // <--- Από τη βάση
             };
         });
+
+        // Ενημέρωση dashboard με αριθμό προσωπικού
+        if (document.getElementById('dash-staff-val')) document.getElementById('dash-staff-val').textContent = staffData.length;
+        if (document.getElementById('dash-staff-sub')) document.getElementById('dash-staff-sub').textContent = `${staffData.length} ενεργοί υπάλληλοι`;
 
         renderStaff('all'); // Εμφάνιση όλων αρχικά
 
@@ -1095,37 +1086,77 @@ async function fetchVehicles() {
         const tbody = document.getElementById('vehicles-body');
         if (!tbody) return;
 
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση στόλου οχημάτων...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση στόλου οχημάτων...</td></tr>';
 
         const { data, error } = await supabase
             .from('VEHICLE')
-            .select('*')
+            .select(`
+                *,
+                VEHICLE_SERVICE (ServiceID, ServiceDate, NextServiceDate)
+            `)
             .order('Type', { ascending: true });
 
         if (error) throw error;
 
+        const notifContainer = document.getElementById('admin-notifications');
+        if (notifContainer) notifContainer.innerHTML = '';
+        let notifCount = 0;
+        let notifHtml = '';
+
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">Δεν υπάρχουν καταχωρημένα οχήματα.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Δεν υπάρχουν καταχωρημένα οχήματα.</td></tr>';
+            updateNotifBadge(notifCount);
             return;
         }
 
-        tbody.innerHTML = data.map(v => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const rowsHtml = data.map(v => {
             let statusHtml = '';
-            let statusText = '';
             const dbStatus = v.Status ? v.Status.toLowerCase() : '';
 
-            // Mapping καταστάσεων σε UI Elements
             if (dbStatus === 'available') {
                 statusHtml = '<span class="pill p-g">Διαθέσιμο</span>';
-                statusText = 'available';
             } else if (dbStatus === 'in_use') {
                 statusHtml = '<span class="pill p-b">Σε Δρομολόγιο</span>';
-                statusText = 'in_use';
             } else if (dbStatus === 'maintenance') {
                 statusHtml = '<span class="pill p-r">Σε Συντήρηση</span>';
-                statusText = 'maintenance';
             } else {
                 statusHtml = `<span class="pill p-a">${v.Status}</span>`;
+            }
+
+            let serviceHtml = '<span class="pill p-g">—</span>';
+            if (v.VEHICLE_SERVICE && v.VEHICLE_SERVICE.length > 0) {
+                const services = v.VEHICLE_SERVICE.filter(s => s.NextServiceDate);
+                if (services.length > 0) {
+                    const latestService = services.reduce((a, b) =>
+                        new Date(a.NextServiceDate) > new Date(b.NextServiceDate) ? a : b
+                    );
+                    const nextDate = new Date(latestService.NextServiceDate);
+                    nextDate.setHours(0, 0, 0, 0);
+                    const diffMs = nextDate - today;
+                    const daysUntil = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                    const dateStr = nextDate.toLocaleDateString('el-GR');
+                    const plate = v.PlateNumber || v.Type;
+                    const vid = v.VehicleID;
+
+                    if (daysUntil < 0) {
+                        serviceHtml = `<span class="pill p-r">Υπερημερία ${dateStr}</span>`;
+                        if (!isDismissed(vid)) {
+                            notifCount++;
+                            notifHtml += `<div class="ns ns-e" onclick="dismissServiceNotif(${vid},this)"><i class="ti ti-car" aria-hidden="true"></i><div><strong>${plate}:</strong> Service υπερήμερο από ${dateStr} — απαιτείται άμεση συντήρηση</div></div>`;
+                        }
+                    } else if (daysUntil <= 30) {
+                        serviceHtml = `<span class="pill p-a">Σε ${daysUntil} ημ. (${dateStr})</span>`;
+                        if (!isDismissed(vid)) {
+                            notifCount++;
+                            notifHtml += `<div class="ns ns-w" onclick="dismissServiceNotif(${vid},this)"><i class="ti ti-car" aria-hidden="true"></i><div><strong>${plate}:</strong> Προγραμματισμένο service σε ${daysUntil} ημέρες (${dateStr})</div></div>`;
+                        }
+                    } else {
+                        serviceHtml = `<span class="pill p-g">${dateStr}</span>`;
+                    }
+                }
             }
 
             return `
@@ -1133,20 +1164,278 @@ async function fetchVehicles() {
                     <td><strong>${v.Type}</strong></td>
                     <td><code style="background:var(--bg-card); padding:2px 6px; border-radius:4px;">${v.PlateNumber}</code></td>
                     <td>${statusHtml}</td>
-                    <td>
-                        <button class="btn btn-sm" onclick="triggerAction('Προγραμματισμός δρομολογίου για: ${v.PlateNumber}', 'info')">
-                            <i class="ti ti-calendar-event"></i>
+                    <td>${serviceHtml}</td>
+                    <td style="white-space:nowrap">
+                        <button class="btn btn-sm btn-dark" onclick="openTripModal(${v.VehicleID}, '${v.PlateNumber || v.Type}')" title="Δρομολόγια">
+                            <i class="ti ti-route"></i>
+                        </button>
+                        <button class="btn btn-sm" onclick="openVehicleModal(${v.VehicleID})" title="Επεξεργασία">
+                            <i class="ti ti-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm" onclick="deleteVehicle(${v.VehicleID})" title="Διαγραφή">
+                            <i class="ti ti-trash"></i>
                         </button>
                     </td>
                 </tr>
             `;
         }).join('');
 
+        tbody.innerHTML = rowsHtml;
+
+        if (notifContainer && notifHtml) {
+            notifContainer.innerHTML = notifHtml;
+        }
+
+        updateNotifBadge(notifCount);
+
     } catch (err) {
         console.error("Σφάλμα φόρτωσης οχημάτων:", err.message);
         showToast("Αποτυχία φόρτωσης στόλου οχημάτων.", "error");
     }
 }
+
+function isDismissed(vehicleId) {
+    const key = `dismissed_svc_${vehicleId}`;
+    const val = localStorage.getItem(key);
+    if (!val) return false;
+    const dismissedAt = parseInt(val, 10);
+    if (isNaN(dismissedAt)) return false;
+    return (Date.now() - dismissedAt) < 24 * 60 * 60 * 1000;
+}
+
+function updateNotifBadge(count) {
+    const el = document.getElementById('dash-action-val');
+    if (!el) return;
+    el.textContent = count;
+    const card = el.closest('.sc');
+    const sub = card?.querySelector('.sc-sub');
+    if (count > 0) {
+        el.className = 'sc-val sc-dn';
+        if (sub) sub.textContent = 'Απαιτούν προσοχή';
+    } else {
+        el.className = 'sc-val sc-up';
+        if (sub) sub.textContent = 'Καμία εκκρεμότητα';
+    }
+}
+
+window.dismissServiceNotif = function(vehicleId, el) {
+    localStorage.setItem(`dismissed_svc_${vehicleId}`, Date.now().toString());
+    el.style.opacity = '0';
+    setTimeout(() => {
+        el.remove();
+        const container = document.getElementById('admin-notifications');
+        const remaining = container ? container.children.length : 0;
+        updateNotifBadge(remaining);
+    }, 300);
+};
+
+/* ==============================================================
+   ΔΡΟΜΟΛΟΓΙΑ — MODAL ΠΡΟΒΟΛΗΣ
+   ============================================================== */
+window.openTripModal = async function(vehicleId, plateNumber) {
+    document.getElementById('trip-modal-title').textContent = `Δρομολόγια — ${plateNumber}`;
+    document.getElementById('trip-modal-body').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση δρομολογίων...</td></tr>';
+    document.getElementById('trip-modal').style.display = 'flex';
+
+    try {
+        const { data, error } = await supabase
+            .from('TRIP')
+            .select(`
+                TripID, Date, Destination, Cost,
+                EMPLOYEE (FirstName, LastName),
+                CUSTOMER (FirstName, LastName)
+            `)
+            .eq('VehicleID', vehicleId)
+            .order('Date', { ascending: false });
+
+        if (error) throw error;
+
+        const tbody = document.getElementById('trip-modal-body');
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν δρομολόγια για αυτό το όχημα.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(t => {
+            const driver = t.EMPLOYEE || {};
+            const driverName = `${driver.FirstName || ''} ${driver.LastName || ''}`.trim() || '—';
+            const customer = t.CUSTOMER || {};
+            const customerName = `${customer.FirstName || ''} ${customer.LastName || ''}`.trim() || '—';
+            const dateStr = new Date(t.Date).toLocaleDateString('el-GR');
+            const cost = t.Cost ? `€${Number(t.Cost).toLocaleString('el-GR')}` : '—';
+
+            return `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td><strong>${t.Destination}</strong></td>
+                    <td>${driverName}</td>
+                    <td>${customerName}</td>
+                    <td><strong>${cost}</strong></td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης δρομολογίων:", err.message);
+        document.getElementById('trip-modal-body').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">Σφάλμα φόρτωσης δεδομένων</td></tr>';
+    }
+};
+
+window.closeTripModal = function(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('trip-modal').style.display = 'none';
+};
+
+/* ==============================================================
+   ΟΧΗΜΑΤΑ — CRUD (ΠΡΟΣΘΗΚΗ / ΕΠΕΞΕΡΓΑΣΙΑ / ΔΙΑΓΡΑΦΗ)
+   ============================================================== */
+window.openVehicleModal = async function(vehicleId) {
+    let vehicle = null;
+    let serviceRecord = null;
+    if (vehicleId) {
+        const { data } = await supabase
+            .from('VEHICLE')
+            .select(`
+                *,
+                VEHICLE_SERVICE (ServiceID, ServiceDate, NextServiceDate)
+            `)
+            .eq('VehicleID', vehicleId)
+            .single();
+        vehicle = data;
+        if (vehicle?.VEHICLE_SERVICE?.length > 0) {
+            serviceRecord = vehicle.VEHICLE_SERVICE.reduce((a, b) =>
+                new Date(a.NextServiceDate || 0) > new Date(b.NextServiceDate || 0) ? a : b
+            );
+        }
+    }
+
+    const existing = document.querySelector('.inv-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'inv-overlay';
+    overlay.innerHTML = `
+        <div class="inv-modal">
+            <h3>${vehicle ? 'Επεξεργασία' : 'Νέο'} Οχήματος</h3>
+            <div class="mform-group">
+                <label>Όχημα / Μοντέλο *</label>
+                <input type="text" id="v-type" value="${vehicle ? (vehicle.Type || '') : ''}" placeholder="π.χ. Mercedes Sprinter">
+            </div>
+            <div class="mform-group">
+                <label>Πινακίδα *</label>
+                <input type="text" id="v-plate" value="${vehicle ? (vehicle.PlateNumber || '') : ''}" placeholder="π.χ. ΚΑΒ-1234">
+            </div>
+            <div class="mform-group">
+                <label>Επόμενο Service</label>
+                <input type="date" id="v-service-date" value="${serviceRecord?.NextServiceDate ? serviceRecord.NextServiceDate.split('T')[0] : ''}">
+            </div>
+            <div class="modal-actions">
+                <button class="btn" id="v-cancel">Ακύρωση</button>
+                <button class="btn btn-dark" id="v-save">${vehicle ? 'Αποθήκευση' : 'Δημιουργία'}</button>
+            </div>
+        </div>
+    `;
+
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#v-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#v-save').addEventListener('click', async () => {
+        const type = overlay.querySelector('#v-type').value.trim();
+        const plate = overlay.querySelector('#v-plate').value.trim();
+        const nextServiceDate = overlay.querySelector('#v-service-date').value || null;
+
+        if (!type || !plate) {
+            showToast('Συμπληρώστε Όχημα και Πινακίδα.', 'error');
+            return;
+        }
+
+        if (!await window.showConfirm(`${vehicle ? 'Ενημέρωση' : 'Δημιουργία'} οχήματος "${plate}";`)) return;
+
+        try {
+            if (vehicle) {
+                const { error: vehErr } = await supabase
+                    .from('VEHICLE')
+                    .update({ Type: type, PlateNumber: plate })
+                    .eq('VehicleID', vehicle.VehicleID);
+                if (vehErr) throw vehErr;
+
+                if (serviceRecord) {
+                    const { error: svcErr } = await supabase
+                        .from('VEHICLE_SERVICE')
+                        .update({ NextServiceDate: nextServiceDate })
+                        .eq('ServiceID', serviceRecord.ServiceID);
+                    if (svcErr) throw svcErr;
+                } else if (nextServiceDate) {
+                    const { error: svcErr } = await supabase
+                        .from('VEHICLE_SERVICE')
+                        .insert([{ VehicleID: vehicle.VehicleID, ServiceDate: nextServiceDate, NextServiceDate: nextServiceDate }]);
+                    if (svcErr) throw svcErr;
+                }
+
+                showToast(`Όχημα "${plate}" ενημερώθηκε.`, 'success');
+            } else {
+                const { data: newVeh, error: vehErr } = await supabase
+                    .from('VEHICLE')
+                    .insert([{ Type: type, PlateNumber: plate, Status: 'available', LicensePlate: plate }])
+                    .select()
+                    .single();
+                if (vehErr) throw vehErr;
+
+                if (nextServiceDate && newVeh) {
+                    const { error: svcErr } = await supabase
+                        .from('VEHICLE_SERVICE')
+                        .insert([{ VehicleID: newVeh.VehicleID, ServiceDate: nextServiceDate, NextServiceDate: nextServiceDate }]);
+                    if (svcErr) throw svcErr;
+                }
+
+                showToast(`Όχημα "${plate}" δημιουργήθηκε.`, 'success');
+            }
+
+            overlay.remove();
+            fetchVehicles();
+        } catch (err) {
+            showToast('Αποτυχία: ' + err.message, 'error');
+        }
+    });
+
+    overlay.querySelector('#v-type').focus();
+
+    overlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') overlay.querySelector('#v-save').click();
+        if (e.key === 'Escape') overlay.remove();
+    });
+};
+
+window.deleteVehicle = async function(vehicleId) {
+    if (!await window.showConfirm('Διαγραφή οχήματος και όλων των δρομολογίων του; Η ενέργεια είναι μη αναστρέψιμη.')) return;
+
+    try {
+        const { error: svcErr } = await supabase
+            .from('VEHICLE_SERVICE')
+            .delete()
+            .eq('VehicleID', vehicleId);
+        if (svcErr) throw svcErr;
+
+        const { error: tripErr } = await supabase
+            .from('TRIP')
+            .delete()
+            .eq('VehicleID', vehicleId);
+        if (tripErr) throw tripErr;
+
+        const { error: vehErr } = await supabase
+            .from('VEHICLE')
+            .delete()
+            .eq('VehicleID', vehicleId);
+        if (vehErr) throw vehErr;
+
+        showToast('Το όχημα διαγράφηκε.', 'success');
+        fetchVehicles();
+    } catch (err) {
+        showToast('Αποτυχία διαγραφής: ' + err.message, 'error');
+    }
+};
 
 /* ==============================================================
    ΕΝΟΙΚΙΑΖΟΜΕΝΑ ΚΑΤΑΣΤΗΜΑΤΑ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
@@ -1344,25 +1633,7 @@ window.payEmployee = async function(btn, id, name, iban) {
    ΚΟΥΜΠΙΑ: BACKUP SYSTEM
    ============================================================== */
 window.runBackup = function(btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<i class="ti ti-loader" aria-hidden="true" style="animation: spin 1s linear infinite;"></i> Σε εξέλιξη...';
-    showToast("Εκκίνηση χειροκίνητου Backup. Παρακαλώ περιμένετε...", "info");
-
-    setTimeout(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="ti ti-player-play" aria-hidden="true"></i> Εκτέλεση τώρα';
-        showToast("Το Backup ολοκληρώθηκε με απόλυτη επιτυχία!", "success");
-
-        // Προσθήκη νέας γραμμής στον πίνακα Backup
-        const tbody = document.querySelector('#backup-table tbody');
-        const now = new Date();
-        const time = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-        
-        const newRow = document.createElement('tr');
-        newRow.innerHTML = `<td>Μόλις τώρα</td><td>${time}</td><td>X:\\backup_manual</td><td>4.2 GB</td><td><span class="pill p-g">Επιτυχές</span></td><td><span class="pill p-g">OK</span></td>`;
-        
-        tbody.insertBefore(newRow, tbody.firstChild);
-    }, 2500); // Προσομοίωση 2.5 δευτερολέπτων
+    showToast("Η λειτουργία backup δεν είναι ακόμα συνδεδεμένη με το σύστημα αρχείων.", "info");
 }
 
 // Απλό animation για το κουμπί backup
@@ -1447,9 +1718,21 @@ async function fetchRevenue() {
             labels.map(date => groupedData[date]['Λοιπά'])
         );
 
-        // Ενημέρωση του συνολικού ποσού στην κάρτα
+        // Ενημέρωση στατιστικών εσόδων
         const total = data.reduce((sum, r) => sum + Number(r.Amount), 0);
         if(document.getElementById('rev-total')) document.getElementById('rev-total').textContent = `€${total.toLocaleString('el-GR')}`;
+
+        const days = Object.keys(groupedData).length;
+        const amounts = data.map(r => Number(r.Amount));
+        const avg = days > 0 ? total / days : 0;
+        const high = amounts.length > 0 ? Math.max(...amounts) : 0;
+        const low = amounts.length > 0 ? Math.min(...amounts) : 0;
+        if (document.getElementById('rev-avg')) document.getElementById('rev-avg').textContent = `€${avg.toLocaleString('el-GR', { maximumFractionDigits: 0 })}`;
+        if (document.getElementById('rev-avg-sub')) document.getElementById('rev-avg-sub').textContent = `${days} ημέρες δεδομένα`;
+        if (document.getElementById('rev-high')) document.getElementById('rev-high').textContent = `€${high.toLocaleString('el-GR')}`;
+        if (document.getElementById('rev-high-sub')) document.getElementById('rev-high-sub').textContent = days > 0 ? data.find(r => Number(r.Amount) === high)?.PaymentDate || '—' : '—';
+        if (document.getElementById('rev-low')) document.getElementById('rev-low').textContent = `€${low.toLocaleString('el-GR')}`;
+        if (document.getElementById('rev-low-sub')) document.getElementById('rev-low-sub').textContent = days > 0 ? data.find(r => Number(r.Amount) === low)?.PaymentDate || '—' : '—';
 
     } catch (err) {
         console.error("Σφάλμα φόρτωσης εσόδων:", err.message);

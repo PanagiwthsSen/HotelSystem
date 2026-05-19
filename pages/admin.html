@@ -66,10 +66,8 @@
   <div class="topbar">
     <div><div class="tb-title" id="tb-title">Πίνακας Ελέγχου</div><div class="tb-meta" id="live-time"></div></div>
     <div class="tb-right">
-      <span class="badge b-gold" id="season-badge"><i class="ti ti-sun" aria-hidden="true"></i> Καλοκαίρι — Υψηλή ζήτηση</span>
+      <span class="badge b-gold" id="season-badge"><i class="ti ti-sun" aria-hidden="true"></i> <span id="season-text">Καλοκαίρι</span></span>
       <span class="badge b-teal" id="live-occ-badge">Πληρ. --%</span>
-      <span class="badge b-red" id="notif-badge"><i class="ti ti-bell" aria-hidden="true"></i> <span id="notif-count">4</span> ειδοπ.</span>
-      <span class="badge b-blue" id="live-revenue-badge">Έσοδα: €128.220</span>
     </div>
   </div>
 
@@ -77,18 +75,13 @@
 
   <div class="view active" id="v-dash">
     <div class="g4">
-      <div class="sc"><div class="sc-lbl">Έσοδα Μήνα</div><div class="sc-val" id="dash-rev">€128.220</div><div class="sc-sub sc-up"><i class="ti ti-trending-up" aria-hidden="true"></i> +11% vs Προηγ.</div></div>
+      <div class="sc"><div class="sc-lbl">Έσοδα Μήνα</div><div class="sc-val sc-up" id="dash-rev">€0</div><div class="sc-sub">Τρέχον μήνας</div></div>
       <div class="sc"><div class="sc-lbl">Πληρότητα σήμερα</div><div class="sc-val" id="dash-occ-val">--%</div><div class="sc-sub" id="dash-occ-sub">-- / 510 δωμάτια</div><div class="prog"><div class="prog-fill" id="dash-occ-bar" style="width:0%;background:#1D9E75"></div></div></div>
-      <div class="sc"><div class="sc-lbl">Προσωπικό ενεργό</div><div class="sc-val">47</div><div class="sc-sub">4 σε άδεια σήμερα</div></div>
-      <div class="sc"><div class="sc-lbl">Εκκρεμείς ενέργειες</div><div class="sc-val sc-dn" id="dash-action-val">4</div><div class="sc-sub">Απαιτούν προσοχή</div></div>
+      <div class="sc"><div class="sc-lbl">Προσωπικό ενεργό</div><div class="sc-val" id="dash-staff-val">--</div><div class="sc-sub" id="dash-staff-sub">Φόρτωση...</div></div>
+      <div class="sc"><div class="sc-lbl">Εκκρεμείς ενέργειες</div><div class="sc-val sc-up" id="dash-action-val">0</div><div class="sc-sub">Καμία εκκρεμότητα</div></div>
     </div>
 
-    <div id="admin-notifications">
-      <div class="ns ns-e" onclick="dismissAdminNotif(this)"><i class="ti ti-building-store" aria-hidden="true"></i><div><strong>Cafeteria Sunrise:</strong> Μίσθωμα Μαΐου €1.200 σε καθυστέρηση — αποστολή όχλησης μέσω δικηγόρου</div></div>
-      <div class="ns ns-w" onclick="dismissAdminNotif(this)"><i class="ti ti-car" aria-hidden="true"></i><div><strong>ΚΑΒ-1234:</strong> ΚΤΕΟ λήγει σε 5 ημέρες · Κόστος λειτουργίας Απρ.: €340</div></div>
-      <div class="ns ns-w" onclick="dismissAdminNotif(this)"><i class="ti ti-package" aria-hidden="true"></i><div><strong>Αποθήκη εστιατορίου:</strong> Κρασί Merlot κάτω από ελάχιστο απόθεμα (8 φιάλες)</div></div>
-      <div class="ns ns-ok" onclick="dismissAdminNotif(this)"><i class="ti ti-circle-check" aria-hidden="true"></i><div><strong>Backup Σήμερα:</strong> Ολοκληρώθηκε επιτυχώς — αφαιρούμενο μέσο X:\backup_today</div></div>
-    </div>
+    <div id="admin-notifications"></div>
 
     <div class="g2">
       <div class="card">
@@ -112,10 +105,10 @@
 
   <div class="view" id="v-revenue">
     <div class="g4">
-      <div class="sc"><div class="sc-lbl">Σύνολο Επιλεγμένης Περιόδου</div><div class="sc-val" id="rev-total">€0</div><div class="sc-sub sc-up">+11% vs Προηγ.</div></div>
-      <div class="sc"><div class="sc-lbl">Μ.Ο. ημέρας</div><div class="sc-val">€14.247</div><div class="sc-sub">9 ημέρες δεδομένα</div></div>
-      <div class="sc"><div class="sc-lbl">Υψηλότερη ημέρα</div><div class="sc-val">€17.200</div><div class="sc-sub">06/05 Τετάρτη</div></div>
-      <div class="sc"><div class="sc-lbl">Χαμηλότερη ημέρα</div><div class="sc-val">€11.450</div><div class="sc-sub">03/05 Κυριακή</div></div>
+      <div class="sc"><div class="sc-lbl">Σύνολο Επιλεγμένης Περιόδου</div><div class="sc-val" id="rev-total">€0</div><div class="sc-sub">Επιλέξτε ημερομηνίες</div></div>
+      <div class="sc"><div class="sc-lbl">Μ.Ο. ημέρας</div><div class="sc-val" id="rev-avg">€0</div><div class="sc-sub" id="rev-avg-sub">—</div></div>
+      <div class="sc"><div class="sc-lbl">Υψηλότερη ημέρα</div><div class="sc-val" id="rev-high">€0</div><div class="sc-sub" id="rev-high-sub">—</div></div>
+      <div class="sc"><div class="sc-lbl">Χαμηλότερη ημέρα</div><div class="sc-val" id="rev-low">€0</div><div class="sc-sub" id="rev-low-sub">—</div></div>
     </div>
     <div class="card">
       <div class="card-hd">
@@ -265,8 +258,7 @@
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-database" aria-hidden="true"></i>Ιστορικό Backup</div><button class="btn btn-sm btn-dark" id="btn-run-backup" onclick="runBackup(this)"><i class="ti ti-player-play" aria-hidden="true"></i> Εκτέλεση τώρα</button></div>
       <table id="backup-table">
         <thead><tr><th>Ημερ.</th><th>Ώρα</th><th>Μέσο</th><th>Μέγεθος</th><th>Κατάσταση</th><th>Επαλ.</th></tr></thead>
-        <tbody>
-          <tr><td>Σήμερα</td><td>08:03</td><td>X:\backup</td><td>4.2 GB</td><td><span class="pill p-g">Επιτυχές</span></td><td><span class="pill p-g">OK</span></td></tr>
+        <tbody id="backup-tbody">
         </tbody>
       </table>
     </div>
@@ -274,9 +266,9 @@
 
   <div class="view" id="v-vehicles">
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-car" aria-hidden="true"></i> Στόλος Οχημάτων</div></div>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-car" aria-hidden="true"></i> Στόλος Οχημάτων</div><button class="btn btn-dark btn-sm" onclick="openVehicleModal()">+ Προσθήκη</button></div>
       <table id="vehicles-table">
-        <thead><tr><th style="width:35%">Όχημα / Μοντέλο</th><th style="width:20%">Πινακίδα</th><th style="width:25%">Κατάσταση</th><th style="width:20%">Ενέργεια</th></tr></thead>
+        <thead><tr><th style="width:25%">Όχημα / Μοντέλο</th><th style="width:15%">Πινακίδα</th><th style="width:18%">Κατάσταση</th><th style="width:22%">Επόμενο Service</th><th style="width:20%">Ενέργειες</th></tr></thead>
         <tbody id="vehicles-body"></tbody>
       </table>
     </div>
@@ -331,6 +323,30 @@
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeBookingsModal()">Κλείσιμο</button>
+    </div>
+  </div>
+</div>
+
+<div id="trip-modal" class="modal-overlay" style="display:none" onclick="closeTripModal(event)">
+  <div class="modal-content" style="max-width:750px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title" id="trip-modal-title">Δρομολόγια</span>
+      <span class="modal-close" onclick="closeTripModal()">&times;</span>
+    </div>
+    <div class="modal-body" style="padding:4px 14px">
+      <table style="width:100%">
+        <thead><tr>
+          <th style="width:15%">Ημερομηνία</th>
+          <th style="width:25%">Προορισμός</th>
+          <th style="width:20%">Οδηγός</th>
+          <th style="width:20%">Πελάτης</th>
+          <th style="width:20%">Κόστος</th>
+        </tr></thead>
+        <tbody id="trip-modal-body"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeTripModal()">Κλείσιμο</button>
     </div>
   </div>
 </div>
