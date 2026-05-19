@@ -143,21 +143,29 @@ function renderStep() {
   } 
   else if (currentStep === 3) {
     const code = bookingData.reservationId ? 'GKH-' + bookingData.reservationId : ('GKH-' + Math.floor(10000 + Math.random() * 90000));
+    const totalFinal = Math.round((bookingData.totalCost > 0 ? bookingData.totalCost : bookingData.price * calcNights()) * 1.13);
     bodyEl.innerHTML = `
       <div class="step-indicator">${dots}</div>
       <div class="success-msg">
-        <div class="success-icon">✓</div>
-        <div class="success-title">Η κράτησή σας ολοκληρώθηκε!</div>
+        <div class="success-banner">
+          <i class="ti ti-circle-check"></i>
+          <span>Η κράτησή σας ολοκληρώθηκε!</span>
+        </div>
         <div class="conf-code">${code}</div>
-        <div class="success-sub">
-          Ένα email επιβεβαίωσης στάλθηκε στο <strong>${bookingData.email}</strong>.<br><br>
-          <strong>${bookingData.first} ${bookingData.last}</strong><br>
-          ${bookingData.room}<br>
-          ${fmtDate(bookingData.checkin)} έως ${fmtDate(bookingData.checkout)} (${nights} νύχτες)<br><br>
-          Σας περιμένουμε! Για αλλαγές επικοινωνήστε στο reservations@grandkavala.gr
+        <div class="summary-box">
+          <div class="sum-row"><span>Επώνυμο</span><span>${bookingData.last}</span></div>
+          <div class="sum-row"><span>Όνομα</span><span>${bookingData.first}</span></div>
+          <div class="sum-row"><span>Τύπος Δωματίου</span><span>${bookingData.room}</span></div>
+          <div class="sum-row"><span>Άφιξη</span><span>${fmtDate(bookingData.checkin)}</span></div>
+          <div class="sum-row"><span>Αναχώρηση</span><span>${fmtDate(bookingData.checkout)}</span></div>
+          <div class="sum-row"><span>Διανυκτερεύσεις</span><span>${nights}</span></div>
+          <div class="sum-row total"><span>Συνολικό Κόστος (με ΦΠΑ)</span><span>€${totalFinal}</span></div>
+        </div>
+        <div class="success-note">
+          <i class="ti ti-mail"></i> Email επιβεβαίωσης στάλθηκε στο <strong>${bookingData.email}</strong>
         </div>
       </div>`;
-    footerEl.innerHTML = `<button class="btn-next" onclick="window.location.href='../index.html'">Επιστροφή στην Αρχική</button>`;
+    footerEl.innerHTML = `<button class="btn-home" onclick="window.location.href='../index.html'"><i class="ti ti-check"></i> Επιστροφή στην Αρχική</button>`;
   }
 }
 
@@ -225,9 +233,17 @@ async function processBookingSubmission(data) {
 
     if (custError) throw custError;
 
+    const { data: maxRow } = await window.supabase
+      .from('RESERVATION')
+      .select('ReservationID')
+      .order('ReservationID', { ascending: false })
+      .limit(1);
+    const nextId = (maxRow?.[0]?.ReservationID || 0) + 1;
+
     const { data: reservation, error: resError } = await window.supabase
       .from('RESERVATION')
       .insert([{
+        ReservationID: nextId,
         CustomerID: customer.CustomerID,
         CheckInDate: data.checkin,
         CheckOutDate: data.checkout,

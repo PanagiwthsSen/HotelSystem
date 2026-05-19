@@ -161,8 +161,10 @@ async function fetchAndRenderRooms() {
 
         const bookedRooms = new Set();
         (reservations || []).forEach(r => {
-            (r.RESERVATION_ROOM || []).forEach(rr => {
-                if (rr.RoomNumber) bookedRooms.add(rr.RoomNumber);
+            const rr = r.RESERVATION_ROOM;
+            const rooms = Array.isArray(rr) ? rr : (rr ? [rr] : []);
+            rooms.forEach(rm => {
+                if (rm.RoomNumber) bookedRooms.add(rm.RoomNumber);
             });
         });
 

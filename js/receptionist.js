@@ -36,6 +36,7 @@ function navTo(id) {
     document.querySelectorAll('.sb-item').forEach(i => i.classList.toggle('active', i.dataset.v === id));
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'v-' + id));
     document.getElementById('tb-title').textContent = viewTitles[id] || id;
+    if (id === 'new-booking') fetchAvailableRooms();
 }
 
 document.querySelectorAll('.sb-item').forEach(el => {
@@ -413,7 +414,7 @@ async function submitBooking() {
                 p_check_out: checkOut,
                 p_total_cost: totalCost,
                 p_status: 'Confirmed',
-                p_room_number: selectedRoom
+                p_room_number: Number(selectedRoom)
             });
 
         if (rpcError) {
@@ -425,6 +426,13 @@ async function submitBooking() {
             return;
         }
 
+        const rtypeMap = { 85: 'Μονόκλινο', 140: 'Δίκλινο', 175: 'Φαρδύκλινο', 380: 'Σουίτα' };
+        const roomType = rtypeMap[parseInt(document.getElementById('nb-rtype').value)];
+        const resId = result?.ReservationID;
+        if (resId && roomType) {
+            await window.supabase.from('RESERVATION').update({ RoomType: roomType }).eq('ReservationID', resId);
+        }
+
         showToast(`Η κράτηση καταχωρήθηκε! Εκχωρήθηκε το δωμάτιο ${selectedRoom}.`, 'success');
         selectedRoom = null;
         fetchTodayReservations();
@@ -433,7 +441,7 @@ async function submitBooking() {
         
         document.getElementById('nb-first').value = '';
         document.getElementById('nb-last').value = '';
-        
+
     } catch (err) {
         showToast("Αποτυχία καταχώρησης: " + err.message, "error");
     }
@@ -550,9 +558,20 @@ function renderAvailableRooms(rooms, checkoutMap = {}) {
 }
 
 window.selectRoom = function(roomNum, el) {
-    document.querySelectorAll('.room-opt').forEach(opt => opt.classList.remove('selected'));
-    if (el) el.classList.add('selected');
+    if (selectedRoom === roomNum) {
+        selectedRoom = null;
+        document.querySelectorAll('.room-opt').forEach(opt => {
+            opt.classList.remove('selected');
+            opt.style.display = '';
+        });
+        return;
+    }
     selectedRoom = roomNum;
+    document.querySelectorAll('.room-opt').forEach(opt => {
+        const match = opt.dataset.room == roomNum;
+        opt.classList.toggle('selected', match);
+        opt.style.display = match ? '' : 'none';
+    });
 };
 
 /* ==============================================================
@@ -885,7 +904,7 @@ window.confirmRsBooking = async function () {
                 p_check_out: rsState.checkOut,
                 p_total_cost: totalCost,
                 p_status: 'Confirmed',
-                p_room_number: rsState.selectedRoom
+                p_room_number: Number(rsState.selectedRoom)
             });
 
         if (rpcError) {
@@ -895,6 +914,11 @@ window.confirmRsBooking = async function () {
                 throw rpcError;
             }
             return;
+        }
+
+        const resId = result?.ReservationID;
+        if (resId && rsState.roomType) {
+            await window.supabase.from('RESERVATION').update({ RoomType: rsState.roomType }).eq('ReservationID', resId);
         }
 
         showToast('Η κράτηση ολοκληρώθηκε! Δωμάτιο ' + rsState.selectedRoom + ' ανατέθηκε.', 'success');
