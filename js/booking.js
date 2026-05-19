@@ -21,6 +21,7 @@ let currentStep = 1;
 let bookingData = {
   room: 'Δωμάτιο Standard',
   price: 0,
+  totalCost: 0,
   checkin: '',
   checkout: '',
   first: '',
@@ -39,6 +40,7 @@ function initApp() {
   const params = new URLSearchParams(window.location.search);
   bookingData.room = params.get('room') || (params.get('type') === 'suite' ? 'Σουίτα' : 'Επιλεγμένο Δωμάτιο');
   bookingData.price = parseFloat(params.get('price')) || 140;
+  bookingData.totalCost = parseFloat(params.get('totalCost')) || 0;
   
   const today = new Date();
   const defaultCheckin = today.toISOString().split('T')[0];
@@ -77,7 +79,7 @@ function fmtDate(d) {
 
 function renderStep() {
   const nights = calcNights();
-  const total = bookingData.price * nights;
+  const total = bookingData.totalCost > 0 ? bookingData.totalCost : bookingData.price * nights;
   const prepay = calcPrepay(total, bookingData.checkin);
   const prepayAmt = Math.round(total * prepay.pct / 100);
 
@@ -204,7 +206,7 @@ function prevStep() {
 
 async function processBookingSubmission(data) {
   const nights = calcNights();
-  const totalCost = data.price * nights;
+  const totalCost = data.totalCost > 0 ? data.totalCost : data.price * nights;
 
   try {
     if (!await window.showConfirm('Ολοκλήρωση κράτησης;')) return;

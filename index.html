@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Grand Kavala Hotel</title>
   <link rel="stylesheet" href="../css/style.css">
-  <script src="../js/app.js" defer></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <script type="module" src="./js/supabase-config.js"></script>
+  <script type="module" src="./js/app.js"></script>
 </head>
 <body>
   <h2 class="sr-only">Grand Kavala Hotel — Ιστοσελίδα κρατήσεων πελατών</h2>
@@ -60,91 +62,7 @@
     </div>
 
     <div id="rooms" class="section-title">Διαθέσιμα Δωμάτια</div>
-    <div class="rooms-list" id="rooms-list">
-      <div class="room-card">
-        <div class="room-img">
-          <img src="https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=600&q=80" alt="Μονόκλινο Standard">
-          <span class="room-tag tag-avail">Διαθέσιμο</span>
-        </div>
-        <div class="room-body">
-          <div class="room-name">Μονόκλινο Standard</div>
-          <div class="room-desc">Άνετο δωμάτιο με θέα την πόλη, ιδανικό για επαγγελματίες ταξιδιώτες. 22 τ.μ.</div>
-          <div class="room-features">
-            <div class="feat"><i class="ti ti-wifi" aria-hidden="true"></i> WiFi</div>
-            <div class="feat"><i class="ti ti-air-conditioning" aria-hidden="true"></i> A/C</div>
-            <div class="feat"><i class="ti ti-tv" aria-hidden="true"></i> Smart TV</div>
-            <div class="feat"><i class="ti ti-fridge" aria-hidden="true"></i> Mini-bar</div>
-          </div>
-          <div class="room-footer">
-            <div class="room-price"><strong>€85</strong> / βράδυ</div>
-            <button class="btn-book" onclick="bookRoomPage('Μονόκλινο Standard', 85)">Κράτηση</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="room-card">
-        <div class="room-img">
-          <img src="https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=600&q=80" alt="Δίκλινο Deluxe">
-          <span class="room-tag tag-avail">Διαθέσιμο</span>
-        </div>
-        <div class="room-body">
-          <div class="room-name">Δίκλινο Deluxe</div>
-          <div class="room-desc">Μεγάλο δίκλινο με μπαλκόνι και θέα στο Αιγαίο. Ιδανικό για ζευγάρια. 32 τ.μ.</div>
-          <div class="room-features">
-            <div class="feat"><i class="ti ti-wifi" aria-hidden="true"></i> WiFi</div>
-            <div class="feat"><i class="ti ti-air-conditioning" aria-hidden="true"></i> A/C</div>
-            <div class="feat"><i class="ti ti-building" aria-hidden="true"></i> Μπαλκόνι</div>
-            <div class="feat"><i class="ti ti-fridge" aria-hidden="true"></i> Mini-bar</div>
-          </div>
-          <div class="room-footer">
-            <div class="room-price"><strong>€140</strong> / βράδυ</div>
-            <button class="btn-book" onclick="bookRoomPage('Δίκλινο Deluxe', 140)">Κράτηση</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="room-card">
-        <div class="room-img">
-          <img src="https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=600&q=80" alt="Φαρδύκλινο Superior">
-          <span class="room-tag tag-hot">Δημοφιλές</span>
-        </div>
-        <div class="room-body">
-          <div class="room-name">Φαρδύκλινο Superior</div>
-          <div class="room-desc">Ευρύχωρο δωμάτιο με king-size κρεβάτι, καθιστικό και θέα θάλασσα. 40 τ.μ.</div>
-          <div class="room-features">
-            <div class="feat"><i class="ti ti-wifi" aria-hidden="true"></i> WiFi</div>
-            <div class="feat"><i class="ti ti-bath" aria-hidden="true"></i> Μπανιέρα</div>
-            <div class="feat"><i class="ti ti-building" aria-hidden="true"></i> Μπαλκόνι</div>
-            <div class="feat"><i class="ti ti-fridge" aria-hidden="true"></i> Mini-bar</div>
-          </div>
-          <div class="room-footer">
-            <div class="room-price"><strong>€175</strong> / βράδυ</div>
-            <button class="btn-book" onclick="bookRoomPage('Φαρδύκλινο Superior', 175)">Κράτηση</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="room-card">
-        <div class="room-img">
-          <img src="https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=600&q=80" alt="Presidential Suite">
-          <span class="room-tag tag-suite">Σουίτα</span>
-        </div>
-        <div class="room-body">
-          <div class="room-name">Presidential Suite</div>
-          <div class="room-desc">Κορυφαίο επίπεδο πολυτέλειας. Ξεχωριστό σαλόνι, jacuzzi, panoramic θέα θάλασσα. 90 τ.μ.</div>
-          <div class="room-features">
-            <div class="feat"><i class="ti ti-wifi" aria-hidden="true"></i> WiFi</div>
-            <div class="feat"><i class="ti ti-bath" aria-hidden="true"></i> Jacuzzi</div>
-            <div class="feat"><i class="ti ti-sofa" aria-hidden="true"></i> Σαλόνι</div>
-            <div class="feat"><i class="ti ti-coffee" aria-hidden="true"></i> Πρωινό</div>
-          </div>
-          <div class="room-footer">
-            <div class="room-price"><strong>€380</strong> / βράδυ</div>
-            <button class="btn-book" onclick="bookRoomPage('Presidential Suite', 380)">Κράτηση</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div class="rooms-list" id="rooms-list"></div>
 
     <div class="policy-strip">
       <div class="policy-title">Πολιτική Κρατήσεων & Ακυρώσεων</div>
