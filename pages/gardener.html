@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Σελίδα Κηπουρού — Διαχείριση Εξωτερικών Χώρων</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="../css/gardener.css">
+    <style>.app{display:none}</style>
+</head>
+<body>
+
+<div id="app-loader" class="app-loader">
+  <div class="loader-box">
+    <div class="loader-logo">Grand Kavala</div>
+    <div class="loader-sub">Σελίδα Κηπουρού</div>
+    <div class="loader-spin"><i class="ti ti-loader"></i></div>
+    <div class="loader-msg">Φόρτωση...</div>
+  </div>
+</div>
+
+<div class="app">
+<aside class="sb">
+  <div class="sb-top">
+    <div class="sb-logo">Grand Kavala</div>
+    <div class="sb-role"><span class="sb-dot" style="background:#4CAF50"></span>Κηπουρός</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-group">Κύριο</div>
+    <div class="sb-item active" data-v="overview"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Επισκόπηση</div>
+    <div class="sb-item" data-v="schedule"><i class="ti ti-clipboard-list" aria-hidden="true"></i>Πρόγραμμα<span class="sb-badge" id="badge-tasks">3</span></div>
+    <div class="sb-item" data-v="map"><i class="ti ti-map-pin" aria-hidden="true"></i>Ζώνες & Χάρτης</div>
+    
+    <div class="sb-group">Αιτήματα & Αναφορές</div>
+    <div class="sb-item" data-v="faults"><i class="ti ti-tool" aria-hidden="true"></i>Αναφορά Βλάβης</div>
+    <div class="sb-item" data-v="supplies"><i class="ti ti-seeding" aria-hidden="true"></i>Προμήθειες</div>
+    
+    <div class="sb-group">Άλλα</div>
+    <div class="sb-item" data-v="events"><i class="ti ti-calendar-event" aria-hidden="true"></i>Εκδηλώσεις</div>
+  </nav>
+  <div class="sb-foot">
+    <div class="av">
+      <div class="av-circle" style="color:#4CAF50">ΓΠ</div>
+      <div><div class="av-name">Γιώργος Π.</div><div class="av-shift">07:00 – 15:00</div></div>
+      <i class="ti ti-logout" style="cursor:pointer;" onclick="logout()" title="Αποσύνδεση"></i>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="tb-l">
+      <div>
+        <div class="tb-title" id="tb-title">Επισκόπηση Βάρδιας</div>
+        <div class="tb-meta">Σάββατο 9 Μαΐου 2026 · 08:30 · Βάρδια 07:00–15:00</div>
+      </div>
+    </div>
+    <div class="tb-r">
+      <span class="badge b-teal">Ολοκλ. <span id="done-count">2</span>/5</span>
+      <span class="badge b-amber">Ζώνες <span id="pend-count">3</span> εκκρ.</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+  <div class="view active" id="v-overview">
+    <div class="g4">
+      <div class="sc"><div class="sc-lbl">Συνολικές Εργασίες</div><div class="sc-val">5</div><div class="sc-sub">Για τη σημερινή βάρδια</div></div>
+      <div class="sc"><div class="sc-lbl">Ολοκληρωμένες</div><div class="sc-val" style="color:#1D9E75">2</div><div class="sc-sub">Πρόοδος 40%</div><div class="prog"><div class="prog-fill" style="width:40%;background:#1D9E75"></div></div></div>
+      <div class="sc"><div class="sc-lbl">Ζώνες για φροντίδα</div><div class="sc-val" style="color:#D85A30">3</div><div class="sc-sub">Απαιτούν άμεση δράση</div></div>
+      <div class="sc"><div class="sc-lbl">Εκδηλώσεις</div><div class="sc-val" style="color:#378ADD">1</div><div class="sc-sub">Στον Κεντρικό Κήπο</div></div>
+    </div>
+
+    <div class="ns ns-w"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>Συντήρηση Πισίνας:</strong> Ο καθαρισμός εξωτερικού χώρου πισίνας πρέπει να τελειώσει πριν τις 10:00.</div></div>
+    <div class="ns ns-ok"><i class="ti ti-circle-check" aria-hidden="true"></i><div><strong>Πότισμα (Ανατολική Πτέρυγα):</strong> Το αυτόματο πότισμα ολοκληρώθηκε επιτυχώς στις 06:00.</div></div>
+
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-clipboard-list" aria-hidden="true"></i>Άμεσες Εργασίες</div><button class="btn btn-sm" onclick="navTo('schedule')">Όλες →</button></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+            <div><div style="font-weight:500;font-size:12px">Κλάδεμα θάμνων</div><div style="font-size:11px;color:var(--color-text-secondary)">Κεντρική Είσοδος</div></div>
+            <span class="pill p-a">Σε εξέλιξη</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+            <div><div style="font-weight:500;font-size:12px">Καθαρισμός μονοπατιών</div><div style="font-size:11px;color:var(--color-text-secondary)">Νότιος Κήπος</div></div>
+            <span class="pill p-r">Εκκρεμεί</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-seeding" aria-hidden="true"></i>Αποθέματα σε έλλειψη</div><button class="btn btn-sm" onclick="navTo('supplies')">Αίτημα →</button></div>
+        <div style="font-size:12px">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><span style="color:var(--color-text-secondary)">Λίπασμα Τριανταφυλλιάς</span><span style="font-weight:500;color:#EF9F27">Μόνο 2kg</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><span style="color:var(--color-text-secondary)">Ανταλλακτικά Μπεκ</span><span style="font-weight:500;color:#E24B4A">Καθόλου</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--color-text-secondary)">Χώμα (Σακιά)</span><span style="font-weight:500">4 τεμ. (ΟΚ)</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="v-schedule">
+    <div class="toast" id="task-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Η εργασία σημειώθηκε ως ολοκληρωμένη!</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-list-check" aria-hidden="true"></i>Λίστα Εργασιών Βάρδιας</div></div>
+      
+      <div class="minibar-row task-row">
+        <div class="mb-room"><input type="checkbox" checked disabled></div>
+        <div class="mb-items"><strong style="color:var(--color-text-primary)">Έλεγχος αυτόματου ποτίσματος</strong> (Όλες οι ζώνες)</div>
+        <span class="pill p-g">Ολοκληρώθηκε</span>
+      </div>
+
+      <div class="minibar-row task-row">
+        <div class="mb-room"><input type="checkbox" onchange="completeTask(this)"></div>
+        <div class="mb-items"><strong style="color:var(--color-text-primary)">Κλάδεμα θάμνων</strong> (Είσοδος & Parking)</div>
+        <span class="pill p-a task-badge">Σε εξέλιξη</span>
+      </div>
+
+      <div class="minibar-row task-row">
+        <div class="mb-room"><input type="checkbox" onchange="completeTask(this)"></div>
+        <div class="mb-items"><strong style="color:var(--color-text-primary)">Καθαρισμός μονοπατιών</strong> (Νότιος Κήπος)</div>
+        <span class="pill p-r task-badge">Εκκρεμεί</span>
+      </div>
+
+      <div class="minibar-row task-row">
+        <div class="mb-room"><input type="checkbox" onchange="completeTask(this)"></div>
+        <div class="mb-items"><strong style="color:var(--color-text-primary)">Κούρεμα γκαζόν</strong> (Πίσω αυλή / Χώρος δεξιώσεων)</div>
+        <span class="pill p-r task-badge">Εκκρεμεί</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="v-map">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-map-pin" aria-hidden="true"></i>Κατάσταση Ζωνών Εξωτερικού Χώρου</div></div>
+      <div class="g3">
+        <div class="sc" style="cursor:pointer; border: 1px solid #C0DD97; background: #EAF3DE" onclick="toggleZone(this)">
+          <div style="display:flex; justify-content:space-between">
+            <div class="sc-lbl" style="color:#27500A">ΖΩΝΗ Α</div>
+            <i class="ti ti-check" style="color:#1D9E75"></i>
+          </div>
+          <div class="sc-val" style="color:#27500A; font-size:16px; margin-top:5px">Κεντρική Είσοδος</div>
+          <div class="sc-sub" style="color:#27500A; opacity:0.8">Φροντίστηκε</div>
+        </div>
+        <div class="sc" style="cursor:pointer; border: 1px solid #FAC775; background: #FAEEDA" onclick="toggleZone(this)">
+          <div style="display:flex; justify-content:space-between">
+            <div class="sc-lbl" style="color:#633806">ΖΩΝΗ Β</div>
+            <i class="ti ti-alert-circle" style="color:#BA7517"></i>
+          </div>
+          <div class="sc-val" style="color:#633806; font-size:16px; margin-top:5px">Χώρος Πισίνας</div>
+          <div class="sc-sub" style="color:#633806; opacity:0.8">Απαιτεί καθαρισμό</div>
+        </div>
+        <div class="sc" style="cursor:pointer; border: 1px solid #F7C1C1; background: #FFF8F8" onclick="toggleZone(this)">
+          <div style="display:flex; justify-content:space-between">
+            <div class="sc-lbl" style="color:#791F1F">ΖΩΝΗ Γ</div>
+            <i class="ti ti-clock" style="color:#E24B4A"></i>
+          </div>
+          <div class="sc-val" style="color:#791F1F; font-size:16px; margin-top:5px">Νότιος Κήπος</div>
+          <div class="sc-sub" style="color:#791F1F; opacity:0.8">Εκκρεμεί πότισμα/κούρεμα</div>
+        </div>
+      </div>
+      <p style="font-size: 11px; color: var(--color-text-secondary); margin-top: 15px;">* Πατήστε πάνω σε μια ζώνη για να αλλάξετε την κατάστασή της (από εκκρεμής σε ολοκληρωμένη).</p>
+    </div>
+  </div>
+
+  <div class="view" id="v-faults">
+    <div class="toast" id="fault-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Η βλάβη στάλθηκε επιτυχώς στο Τεχνικό Τμήμα.</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-tool" aria-hidden="true"></i>Καταχώρηση Νέας Βλάβης (Προς Τεχνικό)</div></div>
+      <div class="fg-row">
+        <div class="fg"><label>Τοποθεσία / Ζώνη</label>
+          <select id="fault-zone">
+            <option>Ζώνη Α (Είσοδος)</option>
+            <option>Ζώνη Β (Πισίνα)</option>
+            <option>Ζώνη Γ (Νότιος Κήπος)</option>
+            <option>Άλλο</option>
+          </select>
+        </div>
+        <div class="fg"><label>Είδος Βλάβης</label>
+          <select id="fault-type">
+            <option>Υδραυλικά / Πότισμα</option>
+            <option>Ηλεκτρολογικά / Φωτισμός</option>
+            <option>Φθορές επίπλων/εγκαταστάσεων</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg"><label>Περιγραφή Προβλήματος</label>
+        <textarea id="fault-desc" placeholder="π.χ. Το μπεκ στη γωνία της πισίνας έχει σπάσει και χάνει νερό..."></textarea>
+      </div>
+      <button class="btn btn-dark" onclick="submitFault()"><i class="ti ti-send" aria-hidden="true"></i> Αποστολή στο Τεχνικό Τμήμα</button>
+    </div>
+  </div>
+
+  <div class="view" id="v-supplies">
+    <div class="toast" id="supply-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Το αίτημα στάλθηκε στον Manager για έγκριση.</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-box" aria-hidden="true"></i>Αίτημα Αναλώσιμων Κήπου</div></div>
+      <div class="fg-row">
+        <div class="fg"><label>Είδος Υλικού</label><input type="text" id="sup-item" placeholder="π.χ. Λίπασμα Τριανταφυλλιάς"></div>
+        <div class="fg"><label>Ποσότητα</label><input type="text" id="sup-qty" placeholder="π.χ. 3 τσουβάλια"></div>
+      </div>
+      <div class="fg"><label>Αιτιολογία (Προαιρετικό)</label>
+        <textarea id="sup-reason" style="min-height:40px" placeholder="π.χ. Χρειάζεται άμεσα για τον Νότιο κήπο"></textarea>
+      </div>
+      <button class="btn btn-teal" onclick="submitSupply()"><i class="ti ti-send" aria-hidden="true"></i> Υποβολή προς Manager</button>
+    </div>
+  </div>
+
+  <div class="view" id="v-events">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-calendar-event" aria-hidden="true"></i>Προγραμματισμένες Εκδηλώσεις</div></div>
+      <div class="room-list">
+        <div class="room-card urgent">
+          <div class="room-num" style="font-size:24px"><i class="ti ti-rings"></i></div>
+          <div class="room-info">
+            <div style="font-weight:600; font-size:14px">Γαμήλια Δεξίωση (G-204)</div>
+            <div class="room-type">Τοποθεσία: Νότιος Κήπος | Ημερομηνία: 22/05/2026</div>
+            <div class="room-guest" style="color:#791F1F; font-weight:500">Απαίτηση: Πλήρης καθαρισμός, καλλωπισμός λουλουδιών & κούρεμα γκαζόν μέχρι τις 14:00.</div>
+          </div>
+        </div>
+        
+        <div class="room-card">
+          <div class="room-num" style="font-size:24px"><i class="ti ti-glass-full"></i></div>
+          <div class="room-info">
+            <div style="font-weight:600; font-size:14px">Εταιρικό Cocktail Party</div>
+            <div class="room-type">Τοποθεσία: Χώρος Πισίνας (Ζώνη Β) | Ημερομηνία: 25/05/2026</div>
+            <div class="room-guest">Απαίτηση: Έλεγχος φωτισμού κήπου, καθαρισμός περιμετρικά της πισίνας.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+</div>
+</div>
+
+<script src="../js/gardener.js"></script>
+</body>
+</html>
