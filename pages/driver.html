@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Σελίδα Οδηγού — Grand Kavala Transfers</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="../css/driver.css">
+    <style>.app{display:none}</style>
+</head>
+<body>
+
+<div id="app-loader" class="app-loader">
+  <div class="loader-box">
+    <div class="loader-logo">Grand Kavala</div>
+    <div class="loader-sub">Υπηρεσία Μεταφορών</div>
+    <div class="loader-spin"><i class="ti ti-loader"></i></div>
+    <div class="loader-msg">Φόρτωση Διαδρομών...</div>
+  </div>
+</div>
+
+<div class="app">
+<aside class="sb">
+  <div class="sb-top">
+    <div class="sb-logo">Grand Kavala</div>
+    <div class="sb-role"><span class="sb-dot" style="background:#F59E0B"></span>Οδηγός</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-group">Κινήσεις</div>
+    <div class="sb-item active" data-v="overview"><i class="ti ti-steering-wheel" aria-hidden="true"></i>Επισκόπηση</div>
+    <div class="sb-item" data-v="schedule"><i class="ti ti-calendar-time" aria-hidden="true"></i>Διαδρομές<span class="sb-badge" id="badge-trips">2</span></div>
+    
+    <div class="sb-group">Στόλος</div>
+    <div class="sb-item" data-v="fleet"><i class="ti ti-car" aria-hidden="true"></i>Οχήματα</div>
+    <div class="sb-item" data-v="fuel"><i class="ti ti-gas-station" aria-hidden="true"></i>Καύσιμα / Έξοδα</div>
+    
+    <div class="sb-group">Αναφορές</div>
+    <div class="sb-item" data-v="faults"><i class="ti ti-alert-octagon" aria-hidden="true"></i>Βλάβη Οχήματος</div>
+  </nav>
+  <div class="sb-foot">
+    <div class="av">
+      <div class="av-circle" style="color:#F59E0B">ΚΣ</div>
+      <div><div class="av-name">Κώστας Σ.</div><div class="av-shift">08:00 – 16:00</div></div>
+      <i class="ti ti-logout" style="cursor:pointer;" title="Αποσύνδεση"></i>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="tb-l">
+      <div>
+        <div class="tb-title" id="tb-title">Επισκόπηση Βάρδιας</div>
+        <div class="tb-meta">Κυριακή 10 Μαΐου 2026 · 09:15 · Όχημα: Mercedes V-Class</div>
+      </div>
+    </div>
+    <div class="tb-r">
+      <span class="badge b-teal">Ολοκλ. 1/3</span>
+      <span class="badge b-amber">Επόμενο: 10:30</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+  <div class="view active" id="v-overview">
+    <div class="g4">
+      <div class="sc"><div class="sc-lbl">Σημερινές Διαδρομές</div><div class="sc-val">3</div><div class="sc-sub">2 Εκκρεμούν</div></div>
+      <div class="sc"><div class="sc-lbl">Επόμενο Pickup</div><div class="sc-val" style="color:#378ADD">10:30</div><div class="sc-sub">Αεροδρόμιο (KVA)</div></div>
+      <div class="sc"><div class="sc-lbl">Κατάσταση Οχήματος</div><div class="sc-val" style="color:#1D9E75">OK</div><div class="sc-sub">Mercedes V-Class</div></div>
+      <div class="sc"><div class="sc-lbl">Καύσιμα</div><div class="sc-val" style="color:#F59E0B">75%</div><div class="sc-sub">Αυτονομία 450km</div></div>
+    </div>
+
+    <div class="ns ns-w"><i class="ti ti-info-circle" aria-hidden="true"></i><div><strong>Σημαντικό:</strong> Η πτήση A3-124 (Mr. Smith) έχει καθυστέρηση 15 λεπτών. Νέα ώρα παραλαβής: 10:45.</div></div>
+
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-clock" aria-hidden="true"></i>Επόμενη Διαδρομή</div></div>
+      <div class="room-card urgent">
+        <div class="room-num"><i class="ti ti-plane-arrival"></i></div>
+        <div class="room-info">
+          <div style="font-weight:600; font-size:14px">Παραλαβή από Αεροδρόμιο Καβάλας (KVA)</div>
+          <div class="room-type">Guest: Mr. & Mrs. Henderson (VIP) | Πτήση: LH-456</div>
+          <div class="room-guest" style="color:#791F1F; font-weight:500">Extra: Χρειάζεται παιδικό κάθισμα & 2 μπουκάλια νερό.</div>
+        </div>
+        <button class="btn btn-dark" onclick="navTo('schedule')">Λεπτομέρειες</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="v-schedule">
+    <div class="toast" id="trip-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Η διαδρομή ολοκληρώθηκε! Ενημερώθηκε η Reception.</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-route" aria-hidden="true"></i>Πρόγραμμα Διαδρομών</div></div>
+      
+      <div class="minibar-row">
+        <div class="mb-room">08:15</div>
+        <div class="mb-items"><strong>Grand Kavala → Λιμάνι</strong> (Group 4 άτομα)</div>
+        <span class="pill p-g">Ολοκληρώθηκε</span>
+      </div>
+
+      <div class="minibar-row" style="background:#FFF8F8; border:1px solid #F7C1C1">
+        <div class="mb-room">10:45</div>
+        <div class="mb-items"><strong>Αεροδρόμιο → Grand Kavala</strong> (Mr. Henderson - VIP)</div>
+        <span class="pill p-a">Επόμενο</span>
+        <button class="btn btn-sm" onclick="showToast('trip-toast')" style="margin-left:5px">Done</button>
+      </div>
+
+      <div class="minibar-row">
+        <div class="mb-room">14:30</div>
+        <div class="mb-items"><strong>Grand Kavala → Αρχαιολογικός Χώρος Φιλίππων</strong> (Ιδιωτική Ξενάγηση)</div>
+        <span class="pill p-r">Εκκρεμεί</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="v-fleet">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-car" aria-hidden="true"></i>Διαθέσιμος Στόλος & Κατάσταση</div></div>
+      <div class="g2">
+        <div class="sc" style="border: 1px solid #C0DD97; background: #EAF3DE">
+          <div class="sc-lbl">KVA-9922 (Σε χρήση από εσάς)</div>
+          <div class="sc-val" style="font-size:16px">Mercedes-Benz V-Class (Black)</div>
+          <div class="sc-sub">Κατάσταση: Άριστη | Καθαρό: Ναι</div>
+        </div>
+        <div class="sc" style="opacity:0.6">
+          <div class="sc-lbl">KVA-1144</div>
+          <div class="sc-val" style="font-size:16px">Mercedes-Benz S-Class (VIP)</div>
+          <div class="sc-sub">Στο συνεργείο (Προγραμματισμένο Service)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="v-fuel">
+    <div class="toast" id="fuel-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Το αίτημα εξόδων υποβλήθηκε για έγκριση.</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-gas-station" aria-hidden="true"></i>Καταχώρηση Εξόδων (Καύσιμα/Διόδια)</div></div>
+      <div class="fg-row">
+        <div class="fg"><label>Τύπος Εξόδου</label>
+          <select id="exp-type">
+            <option>Πλήρωση Καυσίμου (Diesel)</option>
+            <option>Διόδια / Parking</option>
+            <option>Πλύσιμο / Καθαρισμός</option>
+          </select>
+        </div>
+        <div class="fg"><label>Ποσό (€)</label><input type="number" placeholder="0.00"></div>
+      </div>
+      <div class="fg"><label>Χιλιόμετρα (Odometer)</label><input type="number" placeholder="π.χ. 124500"></div>
+      <div class="fg"><label>Φωτογραφία Απόδειξης</label><button class="btn"><i class="ti ti-camera"></i> Άνοιγμα Κάμερας</button></div>
+      <button class="btn btn-teal" onclick="showToast('fuel-toast')">Υποβολή Εξόδου</button>
+    </div>
+  </div>
+
+  <div class="view" id="v-faults">
+    <div class="toast" id="fault-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Η αναφορά στάλθηκε στο Τεχνικό Τμήμα.</div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Αναφορά Προβλήματος Οχήματος</div></div>
+      <div class="fg"><label>Επιλογή Οχήματος</label>
+        <select>
+          <option>Mercedes V-Class (KVA-9922)</option>
+          <option>Mercedes S-Class (KVA-1144)</option>
+          <option>Mini Bus (KVA-5566)</option>
+        </select>
+      </div>
+      <div class="fg"><label>Περιγραφή Βλάβης</label>
+        <textarea placeholder="π.χ. Ακούγεται θόρυβος στα φρένα ή ένδειξη λαδιού στο ταμπλό..."></textarea>
+      </div>
+      <div class="fg"><label>Επείγον;</label>
+        <select style="border-color:#F7C1C1"><option>Όχι - Απλή συντήρηση</option><option>ΝΑΙ - Το όχημα πρέπει να ακινητοποιηθεί</option></select>
+      </div>
+      <button class="btn btn-dark" onclick="showToast('fault-toast')">Αποστολή Αναφοράς</button>
+    </div>
+  </div>
+
+  </div>
+</div>
+</div>
+
+<script src="../js/driver.js"></script>
+</body>
+</html>
