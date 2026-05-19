@@ -441,13 +441,30 @@ async function refreshAll() {
 /* ==============================================================
    ΑΠΟΘΗΚΗ / ΑΝΕΦΟΔΙΑΣΜΟΣ
    ============================================================== */
-function requestRestock(btn) {
+async function requestRestock(btn) {
+    const tr = btn.closest('tr');
+    const itemName = tr?.querySelector('td')?.textContent?.trim();
+    if (itemName) {
+        const itemId = itemIdByName[itemName];
+        if (itemId) {
+            try {
+                await window.supabase.from('NOTIFICATION').insert([{
+                    TargetRole: 'both',
+                    Type: 'restock',
+                    Message: `Αίτημα ανεφοδιασμού: ${itemName}`,
+                    ItemID: itemId
+                }]);
+            } catch (err) {
+                showToast('Σφάλμα αποστολής ειδοποίησης.', 'error');
+            }
+        }
+    }
     btn.disabled = true;
     btn.textContent = "Στάλθηκε";
     btn.classList.replace('btn-warn', 'btn');
     const statusCell = btn.parentElement.previousElementSibling;
     statusCell.innerHTML = '<span class="pill p-b">Σε αναμονή</span>';
-    showToast("Το αίτημα ανεφοδιασμού στάλθηκε στην κεντρική αποθήκη του εστιατορίου.", "info");
+    showToast("Το αίτημα ανεφοδιασμού στάλθηκε στον διαχειριστή και τον διευθυντή.", "info");
 }
 
 /* ==============================================================

@@ -1272,6 +1272,50 @@ window.dismissServiceNotif = function(vehicleId, el) {
 };
 
 /* ==============================================================
+   ΕΙΔΟΠΟΙΗΣΕΙΣ ΑΝΕΦΟΔΙΑΣΜΟΥ (από mini-bar)
+   ============================================================== */
+async function fetchRestockNotifs() {
+    const container = document.getElementById('admin-notifications');
+    if (!container) return;
+
+    const { data } = await supabase
+        .from('NOTIFICATION')
+        .select('*')
+        .in('TargetRole', ['admin', 'both'])
+        .eq('IsRead', false)
+        .order('CreatedAt', { ascending: false });
+
+    let html = '';
+    (data || []).forEach(n => {
+        const time = n.CreatedAt ? new Date(n.CreatedAt).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' }) : '';
+        html += `<div class="ns ns-w" onclick="dismissRestockNotif(${n.NotificationID}, this)" style="cursor:pointer">
+            <i class="ti ti-package" aria-hidden="true"></i>
+            <div><strong>Αίτημα Ανεφοδιασμού:</strong> ${n.Message}</div>
+            <span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary)">${time}</span>
+        </div>`;
+    });
+
+    if (html) container.insertAdjacentHTML('beforeend', html);
+    const totalNotifs = container.children.length;
+    updateNotifBadge(totalNotifs);
+}
+
+window.dismissRestockNotif = async function(id, el) {
+    try {
+        await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
+        el.style.opacity = '0';
+        setTimeout(() => {
+            el.remove();
+            const container = document.getElementById('admin-notifications');
+            const remaining = container ? container.children.length : 0;
+            updateNotifBadge(remaining);
+        }, 300);
+    } catch (err) {
+        showToast('Σφάλμα απόρριψης ειδοποίησης.', 'error');
+    }
+};
+
+/* ==============================================================
    ΔΡΟΜΟΛΟΓΙΑ — MODAL ΠΡΟΒΟΛΗΣ
    ============================================================== */
 window.openTripModal = async function(vehicleId, plateNumber) {
@@ -2068,7 +2112,7 @@ appReady.then(ok => {
   if (document.getElementById('complaints-body')) fetchComplaints();
   if (document.getElementById('arrivals-body')) fetchDashboardBookings();
   if (document.getElementById('inventory-body')) fetchInventory();
-  if (document.getElementById('vehicles-body')) fetchVehicles();
+  if (document.getElementById('vehicles-body')) { fetchVehicles(); fetchRestockNotifs(); }
   if (document.getElementById('rentals-body')) fetchRentals();
   if (document.getElementById('payroll-body')) fetchPayroll();
   initRevenueDates();
