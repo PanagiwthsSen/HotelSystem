@@ -134,6 +134,8 @@ async function fetchRooms() {
 }
 
 // 4. Ζωγραφίζει τα κουτάκια (UI)
+// 4. Ζωγραφίζει τα κουτάκια (UI)
+// HotelSystem/js/admin.js (Αντικατάσταση της συνάρτησης renderMap)
 function renderMap(filter) {
     const rmap = document.getElementById('rmap');
     if (!rmap) return;
@@ -149,19 +151,28 @@ function renderMap(filter) {
         if (filter && filter !== 'all' && r.state !== filter) return;
         const d = document.createElement('div');
         d.className = 'rc rc-' + r.state;
-        d.textContent = r.id; 
+        
+        let prefix = r.type ? r.type.charAt(0).toUpperCase() + '-' : '';
+        d.textContent = prefix + r.id; 
         
         let stateGr = 'Ελεύθερο';
         if (r.state === 'occ') stateGr = 'Κατειλημμένο';
         else if (r.state === 'dirty') stateGr = 'Βρώμικο';
         else if (r.state === 'clean') stateGr = 'Υπό Καθαρισμό';
 
-        d.title = `${r.type} ${r.id} | ${stateGr}`;
+        d.title = `${r.type || 'Άγνωστος Τύπος'} ${r.id} | ${stateGr}`;
+        d.style.cursor = 'pointer';
+
+        d.addEventListener('click', () => {
+            alert(`Πληροφορίες Δωματίου\n--------------------\nΔωμάτιο: ${prefix}${r.id}\nΤύπος: ${r.type || 'Άγνωστος'}\nΚατάσταση: ${stateGr}`);
+        });
+
         rmap.appendChild(d);
     });
     
     calculateLiveStats();
 }
+
 
 window.filterRooms = function(f, el) {
     document.querySelectorAll('#v-rooms .active-filter').forEach(b => b.classList.remove('active-filter'));
@@ -1272,50 +1283,6 @@ window.dismissServiceNotif = function(vehicleId, el) {
 };
 
 /* ==============================================================
-   ΕΙΔΟΠΟΙΗΣΕΙΣ ΑΝΕΦΟΔΙΑΣΜΟΥ (από mini-bar)
-   ============================================================== */
-async function fetchRestockNotifs() {
-    const container = document.getElementById('admin-notifications');
-    if (!container) return;
-
-    const { data } = await supabase
-        .from('NOTIFICATION')
-        .select('*')
-        .in('TargetRole', ['admin', 'both'])
-        .eq('IsRead', false)
-        .order('CreatedAt', { ascending: false });
-
-    let html = '';
-    (data || []).forEach(n => {
-        const time = n.CreatedAt ? new Date(n.CreatedAt).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' }) : '';
-        html += `<div class="ns ns-w" onclick="dismissRestockNotif(${n.NotificationID}, this)" style="cursor:pointer">
-            <i class="ti ti-package" aria-hidden="true"></i>
-            <div><strong>Αίτημα Ανεφοδιασμού:</strong> ${n.Message}</div>
-            <span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary)">${time}</span>
-        </div>`;
-    });
-
-    if (html) container.insertAdjacentHTML('beforeend', html);
-    const totalNotifs = container.children.length;
-    updateNotifBadge(totalNotifs);
-}
-
-window.dismissRestockNotif = async function(id, el) {
-    try {
-        await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
-        el.style.opacity = '0';
-        setTimeout(() => {
-            el.remove();
-            const container = document.getElementById('admin-notifications');
-            const remaining = container ? container.children.length : 0;
-            updateNotifBadge(remaining);
-        }, 300);
-    } catch (err) {
-        showToast('Σφάλμα απόρριψης ειδοποίησης.', 'error');
-    }
-};
-
-/* ==============================================================
    ΔΡΟΜΟΛΟΓΙΑ — MODAL ΠΡΟΒΟΛΗΣ
    ============================================================== */
 window.openTripModal = async function(vehicleId, plateNumber) {
@@ -2112,7 +2079,7 @@ appReady.then(ok => {
   if (document.getElementById('complaints-body')) fetchComplaints();
   if (document.getElementById('arrivals-body')) fetchDashboardBookings();
   if (document.getElementById('inventory-body')) fetchInventory();
-  if (document.getElementById('vehicles-body')) { fetchVehicles(); fetchRestockNotifs(); }
+  if (document.getElementById('vehicles-body')) fetchVehicles();
   if (document.getElementById('rentals-body')) fetchRentals();
   if (document.getElementById('payroll-body')) fetchPayroll();
   initRevenueDates();
