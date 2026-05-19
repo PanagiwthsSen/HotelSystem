@@ -128,6 +128,7 @@ function calculateLiveStats() {
     }
 }
 
+// HotelSystem/js/receptionist.js (Αντικατάσταση της συνάρτησης renderMap)
 function renderMap(filter = 'all') {
     const rmap = document.getElementById('rmap');
     if (!rmap) return;
@@ -137,10 +138,18 @@ function renderMap(filter = 'all') {
         if (filter !== 'all' && r.state !== filter) return;
         const d = document.createElement('div');
         d.className = 'rc rc-' + r.state;
-        d.textContent = r.id; 
+        
+        let prefix = r.type ? r.type.charAt(0).toUpperCase() + '-' : '';
+        d.textContent = prefix + r.id; 
         
         let sText = r.state === 'occ' ? 'Κατειλημμένο' : r.state === 'free' ? 'Ελεύθερο' : r.state === 'dirty' ? 'Βρώμικο' : 'Υπό Καθαρισμό';
-        d.title = `${r.type} ${r.id} | ${sText}`;
+        d.title = `${r.type || 'Άγνωστος Τύπος'} ${r.id} | ${sText}`;
+        d.style.cursor = 'pointer';
+        
+        d.addEventListener('click', () => {
+            alert(`Πληροφορίες Δωματίου\n--------------------\nΔωμάτιο: ${prefix}${r.id}\nΤύπος: ${r.type || 'Άγνωστος'}\nΚατάσταση: ${sText}`);
+        });
+
         rmap.appendChild(d);
     });
     
