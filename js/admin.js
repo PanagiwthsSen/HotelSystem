@@ -431,18 +431,60 @@ function checkDynamicPricing(occPct) {
    ΣΥΝΤΕΛΕΣΤΕΣ ΕΠΟΧΙΚΟΤΗΤΑΣ
    ============================================================== */
 
+function calculateEaster(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+}
+
 const SEASONS = {
-    summer: { months: [6, 7, 8], label: 'Καλοκαίρι (Ιούν–Αύγ)' },
-    xmas: { months: [12], label: 'Χριστούγεννα' },
-    easter: { months: [3, 4], label: 'Πάσχα' }
+    summer: {
+        label: 'Καλοκαίρι',
+        defaultMultiplier: 1.6,
+        isActive: (d) => { const m = d.getMonth() + 1; return m >= 6 && m <= 8; }
+    },
+    xmas: {
+        label: 'Χριστούγεννα',
+        defaultMultiplier: 1.4,
+        isActive: (d) => {
+            const m = d.getMonth() + 1, day = d.getDate();
+            return (m === 12 && day >= 15) || (m === 1 && day <= 7);
+        }
+    },
+    easter: {
+        label: 'Πάσχα',
+        defaultMultiplier: 1.3,
+        isActive: (d) => {
+            const easter = calculateEaster(d.getFullYear());
+            const start = new Date(easter); start.setDate(start.getDate() - 7);
+            const end = new Date(easter); end.setDate(end.getDate() + 7);
+            end.setHours(23, 59, 59, 999);
+            return d >= start && d <= end;
+        }
+    }
 };
 
-function getCurrentSeason() {
-    const month = new Date().getMonth() + 1;
+function getSeasonForDate(date) {
     for (const [key, season] of Object.entries(SEASONS)) {
-        if (season.months.includes(month)) return key;
+        if (season.isActive(date)) return key;
     }
     return null;
+}
+
+function getCurrentSeason() {
+    return getSeasonForDate(new Date());
 }
 
 function updateSeasonality() {
@@ -450,7 +492,7 @@ function updateSeasonality() {
     const activeSeason = getCurrentSeason();
 
     const seasonTextEl = document.getElementById('season-text');
-    if (seasonTextEl) seasonTextEl.textContent = SEASONS[activeSeason]?.label?.split(' (')[0] || 'Κανονική περίοδος';
+    if (seasonTextEl) seasonTextEl.textContent = SEASONS[activeSeason]?.label || 'Κανονική περίοδος';
 
     ['summer', 'xmas', 'easter', 'low'].forEach(season => {
         const multEl = document.getElementById(`mult-${season}`);
