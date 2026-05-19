@@ -218,7 +218,7 @@
             <input type="text" id="arrivals-search" class="search-input" placeholder="Αναζήτηση" oninput="filterArrivals()">
           </div>
           <table id="arrivals-table">
-            <thead><tr><th>Πελάτης</th><th>Τύπος</th><th>Δωμάτιο</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
+            <thead><tr><th>Πελάτης</th><th>Τύπος</th><th>Τύπος Δωμ.</th><th>Δωμάτιο</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -280,7 +280,8 @@
     </div>
     <div class="pw-body">
       <p style="margin-bottom:16px;font-size:13px;color:#6B7280;">
-        Πελάτης: <strong id="modal-cust-name" style="color:#111827;"></strong>
+        Πελάτης: <strong id="modal-cust-name" style="color:#111827;"></strong><br>
+        <span style="font-size:12px;color:#9CA3AF;">Τύπος Δωματίου: <strong id="modal-room-type" style="color:#111827;">—</strong></span>
       </p>
       <div id="modal-room-wrap" class="pw-field">
         <label for="modal-room-select">Διαθέσιμο δωμάτιο:</label>

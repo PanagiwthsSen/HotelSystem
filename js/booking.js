@@ -205,8 +205,8 @@ function prevStep() {
 }
 
 async function processBookingSubmission(data) {
-  const nights = calcNights();
-  const totalCost = data.totalCost > 0 ? data.totalCost : data.price * nights;
+  const baseTotal = data.totalCost > 0 ? data.totalCost : data.price * calcNights();
+  const totalCost = Math.round(baseTotal * 1.13);
 
   try {
     if (!await window.showConfirm('Ολοκλήρωση κράτησης;')) return;
@@ -232,6 +232,7 @@ async function processBookingSubmission(data) {
         CheckInDate: data.checkin,
         CheckOutDate: data.checkout,
         TotalCost: totalCost,
+        RoomType: data.room,
         Status: 'Confirmed'
       }])
       .select()

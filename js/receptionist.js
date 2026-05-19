@@ -163,7 +163,7 @@ async function fetchTodayReservations() {
         // Αφίξεις Σήμερα
         const { data: arrivals, error: arrErr } = await window.supabase
             .from('RESERVATION')
-            .select(`ReservationID, Status, CUSTOMER ( FirstName, LastName, IsGroup )`)
+            .select(`ReservationID, Status, RoomType, CUSTOMER ( FirstName, LastName, IsGroup )`)
             .eq('CheckInDate', today);
 
         // Αναχωρήσεις Σήμερα
@@ -224,17 +224,20 @@ function renderArrivals(arrivals) {
         const isGroup = c.IsGroup === true;
         const hasRoom = roomNumber !== '-';
         const safeName = customerName.replace(/'/g, "\\'");
+        const roomType = arr.RoomType || '—';
+        const safeRoomType = roomType.replace(/'/g, "\\'");
         
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${customerName}</td>
             <td>${isGroup ? 'Γκρουπ' : 'Ιδιώτης'}</td>
+            <td>${roomType}</td>
             <td>${roomNumber}</td>
             <td><span class="pill ${isCheckedIn ? 'p-g' : 'p-a'}">${isCheckedIn ? 'Ολοκλ.' : 'Εκκρεμεί'}</span></td>
             <td>
                 <button class="btn btn-sm ${isCheckedIn ? '' : 'btn-dark'}" 
                         ${isCheckedIn ? 'disabled' : ''} 
-                        onclick="openCheckinModal(${arr.ReservationID}, '${safeName}', ${hasRoom ? roomNumber : null})">
+                        onclick="openCheckinModal(${arr.ReservationID}, '${safeName}', '${safeRoomType}', ${hasRoom ? roomNumber : null})">
                     ${isCheckedIn ? 'C/I OK' : 'Check-in'}
                 </button>
             </td>
@@ -549,7 +552,7 @@ window.selectRoom = function(roomNum, el) {
 let activeCheckinResId = null;
 let activeCheckinRoom = null;
 
-function openCheckinModal(reservationId, customerName, preAssignedRoom = null) {
+function openCheckinModal(reservationId, customerName, roomType = '', preAssignedRoom = null) {
     activeCheckinResId = reservationId;
     activeCheckinRoom = preAssignedRoom;
 
@@ -557,12 +560,14 @@ function openCheckinModal(reservationId, customerName, preAssignedRoom = null) {
     const roomWrap = document.getElementById('modal-room-wrap');
     const assignedWrap = document.getElementById('modal-assigned-wrap');
     const select = document.getElementById('modal-room-select');
+    const typeEl = document.getElementById('modal-room-type');
 
     if (!custEl || !roomWrap || !assignedWrap || !select) {
         showToast('Σφάλμα: το modal δεν βρέθηκε', 'error');
         return;
     }
     custEl.textContent = customerName;
+    if (typeEl) typeEl.textContent = roomType || '—';
     
     if (preAssignedRoom) {
         roomWrap.style.display = 'none';
@@ -580,7 +585,10 @@ function openCheckinModal(reservationId, customerName, preAssignedRoom = null) {
 
         select.innerHTML = '<option value="">-- Επιλέξτε Δωμάτιο --</option>';
 
-        const availableRooms = hotelRooms.filter(r => r.state === 'free');
+        let availableRooms = hotelRooms.filter(r => r.state === 'free');
+        if (roomType) {
+            availableRooms = availableRooms.filter(r => r.type === roomType);
+        }
 
         if (availableRooms.length === 0) {
             select.innerHTML += '<option value="" disabled>Δεν υπάρχουν διαθέσιμα δωμάτια</option>';
