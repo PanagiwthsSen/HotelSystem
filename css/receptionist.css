@@ -130,7 +130,7 @@ tr:last-child td{border-bottom:none}
 .rc-occ   { background: #D85A30; } /* Κατειλημμένο - Κόκκινο */
 .rc-free  { background: #1D9E75; } /* Ελεύθερο χωρίς καθαριότητα - Πράσινο/Κίτρινο βάση req */
 .rc-dirty { background: #EF9F27; color: #fff; } /* Προσεχώς άδειο/Υπό καθαρισμό - Πορτοκαλί */
-.rc-clean { background: #378ADD; } /* Υπό Καθαρισμό */
+.rc-clean { background: #1D9E75; } /* Έτοιμο για νέο πελάτη */
 
 .active-filter { background: #0A1628 !important; color: #fff !important; }
 

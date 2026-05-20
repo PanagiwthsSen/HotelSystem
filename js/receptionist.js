@@ -56,17 +56,58 @@ updateLiveTime();
    STATE & ROOMS FETCHING (SUPABASE)
    ============================================================== */
 let hotelRooms = [];
-let currentOcc = 0, currentFree = 0, currentDirty = 0, currentClean = 0;
+let currentOcc = 0, currentFree = 0, currentDirty = 0;
 let selectedRoom = null;
+let checkoutMap = {};
+
+function isSoonCheckout(checkOutDate) {
+  if (!checkOutDate) return false;
+  const d = new Date(checkOutDate);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(23, 59, 59, 999);
+  return d <= tomorrow;
+}
+
+function roomStatusLabel(state, checkOutDate) {
+  if (state === 'free' || state === 'clean') return 'Έτοιμο για νέο πελάτη';
+  if (state === 'dirty') return 'Άδειο (χωρίς καθαριότητα)';
+  if (state === 'occ') return isSoonCheckout(checkOutDate) ? 'Προσεχώς άδειο' : 'Κατειλημμένο';
+  return 'Ελεύθερο';
+}
 
 function mapDbStatusToUI(dbStatus) {
     switch (dbStatus) {
         case 'occ': return 'occ';
         case 'free': return 'free';
         case 'dirty': return 'dirty';
-        case 'clean': return 'clean';
+        case 'clean': return 'free';
         default: return 'free';
     }
+}
+
+async function buildCheckoutMap() {
+  const map = {};
+  try {
+    const { data: rrData } = await window.supabase
+      .from('RESERVATION_ROOM')
+      .select('RoomNumber, ReservationID');
+    if (!rrData || rrData.length === 0) return map;
+    const ids = rrData.map(r => r.ReservationID);
+    const { data: resData } = await window.supabase
+      .from('RESERVATION')
+      .select('ReservationID, CheckOutDate')
+      .in('ReservationID', ids)
+      .neq('Status', 'CheckedOut');
+    if (resData) {
+      const dateMap = {};
+      resData.forEach(r => dateMap[r.ReservationID] = r.CheckOutDate);
+      rrData.forEach(rr => { if (dateMap[rr.ReservationID]) map[rr.RoomNumber] = dateMap[rr.ReservationID]; });
+    }
+  } catch (err) {
+    console.warn('buildCheckoutMap error:', err);
+  }
+  return map;
 }
 
 async function fetchRoomsAndRender() {
@@ -78,11 +119,14 @@ async function fetchRoomsAndRender() {
 
         if (error) throw error;
 
+        checkoutMap = await buildCheckoutMap();
+
         hotelRooms = rooms.map(r => ({
             id: r.RoomNumber,
             type: r.RoomType,
             state: mapDbStatusToUI(r.Status),
-            dbStatus: r.Status 
+            dbStatus: r.Status,
+            checkOutDate: checkoutMap[r.RoomNumber] || null
         }));
 
         renderMap();
@@ -97,9 +141,8 @@ function calculateLiveStats() {
     
     hotelRooms.forEach(r => {
         if (r.state === 'occ') currentOcc++;
-        else if (r.state === 'free') currentFree++;
         else if (r.state === 'dirty') currentDirty++;
-        else if (r.state === 'clean') currentClean++;
+        else currentFree++;
     });
     
     const totalRooms = hotelRooms.length || 1;
@@ -118,14 +161,13 @@ function calculateLiveStats() {
     if(dashOccBar) dashOccBar.style.width = `${occPct}%`;
     
     const dashFreeVal = document.getElementById('dash-free-val');
-    if(dashFreeVal) dashFreeVal.textContent = currentFree + currentClean;
+    if(dashFreeVal) dashFreeVal.textContent = currentFree;
     
     if(document.getElementById('stat-occ')) {
         document.getElementById('stat-occ').textContent = currentOcc;
         document.getElementById('stat-occ-bar').style.width = `${occPct}%`;
         document.getElementById('stat-free').textContent = currentFree;
         document.getElementById('stat-dirty').textContent = currentDirty;
-        document.getElementById('stat-clean').textContent = currentClean;
     }
 }
 
@@ -143,7 +185,7 @@ function renderMap(filter = 'all') {
         let prefix = r.type ? r.type.charAt(0).toUpperCase() + '-' : '';
         d.textContent = prefix + r.id; 
         
-        let sText = r.state === 'occ' ? 'Κατειλημμένο' : r.state === 'free' ? 'Ελεύθερο' : r.state === 'dirty' ? 'Βρώμικο' : 'Υπό Καθαρισμό';
+        const sText = roomStatusLabel(r.state, r.checkOutDate);
         d.title = `${r.type || 'Άγνωστος Τύπος'} ${r.id} | ${sText}`;
         d.style.cursor = 'pointer';
         
@@ -522,6 +564,28 @@ async function fetchAvailableRooms() {
         if (section) section.style.display = 'block';
         renderAvailableRooms(available, checkoutMap);
 
+        const existing = section?.querySelector('.capacity-note');
+        if (existing) existing.remove();
+        try {
+            const cap = await window.checkRoomTypeCapacity(roomType, checkIn, checkOut);
+            if (cap.total > 0 && section) {
+                const note = document.createElement('div');
+                note.className = 'capacity-note';
+                note.style.cssText = 'font-size:12px;margin-top:8px;padding:8px 10px;border-radius:6px;display:flex;align-items:center;gap:6px;';
+                if (cap.isFull) {
+                    note.style.cssText += 'background:#FEF2F2;color:#991B1B;border:1px solid #FECACA;';
+                    note.innerHTML = '<i class="ti ti-alert-triangle"></i> ' + roomType + ': Πλήρως κλεισμένο (' + cap.booked + '/' + cap.total + ')';
+                    section.appendChild(note);
+                } else if (cap.available <= 5) {
+                    note.style.cssText += 'background:#FFF8E6;color:#7A6118;border:1px solid #FDE68A;';
+                    note.innerHTML = '<i class="ti ti-info-circle"></i> ' + roomType + ': Μόνο ' + cap.available + ' δωμάτια απομένουν (' + cap.booked + '/' + cap.total + ' κλεισμένα)';
+                    section.appendChild(note);
+                }
+            }
+        } catch (e) {
+            console.warn('Capacity check failed:', e);
+        }
+
     } catch (err) {
         showToast('Σφάλμα αναζήτησης: ' + err.message, 'error');
     }
@@ -543,10 +607,14 @@ function renderAvailableRooms(rooms, checkoutMap = {}) {
             ? mapDbStatusToUI(r.Status)
             : (hotelRooms.find(h => h.id == r.RoomNumber)?.state || 'free');
         let label, color;
-        if (state === 'free') { label = 'Ελεύθερο'; color = '#1D9E75'; }
-        else if (state === 'dirty') { label = 'Βρώμικο'; color = '#EF9F27'; }
-        else if (state === 'clean') { label = 'Υπό Καθαρισμό'; color = '#378ADD'; }
-        else { label = 'Εως ' + new Date(checkoutMap[r.RoomNumber]).toLocaleDateString('el-GR'); color = '#D85A30'; }
+        if (state === 'free') { label = 'Έτοιμο για νέο πελάτη'; color = '#1D9E75'; }
+        else if (state === 'dirty') { label = 'Άδειο (χωρίς καθαριότητα)'; color = '#EF9F27'; }
+        else if (state === 'occ') {
+          const soon = isSoonCheckout(checkoutMap[r.RoomNumber]);
+          label = soon ? 'Προσεχώς άδειο' : 'Κατειλημμένο';
+          color = soon ? '#D85A30' : '#991B1B';
+        }
+        else { label = 'Έτοιμο για νέο πελάτη'; color = '#1D9E75'; }
         return `
         <div class="room-opt${selectedRoom === r.RoomNumber ? ' selected' : ''}"
              onclick="selectRoom(${r.RoomNumber}, this)"
@@ -826,8 +894,10 @@ function renderSearchResults(rooms) {
     count.textContent = sorted.length + ' διαθέσιμα';
     tbody.innerHTML = sorted.map(r => {
         const st = r.Status;
-        const label = st === 'free' ? 'Ελεύθερο' : st === 'dirty' ? 'Βρώμικο' : st === 'clean' ? 'Υπό Καθαρισμό' : 'Εως ' + new Date(rsState.checkoutMap[r.RoomNumber]).toLocaleDateString('el-GR');
-        const cls = st === 'free' ? 'p-g' : st === 'dirty' ? 'p-a' : st === 'clean' ? 'p-b' : 'p-r';
+        const isOcc = st === 'occ';
+        const soon = isOcc && isSoonCheckout(rsState.checkoutMap[r.RoomNumber]);
+        const label = st === 'free' || st === 'clean' ? 'Έτοιμο για νέο πελάτη' : st === 'dirty' ? 'Άδειο (χωρίς καθαριότητα)' : soon ? 'Προσεχώς άδειο' : 'Κατειλημμένο';
+        const cls = st === 'free' || st === 'clean' ? 'p-g' : st === 'dirty' ? 'p-a' : soon ? 'p-a' : 'p-r';
         return `<tr>
             <td><strong>${r.RoomNumber}</strong></td>
             <td>${r.RoomType}</td>

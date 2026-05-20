@@ -23,6 +23,51 @@ const appReady = (async () => {
   return true;
 })();
 /* ==============================================================
+   ROOM STATUS HELPERS
+   ============================================================== */
+let checkoutMap = {};
+
+function isSoonCheckout(checkOutDate) {
+  if (!checkOutDate) return false;
+  const d = new Date(checkOutDate);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(23, 59, 59, 999);
+  return d <= tomorrow;
+}
+
+async function buildCheckoutMap() {
+  const map = {};
+  try {
+    const { data: rrData } = await supabase
+      .from('RESERVATION_ROOM')
+      .select('RoomNumber, ReservationID');
+    if (!rrData || rrData.length === 0) return map;
+    const ids = rrData.map(r => r.ReservationID);
+    const { data: resData } = await supabase
+      .from('RESERVATION')
+      .select('ReservationID, CheckOutDate')
+      .in('ReservationID', ids)
+      .neq('Status', 'CheckedOut');
+    if (resData) {
+      const dateMap = {};
+      resData.forEach(r => dateMap[r.ReservationID] = r.CheckOutDate);
+      rrData.forEach(rr => { if (dateMap[rr.ReservationID]) map[rr.RoomNumber] = dateMap[rr.ReservationID]; });
+    }
+  } catch (err) {
+    console.warn('buildCheckoutMap error:', err);
+  }
+  return map;
+}
+
+function getStatusLabel(state, checkoutDate) {
+  if (state === 'free' || state === 'clean') return 'Έτοιμο για νέο πελάτη';
+  if (state === 'dirty') return 'Άδειο (χωρίς καθαριότητα)';
+  if (state === 'occ') return isSoonCheckout(checkoutDate) ? 'Προσεχώς άδειο' : 'Κατειλημμένο';
+  return 'Ελεύθερο';
+}
+
+/* ==============================================================
    TOAST NOTIFICATION SYSTEM (ΖΩΝΤΑΝΕΣ ΕΙΔΟΠΟΙΗΣΕΙΣ)
    ============================================================== */
 function showToast(message, type = 'success') {
@@ -105,6 +150,8 @@ async function fetchRooms() {
 
         if (error) throw error;
 
+        checkoutMap = await buildCheckoutMap();
+
         // 2. Μετατροπή των δεδομένων της βάσης στη μορφή που θέλει το frontend
         hotelRooms = data.map(room => {
             let uiState = 'free'; // Default κατάσταση
@@ -112,15 +159,14 @@ async function fetchRooms() {
             
             // Έξυπνο mapping: Πιάνουμε διάφορες εκδοχές των λέξεων (π.χ. 'occupied', 'occ', 'cleaning')
             if (dbStatus.includes('occup') || dbStatus === 'occ') uiState = 'occ';
-            else if (dbStatus === 'dirty') uiState = 'dirty';
-            else if (dbStatus.includes('cleaning')) uiState = 'dirty';
-            else if (dbStatus === 'clean') uiState = 'clean';
+            else if (dbStatus === 'dirty' || dbStatus.includes('cleaning')) uiState = 'dirty';
             else uiState = 'free';
 
             return {
                 id: room.RoomNumber,
                 type: room.RoomType,
-                state: uiState
+                state: uiState,
+                checkOutDate: checkoutMap[room.RoomNumber] || null
             };
         });
 
@@ -155,10 +201,7 @@ function renderMap(filter) {
         let prefix = r.type ? r.type.charAt(0).toUpperCase() + '-' : '';
         d.textContent = prefix + r.id; 
         
-        let stateGr = 'Ελεύθερο';
-        if (r.state === 'occ') stateGr = 'Κατειλημμένο';
-        else if (r.state === 'dirty') stateGr = 'Βρώμικο';
-        else if (r.state === 'clean') stateGr = 'Υπό Καθαρισμό';
+        const stateGr = getStatusLabel(r.state, r.checkOutDate);
 
         d.title = `${r.type || 'Άγνωστος Τύπος'} ${r.id} | ${stateGr}`;
         d.style.cursor = 'pointer';
@@ -181,15 +224,14 @@ window.filterRooms = function(f, el) {
 };
 
 // 5. Δυναμικός Υπολογισμός Στατιστικών (δεν χρησιμοποιούμε πια το "510" καρφωτά)
-let currentOcc = 0, currentFree = 0, currentDirty = 0, currentClean = 0;
+let currentOcc = 0, currentFree = 0, currentDirty = 0;
 function calculateLiveStats() {
-    const totalRooms = hotelRooms.length || 1; // || 1 για αποφυγή διαίρεσης με το 0 αν η βάση είναι άδεια
-    currentOcc = 0; currentFree = 0; currentDirty = 0; currentClean = 0;
+    const totalRooms = hotelRooms.length || 1;
+    currentOcc = 0; currentFree = 0; currentDirty = 0;
     
     hotelRooms.forEach(r => {
         if (r.state === 'occ') currentOcc++;
         else if (r.state === 'dirty') currentDirty++;
-        else if (r.state === 'clean') currentClean++;
         else currentFree++;
     });
     
@@ -209,7 +251,6 @@ function calculateLiveStats() {
         document.getElementById('stat-free').textContent = currentFree;
         document.getElementById('stat-free-pct').textContent = `${freePct}%`;
         document.getElementById('stat-dirty').textContent = currentDirty;
-        document.getElementById('stat-clean').textContent = currentClean;
     }
     
     if (typeof checkDynamicPricing === "function") checkDynamicPricing(occPct);
@@ -1902,6 +1943,7 @@ async function fetchUsers() {
             const btnText = u.isActive ? 'Απενεργοποίηση' : 'Ενεργοποίηση';
             const btnClass = u.isActive ? 'btn-sm' : 'btn-dark btn-sm';
             const uName = `${u.FirstName || ''} ${u.LastName || ''}`.trim();
+            const safeName = uName.replace(/'/g, "\\'");
 
             return `
                 <tr>
@@ -1909,12 +1951,18 @@ async function fetchUsers() {
                     <td><code>${u.Username || '-'}</code></td>
                     <td><span class="pill p-b">${u.Role}</span></td>
                     <td>${statusHtml}</td>
-                    <td>
-                        <button class="btn ${btnClass}" onclick="toggleUserStatus(${u.EmpID}, ${u.isActive}, '${uName}')">
+                    <td style="white-space:nowrap">
+                        <button class="btn ${btnClass}" onclick="toggleUserStatus(${u.EmpID}, ${u.isActive}, '${safeName}')">
                             ${btnText}
                         </button>
-                        <button class="btn btn-sm" onclick="changePassword(${u.EmpID}, '${u.Username || uName}')">
+                        <button class="btn btn-sm" onclick="changePassword(${u.EmpID}, '${u.Username || safeName}')" title="Αλλαγή κωδικού">
                             <i class="ti ti-key"></i>
+                        </button>
+                        <button class="btn btn-sm" onclick="openUserModal(${u.EmpID})" title="Επεξεργασία">
+                            <i class="ti ti-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm" onclick="deleteUser(${u.EmpID}, '${safeName}')" title="Διαγραφή">
+                            <i class="ti ti-trash"></i>
                         </button>
                     </td>
                 </tr>
@@ -2046,6 +2094,144 @@ window.changePassword = function(empId, username) {
     };
     toggleVisibility('#pw-new', '#pw-eye-new');
     toggleVisibility('#pw-confirm', '#pw-eye-confirm');
+};
+
+/* ==============================================================
+   ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ — CRUD (ΠΡΟΣΘΗΚΗ / ΕΠΕΞΕΡΓΑΣΙΑ / ΔΙΑΓΡΑΦΗ)
+   ============================================================== */
+window.openUserModal = async function(empId) {
+    let user = null;
+    if (empId) {
+        const { data } = await supabase
+            .from('EMPLOYEE')
+            .select('EmpID, FirstName, LastName, Username, Role, Salary, isActive')
+            .eq('EmpID', empId)
+            .single();
+        user = data;
+    }
+
+    const existing = document.querySelector('.inv-overlay');
+    if (existing) existing.remove();
+
+    const roleOptions = ['admin', 'manager', 'receptionist', 'maid', 'minibar', 'restaurant'];
+    const roleHtml = roleOptions.map(r =>
+        `<option value="${r}"${user?.Role === r ? ' selected' : ''}>${r}</option>`
+    ).join('');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'inv-overlay';
+    overlay.innerHTML = `
+        <div class="inv-modal">
+            <h3>${user ? 'Επεξεργασία' : 'Νέος'} Χρήστης</h3>
+            <div class="mform-group">
+                <label>Όνομα</label>
+                <input type="text" id="u-first" value="${user?.FirstName || ''}">
+            </div>
+            <div class="mform-group">
+                <label>Επώνυμο</label>
+                <input type="text" id="u-last" value="${user?.LastName || ''}">
+            </div>
+            <div class="mform-group">
+                <label>Username *</label>
+                <input type="text" id="u-user" value="${user?.Username || ''}" ${user ? '' : 'required'}>
+            </div>
+            <div class="mform-group">
+                <label>Κωδικός ${user ? '(αφήστε κενό για να παραμείνει ίδιος)' : '*'}</label>
+                <input type="password" id="u-pass" ${user ? '' : 'required'}>
+            </div>
+            <div class="mform-group">
+                <label>Ρόλος *</label>
+                <select id="u-role">${roleHtml}</select>
+            </div>
+            <div class="mform-group">
+                <label>Μισθός (€) *</label>
+                <input type="number" id="u-salary" min="0" value="${user?.Salary || 0}">
+            </div>
+            <div class="mform-group" style="flex-direction:row;align-items:center;gap:8px">
+                <input type="checkbox" id="u-active" ${user?.isActive !== false ? 'checked' : ''} style="width:auto">
+                <label for="u-active" style="margin:0">Ενεργός λογαριασμός</label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" id="u-cancel">Ακύρωση</button>
+                <button class="btn btn-dark" id="u-save">${user ? 'Αποθήκευση' : 'Δημιουργία'}</button>
+            </div>
+        </div>
+    `;
+
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#u-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#u-save').addEventListener('click', async () => {
+        const first = overlay.querySelector('#u-first').value.trim();
+        const last = overlay.querySelector('#u-last').value.trim();
+        const username = overlay.querySelector('#u-user').value.trim();
+        const password = overlay.querySelector('#u-pass').value;
+        const role = overlay.querySelector('#u-role').value;
+        const salary = parseInt(overlay.querySelector('#u-salary').value, 10);
+        const isActive = overlay.querySelector('#u-active').checked;
+
+        if (!username || !role || isNaN(salary)) {
+            showToast('Συμπληρώστε Username, Ρόλο και Μισθό.', 'error');
+            return;
+        }
+        if (!user && !password) {
+            showToast('Ο κωδικός είναι υποχρεωτικός για νέο χρήστη.', 'error');
+            return;
+        }
+
+        if (!await window.showConfirm(`${user ? 'Ενημέρωση' : 'Δημιουργία'} χρήστη "${username}";`)) return;
+
+        try {
+            const payload = {
+                FirstName: first || null,
+                LastName: last || null,
+                Username: username,
+                Role: role,
+                Salary: salary,
+                isActive: isActive
+            };
+            if (password) payload.Password = password;
+
+            if (user) {
+                const { error } = await supabase.from('EMPLOYEE').update(payload).eq('EmpID', user.EmpID);
+                if (error) throw error;
+                showToast(`Χρήστης "${username}" ενημερώθηκε.`, 'success');
+            } else {
+                const { error } = await supabase.from('EMPLOYEE').insert([payload]);
+                if (error) throw error;
+                showToast(`Χρήστης "${username}" δημιουργήθηκε.`, 'success');
+            }
+            overlay.remove();
+            fetchUsers();
+        } catch (err) {
+            showToast('Αποτυχία: ' + err.message, 'error');
+        }
+    });
+
+    overlay.querySelector('#u-user').focus();
+    overlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') overlay.querySelector('#u-save').click();
+        if (e.key === 'Escape') overlay.remove();
+    });
+};
+
+window.deleteUser = async function(empId, name) {
+    const currentUser = JSON.parse(localStorage.getItem('hotel_user') || '{}');
+    if (empId === currentUser.id) {
+        showToast('Δεν μπορείτε να διαγράψετε τον δικό σας λογαριασμό.', 'error');
+        return;
+    }
+    if (!await window.showConfirm(`Οριστική διαγραφή του χρήστη "${name}"; Η ενέργεια είναι μη αναστρέψιμη.`)) return;
+
+    try {
+        const { error } = await supabase.from('EMPLOYEE').delete().eq('EmpID', empId);
+        if (error) throw error;
+        showToast(`Ο χρήστης "${name}" διαγράφηκε.`, 'success');
+        fetchUsers();
+    } catch (err) {
+        showToast('Αποτυχία διαγραφής: ' + err.message, 'error');
+    }
 };
 
 // Εκκίνηση Φόρτωσης όταν ανοίγουν τα Tabs

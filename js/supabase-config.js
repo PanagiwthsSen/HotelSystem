@@ -53,3 +53,30 @@ window.showConfirm = function(message) {
     overlay.querySelector('#confirm-yes').focus();
   });
 };
+
+// Έλεγχος χωρητικότητας ανά τύπο δωματίου για δεδομένες ημερομηνίες
+window.checkRoomTypeCapacity = async function(roomType, checkIn, checkOut) {
+  try {
+    const { data: totalData, error: totalErr } = await window.supabase
+      .from('ROOM')
+      .select('RoomNumber')
+      .eq('RoomType', roomType);
+    if (totalErr) throw totalErr;
+    const total = totalData ? totalData.length : 0;
+
+    const { data: bookedData, error: bookedErr } = await window.supabase
+      .from('RESERVATION')
+      .select('ReservationID')
+      .eq('RoomType', roomType)
+      .not('Status', 'in', '("Cancelled","CheckedOut")')
+      .lt('CheckInDate', checkOut)
+      .gt('CheckOutDate', checkIn);
+    if (bookedErr) throw bookedErr;
+    const booked = bookedData ? bookedData.length : 0;
+
+    return { total, booked, available: total - booked, isFull: booked >= total };
+  } catch (err) {
+    console.error('Capacity check error:', err);
+    return { total: 0, booked: 0, available: 0, isFull: false };
+  }
+};

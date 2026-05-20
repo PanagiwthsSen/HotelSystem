@@ -193,6 +193,15 @@ async function nextStep() {
       return;
     }
     try {
+      const cap = await window.checkRoomTypeCapacity(bookingData.room, bookingData.checkin, bookingData.checkout);
+      if (cap.isFull) {
+        showToast('Λυπούμαστε, όλα τα δωμάτια τύπου ' + bookingData.room + ' είναι κλεισμένα για αυτές τις ημερομηνίες.', 'error');
+        return;
+      }
+    } catch (e) {
+      console.warn('Capacity check failed, proceeding anyway:', e);
+    }
+    try {
       await processBookingSubmission(bookingData);
     } catch (err) {
       return;

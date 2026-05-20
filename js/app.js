@@ -148,27 +148,34 @@ async function fetchAndRenderRooms() {
         const { data: rooms, error: roomsErr } = await supabase
             .from('ROOM')
             .select('*')
-            .eq('Status', 'free');
+            .in('Status', ['free', 'clean']);
         if (roomsErr) throw roomsErr;
 
         const { data: reservations, error: resErr } = await supabase
             .from('RESERVATION')
-            .select('ReservationID, Status, RESERVATION_ROOM (RoomNumber)')
+            .select('ReservationID, RoomType, RESERVATION_ROOM (RoomNumber)')
             .neq('Status', 'Cancelled')
             .lte('CheckInDate', checkout)
             .gte('CheckOutDate', checkin);
         if (resErr) throw resErr;
 
         const bookedRooms = new Set();
+        const typeBookedCount = {};
         (reservations || []).forEach(r => {
             const rr = r.RESERVATION_ROOM;
             const rooms = Array.isArray(rr) ? rr : (rr ? [rr] : []);
-            rooms.forEach(rm => {
-                if (rm.RoomNumber) bookedRooms.add(rm.RoomNumber);
-            });
+            if (rooms.length > 0) {
+                rooms.forEach(rm => { if (rm.RoomNumber) bookedRooms.add(rm.RoomNumber); });
+            } else if (r.RoomType) {
+                typeBookedCount[r.RoomType] = (typeBookedCount[r.RoomType] || 0) + 1;
+            }
         });
 
         const available = rooms.filter(r => !bookedRooms.has(r.RoomNumber));
+        const availableCounts = {};
+        available.forEach(r => {
+            availableCounts[r.RoomType] = (availableCounts[r.RoomType] || 0) + 1;
+        });
 
         if (available.length === 0) {
             list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-secondary);width:100%;">Δεν βρέθηκαν διαθέσιμα δωμάτια για τις επιλεγμένες ημερομηνίες.</div>';
@@ -187,15 +194,39 @@ async function fetchAndRenderRooms() {
         let html = '';
 
         roomTypes.forEach(type => {
+            if (typeFilter !== 'all' && type !== typeMap[typeFilter]) return;
+
             const roomsOfType = byType[type];
-            if (!roomsOfType || roomsOfType.length === 0) return;
+            const info = ROOM_TYPE_INFO[type];
+            if (!info) return;
+
+            const effectiveCount = (availableCounts[type] || 0) - (typeBookedCount[type] || 0);
+
+            if (!roomsOfType || effectiveCount <= 0) {
+                html += `
+                <div class="room-card sold-out">
+                    <div class="room-img">
+                        <img src="${info.img}" alt="${type}" loading="lazy">
+                        <span class="room-tag">Μη διαθέσιμο</span>
+                    </div>
+                    <div class="room-body">
+                        <div class="room-name">${info.display}</div>
+                        <div class="room-desc">${info.desc}</div>
+                        <div class="room-features">
+                            ${info.features.map(f => `<div class="feat"><i class="ti ti-${f.icon}" aria-hidden="true"></i> ${f.label}</div>`).join('')}
+                        </div>
+                        <div class="room-footer">
+                            <div class="room-price" style="color:#9CA3AF;">Πλήρως κλεισμένο</div>
+                            <button class="btn-book" disabled>Μη διαθέσιμο</button>
+                        </div>
+                    </div>
+                </div>`;
+                return;
+            }
 
             const cheapest = roomsOfType.reduce((a, b) => a.BasePrice < b.BasePrice ? a : b);
             const breakdown = calcPriceBreakdown(cheapest.BasePrice, checkin, checkout);
-            const info = ROOM_TYPE_INFO[type];
             const totalNights = breakdown.groups.reduce((s, g) => s + g.count, 0);
-
-            if (!info) return;
 
             const groupsHtml = breakdown.groups.map(g =>
                 `<div style="font-size:13px;color:var(--color-text-secondary);margin:3px 0;display:flex;justify-content:space-between"><span>${g.count} νύχτες</span><span><strong>€${g.pricePerNight}</strong> <span style="display:inline-block;background:var(--color-background-secondary);padding:1px 8px;border-radius:4px;font-size:11px;margin-left:4px">${g.label}</span></span></div>`

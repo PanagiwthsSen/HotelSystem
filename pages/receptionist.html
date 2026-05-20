@@ -100,17 +100,16 @@
       <div class="view" id="v-rooms">
         <div class="g4">
           <div class="sc"><div class="sc-lbl">Κατειλημμένα</div><div class="sc-val sc-dn" id="stat-occ">--</div><div class="prog"><div class="prog-fill" id="stat-occ-bar" style="width:0%;background:#D85A30"></div></div></div>
-          <div class="sc"><div class="sc-lbl">Ελεύθερα</div><div class="sc-val sc-up" id="stat-free">--</div></div>
-          <div class="sc"><div class="sc-lbl">Βρώμικο</div><div class="sc-val" style="color:#EF9F27" id="stat-dirty">--</div></div>
-          <div class="sc"><div class="sc-lbl">Υπό Καθαρισμό</div><div class="sc-val" style="color:#378ADD" id="stat-clean">--</div></div>
+          <div class="sc"><div class="sc-lbl">Έτοιμο για νέο πελάτη</div><div class="sc-val sc-up" id="stat-free">--</div></div>
+          <div class="sc"><div class="sc-lbl">Άδειο (χωρίς καθαριότητα)</div><div class="sc-val" style="color:#EF9F27" id="stat-dirty">--</div></div>
         </div>
         <div class="card">
           <div class="card-hd"><div class="card-hd-l"><i class="ti ti-grid-dots" aria-hidden="true"></i>Χάρτης Δωματίων</div>
             <div style="display:flex;gap:5px">
               <button class="btn btn-sm active-filter" data-filter="all" onclick="filterRooms('all',this)">Όλα</button>
-              <button class="btn btn-sm" data-filter="free" onclick="filterRooms('free',this)">Ελεύθερα</button>
-              <button class="btn btn-sm" data-filter="dirty" onclick="filterRooms('dirty',this)">Βρώμικο</button>
-              <button class="btn btn-sm" data-filter="clean" onclick="filterRooms('clean',this)">Υπό Καθαρισμό</button>
+              <button class="btn btn-sm" data-filter="free" onclick="filterRooms('free',this)">Έτοιμο για νέο πελάτη</button>
+              <button class="btn btn-sm" data-filter="dirty" onclick="filterRooms('dirty',this)">Άδειο (χωρίς καθαριότητα)</button>
+              <button class="btn btn-sm" data-filter="occ" onclick="filterRooms('occ',this)">Κατειλημμένο</button>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:repeat(20,1fr);gap:3px;margin-bottom:15px;max-height:400px;overflow-y:auto;padding-right:5px;" id="rmap"></div>

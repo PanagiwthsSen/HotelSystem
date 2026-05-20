@@ -130,7 +130,7 @@ input[type=range]{flex:1}
 .rc-occ   { background: #D85A30; } 
 .rc-free  { background: #1D9E75; } 
 .rc-dirty { background: #EF9F27; color: #fff; } 
-.rc-clean { background: #378ADD; } 
+.rc-clean { background: #1D9E75; } 
 
 /* =========================================================
    ΤΟ ΣΥΣΤΗΜΑ TOAST (ΑΝΑΔΥΟΜΕΝΕΣ ΕΙΔΟΠΟΙΗΣΕΙΣ ΠΑΝΩ ΔΕΞΙΑ)
