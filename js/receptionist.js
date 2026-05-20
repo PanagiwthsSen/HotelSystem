@@ -480,6 +480,20 @@ async function submitBooking() {
         if (resId && paymentMethod) {
             await window.supabase.from('RESERVATION').update({ PaymentMethod: paymentMethod }).eq('ReservationID', resId);
         }
+        if (resId && bookingType) {
+            await window.supabase.from('RESERVATION').update({ BookingType: bookingType, NumberOfGuests: 1, Deposit: 0 }).eq('ReservationID', resId);
+        }
+
+        // Create initial history entry
+        if (resId) {
+            const user = JSON.parse(localStorage.getItem('hotel_user') || '{}');
+            await window.supabase.from('RESERVATION_HISTORY').insert([{
+                ReservationID: resId,
+                Action: 'created',
+                ChangedBy: user.name || 'Σύστημα',
+                ChangedByEmpID: user.id || null
+            }]);
+        }
 
         showToast(`Η κράτηση καταχωρήθηκε! Εκχωρήθηκε το δωμάτιο ${selectedRoom}.`, 'success');
         selectedRoom = null;
@@ -658,15 +672,48 @@ function openCheckinModal(reservationId, customerName, roomType = '', preAssigne
     activeCheckinResId = reservationId;
     activeCheckinRoom = preAssignedRoom;
 
-    const custEl = document.getElementById('modal-cust-name');
-    const roomWrap = document.getElementById('modal-room-wrap');
-    const assignedWrap = document.getElementById('modal-assigned-wrap');
-    const select = document.getElementById('modal-room-select');
-    const typeEl = document.getElementById('modal-room-type');
+    let custEl = document.getElementById('modal-cust-name');
+    let roomWrap = document.getElementById('modal-room-wrap');
+    let assignedWrap = document.getElementById('modal-assigned-wrap');
+    let select = document.getElementById('modal-room-select');
+    let typeEl = document.getElementById('modal-room-type');
 
     if (!custEl || !roomWrap || !assignedWrap || !select) {
-        showToast('Σφάλμα: το modal δεν βρέθηκε', 'error');
-        return;
+        const modal = document.createElement('div');
+        modal.id = 'checkin-modal';
+        modal.className = 'modal-overlay';
+        modal.style.display = 'none';
+        modal.innerHTML = `
+        <div class="pw-modal">
+            <div class="pw-head">
+                <i class="ti ti-key"></i>
+                <span>Εκχώρηση Δωματίου</span>
+                <span class="pw-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="pw-body">
+                <p style="margin-bottom:16px;font-size:13px;color:#6B7280;">
+                    Πελάτης: <strong id="modal-cust-name" style="color:#111827;"></strong><br>
+                    <span style="font-size:12px;color:#9CA3AF;">Τύπος Δωματίου: <strong id="modal-room-type" style="color:#111827;">—</strong></span>
+                </p>
+                <div id="modal-room-wrap" class="pw-field">
+                    <label for="modal-room-select">Διαθέσιμο δωμάτιο:</label>
+                    <select id="modal-room-select" style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-family:inherit;"></select>
+                </div>
+                <div id="modal-assigned-wrap" style="display:none;padding:10px 12px;border-radius:6px;background:#F3F4F6;font-size:13px;">
+                    Θα γίνει check-in στο δωμάτιο <strong id="modal-assigned-val"></strong>
+                </div>
+            </div>
+            <div class="pw-foot">
+                <button class="btn" onclick="closeModal()">Ακύρωση</button>
+                <button class="btn btn-dark" onclick="confirmCheckin()"><i class="ti ti-check"></i> Επιβεβαίωση</button>
+            </div>
+        </div>`;
+        document.body.appendChild(modal);
+        custEl = document.getElementById('modal-cust-name');
+        roomWrap = document.getElementById('modal-room-wrap');
+        assignedWrap = document.getElementById('modal-assigned-wrap');
+        select = document.getElementById('modal-room-select');
+        typeEl = document.getElementById('modal-room-type');
     }
     custEl.textContent = customerName;
     if (typeEl) typeEl.textContent = roomType || '—';
@@ -1000,6 +1047,20 @@ window.confirmRsBooking = async function () {
         if (resId && paymentMethod) {
             await window.supabase.from('RESERVATION').update({ PaymentMethod: paymentMethod }).eq('ReservationID', resId);
         }
+        if (resId && bookingType) {
+            await window.supabase.from('RESERVATION').update({ BookingType: bookingType, NumberOfGuests: 1, Deposit: 0 }).eq('ReservationID', resId);
+        }
+
+        // Create initial history entry
+        if (resId) {
+            const user = JSON.parse(localStorage.getItem('hotel_user') || '{}');
+            await window.supabase.from('RESERVATION_HISTORY').insert([{
+                ReservationID: resId,
+                Action: 'created',
+                ChangedBy: user.name || 'Σύστημα',
+                ChangedByEmpID: user.id || null
+            }]);
+        }
 
         showToast('Η κράτηση ολοκληρώθηκε! Δωμάτιο ' + rsState.selectedRoom + ' ανατέθηκε.', 'success');
         closeRsModal();
@@ -1051,7 +1112,7 @@ async function fetchAllReservations() {
     try {
         const { data, error } = await window.supabase
             .from('RESERVATION')
-            .select(`ReservationID, CheckInDate, CheckOutDate, TotalCost, Status, RoomType, CUSTOMER ( CustomerID, FirstName, LastName, Phone, Email, IsGroup )`);
+            .select(`ReservationID, CheckInDate, CheckOutDate, TotalCost, Status, RoomType, PaymentMethod, Notes, NumberOfGuests, Deposit, BookingType, EditedAt, EditedBy, CUSTOMER ( CustomerID, FirstName, LastName, Phone, Email, IsGroup )`);
 
         if (error) throw error;
 
@@ -1117,12 +1178,477 @@ function renderAllBookings(reservations) {
             <td><span class="pill ${st.cls}">${st.label}</span></td>
             <td style="display:flex;gap:4px;flex-wrap:wrap;">
                 <button class="btn btn-sm" onclick="viewReservation(${r.ReservationID})" title="Λεπτομέρειες"><i class="ti ti-eye"></i></button>
+                <button class="btn btn-sm" onclick="openEditReservationModal(${r.ReservationID})" title="Επεξεργασία"><i class="ti ti-edit"></i></button>
                 ${canCheckin ? `<button class="btn btn-sm btn-dark" onclick="navTo('arrivals')" title="Check-in"><i class="ti ti-door-enter"></i></button>` : ''}
                 ${canCancel ? `<button class="btn btn-sm" style="color:#E24B4A;" onclick="cancelReservation(${r.ReservationID})" title="Ακύρωση"><i class="ti ti-x"></i></button>` : ''}
             </td>
         </tr>`;
     }).join('');
 }
+
+/* ==============================================================
+   EDIT RESERVATION MODAL
+   ============================================================== */
+let editState = {};
+
+function closeEditModal() {
+    const overlay = document.getElementById('edit-reservation-overlay');
+    if (overlay) overlay.remove();
+    editState = {};
+}
+
+function recalcEditPrice() {
+    const checkIn = document.getElementById('edit-checkin')?.value;
+    const checkOut = document.getElementById('edit-checkout')?.value;
+    const roomSelect = document.getElementById('edit-room');
+    if (!roomSelect || !checkIn || !checkOut) return;
+
+    const nights = Math.max(1, Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000));
+    const basePrice = parseFloat(roomSelect.options[roomSelect.selectedIndex]?.dataset?.price || editState.basePrice || 0);
+    const manualTotal = parseFloat(document.getElementById('edit-total-cost')?.value) || 0;
+    const deposit = parseFloat(document.getElementById('edit-deposit')?.value) || 0;
+
+    const calcTotal = basePrice * nights;
+    const total = manualTotal > 0 ? manualTotal : calcTotal;
+    const balance = total - deposit;
+
+    const nightsEl = document.getElementById('edit-nights');
+    const totalDisplayEl = document.getElementById('edit-total-display');
+    const balanceEl = document.getElementById('edit-balance');
+    const depositDisplayEl = document.getElementById('edit-deposit-display');
+
+    if (nightsEl) nightsEl.textContent = nights;
+    if (totalDisplayEl) totalDisplayEl.textContent = `€${total.toFixed(2)}`;
+    if (depositDisplayEl) depositDisplayEl.textContent = `€${deposit.toFixed(2)}`;
+    if (balanceEl) balanceEl.textContent = `€${balance.toFixed(2)}`;
+    if (balanceEl) balanceEl.style.color = balance <= 0 ? '#1D9E75' : '#D85A30';
+}
+
+window.openEditReservationModal = async function (reservationId) {
+    const r = allReservations.find(x => x.ReservationID === reservationId);
+    if (!r) { showToast('Η κράτηση δεν βρέθηκε.', 'error'); return; }
+
+    const existing = document.getElementById('edit-reservation-overlay');
+    if (existing) existing.remove();
+
+    const c = r.CUSTOMER || {};
+    const user = JSON.parse(localStorage.getItem('hotel_user') || '{}');
+
+    editState = {
+        reservationId: r.ReservationID,
+        originalCustomer: { ...c },
+        originalReservation: { ...r },
+        basePrice: 0
+    };
+
+    const overlay = document.createElement('div');
+    overlay.id = 'edit-reservation-overlay';
+    overlay.className = 'modal-overlay';
+
+    overlay.innerHTML = `<div class="pw-modal edit-modal"><div class="edit-loading" id="edit-loading"><i class="ti ti-loader"></i>Φόρτωση στοιχείων...</div></div>`;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeEditModal(); });
+    document.body.appendChild(overlay);
+
+    try {
+        const { data: rooms, error: roomsErr } = await window.supabase
+            .from('ROOM')
+            .select('*')
+            .order('RoomNumber');
+        if (roomsErr) throw roomsErr;
+
+        const { data: rrData } = await window.supabase
+            .from('RESERVATION_ROOM')
+            .select('RoomNumber')
+            .eq('ReservationID', r.ReservationID)
+            .maybeSingle();
+        const currentRoomNumber = rrData?.RoomNumber;
+
+        const { data: historyData } = await window.supabase
+            .from('RESERVATION_HISTORY')
+            .select('*')
+            .eq('ReservationID', r.ReservationID)
+            .order('ChangedAt', { ascending: false })
+            .limit(20);
+
+        const roomOptionsHtml = rooms.map(room => {
+            const isCurrent = room.RoomNumber === currentRoomNumber;
+            const isFree = room.Status === 'free' || room.Status === 'clean';
+            const availableLabel = isFree ? '' : ' (κατειλημμένο)';
+            const disabled = !isFree && !isCurrent;
+            return `<option value="${room.RoomNumber}" 
+                data-price="${room.BasePrice}" 
+                data-type="${room.RoomType}"
+                ${isCurrent ? 'selected' : ''} 
+                ${disabled ? 'disabled' : ''}>
+                Δωμ. ${room.RoomNumber} — ${room.RoomType} (€${room.BasePrice})${availableLabel}
+            </option>`;
+        }).join('');
+
+        const roomPrice = rooms.find(rr => rr.RoomNumber === currentRoomNumber)?.BasePrice || 0;
+        editState.basePrice = roomPrice;
+        editState.currentRoomNumber = currentRoomNumber;
+        editState.rooms = rooms;
+
+        const bookingTypeLabels = {
+            phone: 'Τηλεφωνική (20% Προκαταβολή)',
+            prepaid: 'Προπληρωμένη (50% Προπληρωμή)',
+            group: 'Γκρουπ (Ειδική Προκαταβολή)',
+            walkin: 'Walk-in (Άμεση Πληρωμή)'
+        };
+        const statusLabels = {
+            Confirmed: 'Επιβεβαιωμένη',
+            CheckedIn: 'Check-in',
+            CheckedOut: 'Check-out',
+            Cancelled: 'Ακυρωμένη'
+        };
+        const paymentLabels = {
+            cash: 'Μετρητά',
+            card: 'Κάρτα',
+            bank_transfer: 'Τραπεζικό Έμβασμα'
+        };
+
+        const btypeOptions = Object.entries(bookingTypeLabels).map(([v, lbl]) =>
+            `<option value="${v}"${r.BookingType === v ? ' selected' : ''}>${lbl}</option>`
+        ).join('');
+        const statusOptions = Object.entries(statusLabels).map(([v, lbl]) =>
+            `<option value="${v}"${r.Status === v ? ' selected' : ''}>${lbl}</option>`
+        ).join('');
+        const paymentOptions = Object.entries(paymentLabels).map(([v, lbl]) =>
+            `<option value="${v}"${r.PaymentMethod === v ? ' selected' : ''}>${lbl}</option>`
+        ).join('');
+
+        const nights = Math.max(1, Math.round((new Date(r.CheckOutDate) - new Date(r.CheckInDate)) / 86400000));
+        const total = parseFloat(r.TotalCost) || 0;
+        const deposit = parseFloat(r.Deposit) || 0;
+        const balance = total - deposit;
+
+        let historyHtml = '';
+        if (historyData && historyData.length > 0) {
+            const actionLabels = {
+                created: 'Δημιουργήθηκε',
+                edited: 'Επεξεργασία',
+                extended: 'Παράταση διαμονής',
+                early_checkout: 'Πρόωρη αναχώρηση'
+            };
+            const actionDots = {
+                created: 'created',
+                edited: 'edited',
+                extended: 'extended',
+                early_checkout: 'early'
+            };
+            historyHtml = historyData.map(h => {
+                const dot = actionDots[h.Action] || 'other';
+                const label = actionLabels[h.Action] || h.Action;
+                const date = new Date(h.ChangedAt).toLocaleString('el-GR');
+                return `<div class="edit-history-item">
+                    <span class="edit-history-dot ${dot}"></span>
+                    <span class="edit-history-text"><strong>${label}</strong> από ${h.ChangedBy}</span>
+                    <span class="edit-history-date">${date}</span>
+                </div>`;
+            }).join('');
+        } else {
+            historyHtml = '<div style="color:#9CA3AF;font-size:11px;">Δεν υπάρχει ιστορικό αλλαγών.</div>';
+        }
+
+        const createdHistory = historyData && historyData.find(h => h.Action === 'created');
+        const createdDate = createdHistory ? new Date(createdHistory.ChangedAt).toLocaleString('el-GR') : '—';
+        const createdBy = createdHistory?.ChangedBy || '—';
+
+        overlay.innerHTML = `
+        <div class="pw-modal edit-modal">
+            <div class="pw-head">
+                <i class="ti ti-edit"></i>
+                <span>Επεξεργασία Κράτησης #${r.ReservationID}</span>
+                <span class="pw-close" onclick="closeEditModal()">&times;</span>
+            </div>
+            <div class="pw-body">
+
+                <!-- Guest Info -->
+                <div class="edit-section">
+                    <div class="edit-section-title"><i class="ti ti-user"></i> Στοιχεία Πελάτη</div>
+                    <div class="form-grid">
+                        <div class="fg"><label>Όνομα *</label><input type="text" id="edit-first" value="${c.FirstName || ''}"></div>
+                        <div class="fg"><label>Επώνυμο *</label><input type="text" id="edit-last" value="${c.LastName || ''}"></div>
+                        <div class="fg"><label>Τηλέφωνο *</label><input type="tel" id="edit-phone" value="${c.Phone || ''}"></div>
+                        <div class="fg"><label>Email *</label><input type="email" id="edit-email" value="${c.Email || ''}"></div>
+                        <div class="fg"><label>Αριθμός Ατόμων</label><input type="number" id="edit-guests" min="1" max="20" value="${r.NumberOfGuests || 1}"></div>
+                    </div>
+                </div>
+
+                <!-- Stay Details -->
+                <div class="edit-section">
+                    <div class="edit-section-title"><i class="ti ti-building"></i> Στοιχεία Διαμονής</div>
+                    <div class="form-grid">
+                        <div class="fg"><label>Check-in *</label><input type="date" id="edit-checkin" value="${r.CheckInDate}" onchange="recalcEditPrice()"></div>
+                        <div class="fg"><label>Check-out *</label><input type="date" id="edit-checkout" value="${r.CheckOutDate}" onchange="recalcEditPrice()"></div>
+                        <div class="fg" style="grid-column:span 2;">
+                            <label>Δωμάτιο</label>
+                            <select id="edit-room" onchange="recalcEditPrice()">${roomOptionsHtml}</select>
+                        </div>
+                        <div class="fg"><label>Τύπος Κράτησης</label>
+                            <select id="edit-btype">${btypeOptions}</select>
+                        </div>
+                        <div class="fg"><label>Κατάσταση</label>
+                            <select id="edit-status">${statusOptions}</select>
+                        </div>
+                    </div>
+                    <div id="edit-room-warning" class="edit-warning" style="display:none;margin-top:8px;"></div>
+                </div>
+
+                <!-- Payment -->
+                <div class="edit-section">
+                    <div class="edit-section-title"><i class="ti ti-coin"></i> Στοιχεία Πληρωμής</div>
+                    <div class="edit-summary">
+                        <div>Τιμή δωματίου: <strong>€${roomPrice.toFixed(2)}</strong> /διαν.</div>
+                        <div>Διανυκτερεύσεις: <strong id="edit-nights">${nights}</strong></div>
+                        <div>Συνολικό Κόστος: <strong id="edit-total-display">€${total.toFixed(2)}</strong></div>
+                        <div>Προκαταβολή: <strong id="edit-deposit-display">€${deposit.toFixed(2)}</strong></div>
+                        <div>Υπόλοιπο: <strong id="edit-balance" style="color:${balance <= 0 ? '#1D9E75' : '#D85A30'}">€${balance.toFixed(2)}</strong></div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="fg"><label>Συνολικό Κόστος (€)</label><input type="number" id="edit-total-cost" step="0.01" value="${total.toFixed(2)}" onchange="recalcEditPrice()"></div>
+                        <div class="fg"><label>Προκαταβολή (€)</label><input type="number" id="edit-deposit" step="0.01" value="${deposit.toFixed(2)}" onchange="recalcEditPrice()"></div>
+                        <div class="fg"><label>Τρόπος Πληρωμής</label>
+                            <select id="edit-payment">${paymentOptions}</select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="edit-section">
+                    <div class="edit-section-title"><i class="ti ti-notes"></i> Σημειώσεις</div>
+                    <textarea id="edit-notes" rows="4" style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;">${r.Notes || ''}</textarea>
+                </div>
+
+                <!-- History -->
+                <div class="edit-section">
+                    <div class="edit-section-title"><i class="ti ti-history"></i> Ιστορικό Αλλαγών</div>
+                    <div style="font-size:11px;color:#9CA3AF;margin-bottom:6px;">Δημιουργήθηκε: <strong>${createdDate}</strong> από <strong>${createdBy}</strong></div>
+                    <div class="edit-history-list">${historyHtml}</div>
+                </div>
+
+                <div id="edit-save-warning" class="edit-warning" style="display:none;"></div>
+            </div>
+            <div class="pw-foot">
+                <button class="btn" onclick="closeEditModal()">Ακύρωση</button>
+                <button class="btn btn-dark" id="edit-save-btn" onclick="saveEditReservation()">
+                    <i class="ti ti-check"></i> Αποθήκευση Αλλαγών
+                </button>
+            </div>
+        </div>`;
+
+    } catch (err) {
+        overlay.innerHTML = `<div class="pw-modal edit-modal"><div class="edit-loading" style="color:#E24B4A;"><i class="ti ti-alert-circle"></i>Σφάλμα φόρτωσης: ${err.message}</div></div>`;
+        showToast('Σφάλμα φόρτωσης: ' + err.message, 'error');
+    }
+};
+
+window.saveEditReservation = async function () {
+    const overlay = document.getElementById('edit-reservation-overlay');
+    if (!overlay) return;
+
+    const saveBtn = overlay.querySelector('#edit-save-btn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> Αποθήκευση...';
+
+    try {
+        const firstName = overlay.querySelector('#edit-first').value.trim();
+        const lastName = overlay.querySelector('#edit-last').value.trim();
+        const phone = overlay.querySelector('#edit-phone').value.trim();
+        const email = overlay.querySelector('#edit-email').value.trim();
+        const guests = parseInt(overlay.querySelector('#edit-guests').value) || 1;
+        const checkIn = overlay.querySelector('#edit-checkin').value;
+        const checkOut = overlay.querySelector('#edit-checkout').value;
+        const roomNumber = parseInt(overlay.querySelector('#edit-room').value);
+        const bookingType = overlay.querySelector('#edit-btype').value;
+        const status = overlay.querySelector('#edit-status').value;
+        const totalCost = parseFloat(overlay.querySelector('#edit-total-cost').value) || 0;
+        const deposit = parseFloat(overlay.querySelector('#edit-deposit').value) || 0;
+        const paymentMethod = overlay.querySelector('#edit-payment').value;
+        const notes = overlay.querySelector('#edit-notes').value.trim();
+
+        if (!firstName || !lastName || !phone || !email || !checkIn || !checkOut) {
+            showToast('Συμπληρώστε Όνομα, Επώνυμο, Τηλέφωνο, Email και ημερομηνίες.', 'error');
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="ti ti-check"></i> Αποθήκευση Αλλαγών';
+            return;
+        }
+        if (new Date(checkOut) <= new Date(checkIn)) {
+            showToast('Η ημερομηνία αναχώρησης πρέπει να είναι μετά την άφιξη.', 'error');
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="ti ti-check"></i> Αποθήκευση Αλλαγών';
+            return;
+        }
+
+        const rid = editState.reservationId;
+        const orig = editState.originalReservation;
+        const origCust = editState.originalCustomer;
+
+        const changes = {};
+        if (firstName !== origCust.FirstName) changes.Πελάτης = `${firstName} ${lastName}`;
+        if (phone !== origCust.Phone) changes.Τηλέφωνο = phone;
+        if (email !== origCust.Email) changes.Email = email;
+        if (guests !== (orig.NumberOfGuests || 1)) changes.Άτομα = guests;
+        if (checkIn !== orig.CheckInDate) changes.CheckIn = checkIn;
+        if (checkOut !== orig.CheckOutDate) changes.CheckOut = checkOut;
+        if (roomNumber !== editState.currentRoomNumber) changes.Δωμάτιο = roomNumber;
+        if (bookingType !== (orig.BookingType || 'phone')) changes.Τύπος = bookingType;
+        const editStatusLabels = { Confirmed: 'Επιβεβαιωμένη', CheckedIn: 'Check-in', CheckedOut: 'Check-out', Cancelled: 'Ακυρωμένη' };
+        if (status !== orig.Status) changes.Κατάσταση = editStatusLabels[status] || status;
+        if (Math.abs(totalCost - parseFloat(orig.TotalCost)) > 0.01) changes.Σύνολο = `€${totalCost}`;
+        if (Math.abs(deposit - parseFloat(orig.Deposit || 0)) > 0.01) changes.Προκαταβολή = `€${deposit}`;
+        if (paymentMethod !== (orig.PaymentMethod || 'cash')) changes.Πληρωμή = paymentMethod;
+        if (notes !== (orig.Notes || '')) changes.Σημειώσεις = 'Ενημερώθηκαν';
+
+        if (Object.keys(changes).length === 0) {
+            showToast('Δεν υπάρχουν αλλαγές προς αποθήκευση.', 'info');
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="ti ti-check"></i> Αποθήκευση Αλλαγών';
+            return;
+        }
+
+        // Room availability check if dates or room changed
+        if (checkIn !== orig.CheckInDate || checkOut !== orig.CheckOutDate || roomNumber !== editState.currentRoomNumber) {
+            const { data: overlapping } = await window.supabase
+                .from('RESERVATION')
+                .select('ReservationID')
+                .lt('CheckInDate', checkOut)
+                .gt('CheckOutDate', checkIn)
+                .not('Status', 'in', '("Cancelled","CheckedOut")')
+                .neq('ReservationID', rid);
+
+            if (overlapping && overlapping.length > 0) {
+                const ids = overlapping.map(r => r.ReservationID);
+                const { data: busyRooms } = await window.supabase
+                    .from('RESERVATION_ROOM')
+                    .select('RoomNumber')
+                    .in('ReservationID', ids);
+                const busyNums = (busyRooms || []).map(r => r.RoomNumber);
+                if (busyNums.includes(roomNumber)) {
+                    showToast('Το δωμάτιο είναι ήδη κλεισμένο για αυτές τις ημερομηνίες.', 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="ti ti-check"></i> Αποθήκευση Αλλαγών';
+                    return;
+                }
+            }
+        }
+
+        const summaryLines = Object.entries(changes)
+            .map(([k, v]) => `• ${k}: ${v}`).join('\n');
+
+        if (!await window.showConfirm(
+            `Αποθήκευση αλλαγών στην κράτηση #${rid};\n\nΑλλαγές:\n${summaryLines}`
+        )) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="ti ti-check"></i> Αποθήκευση Αλλαγών';
+            return;
+        }
+
+        const user = JSON.parse(localStorage.getItem('hotel_user') || '{}');
+        const editorName = user.name || 'Άγνωστος';
+        const editorId = user.id || null;
+
+        // Update CUSTOMER
+        const { error: custErr } = await window.supabase
+            .from('CUSTOMER')
+            .update({
+                FirstName: firstName,
+                LastName: lastName,
+                Phone: phone,
+                Email: email
+            })
+            .eq('CustomerID', origCust.CustomerID);
+        if (custErr) throw custErr;
+
+        // Update RESERVATION
+        const updateData = {
+            CheckInDate: checkIn,
+            CheckOutDate: checkOut,
+            TotalCost: totalCost,
+            Status: status,
+            BookingType: bookingType,
+            PaymentMethod: paymentMethod,
+            NumberOfGuests: guests,
+            Deposit: deposit,
+            Notes: notes,
+            EditedAt: new Date().toISOString(),
+            EditedBy: editorName
+        };
+
+        // If room type changed, update it based on the selected room
+        const selectedRoomData = editState.rooms.find(rr => rr.RoomNumber === roomNumber);
+        if (selectedRoomData) {
+            updateData.RoomType = selectedRoomData.RoomType;
+        }
+
+        const { error: resErr } = await window.supabase
+            .from('RESERVATION')
+            .update(updateData)
+            .eq('ReservationID', rid);
+        if (resErr) throw resErr;
+
+        // Update RESERVATION_ROOM if room changed
+        if (roomNumber !== editState.currentRoomNumber) {
+            await window.supabase
+                .from('RESERVATION_ROOM')
+                .delete()
+                .eq('ReservationID', rid);
+            await window.supabase
+                .from('RESERVATION_ROOM')
+                .insert([{ ReservationID: rid, RoomNumber: roomNumber }]);
+        }
+
+        // Determine action type
+        let action = 'edited';
+        if (new Date(checkOut) > new Date(orig.CheckOutDate)) action = 'extended';
+        else if (new Date(checkOut) < new Date(orig.CheckOutDate)) action = 'early_checkout';
+
+        // Insert history
+        await window.supabase
+            .from('RESERVATION_HISTORY')
+            .insert([{
+                ReservationID: rid,
+                Action: action,
+                ChangedBy: editorName,
+                ChangedByEmpID: editorId,
+                OldValues: {
+                    CheckInDate: orig.CheckInDate,
+                    CheckOutDate: orig.CheckOutDate,
+                    TotalCost: orig.TotalCost,
+                    Status: orig.Status,
+                    RoomNumber: editState.currentRoomNumber,
+                    PaymentMethod: orig.PaymentMethod,
+                    BookingType: orig.BookingType,
+                    Notes: orig.Notes,
+                    NumberOfGuests: orig.NumberOfGuests,
+                    Deposit: orig.Deposit
+                },
+                NewValues: {
+                    CheckInDate: checkIn,
+                    CheckOutDate: checkOut,
+                    TotalCost: totalCost,
+                    Status: status,
+                    RoomNumber: roomNumber,
+                    PaymentMethod: paymentMethod,
+                    BookingType: bookingType,
+                    Notes: notes,
+                    NumberOfGuests: guests,
+                    Deposit: deposit
+                }
+            }]);
+
+        showToast(`Η κράτηση #${rid} ενημερώθηκε επιτυχώς!`, 'success');
+        closeEditModal();
+        fetchAllReservations();
+        fetchTodayReservations();
+        fetchRoomsAndRender();
+
+    } catch (err) {
+        showToast('Σφάλμα αποθήκευσης: ' + err.message, 'error');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="ti ti-check"></i> Αποθήκευση Αλλαγών';
+    }
+};
 
 window.filterBookings = function () {
     const q = normalizeGreek(document.getElementById('bk-search')?.value || '');
@@ -1174,19 +1700,26 @@ window.viewReservation = function (reservationId) {
         'CheckedOut': 'Check-out', 'Cancelled': 'Ακυρωμένη'
     };
     const paymentLabels = { cash: 'Μετρητά', card: 'Κάρτα', bank_transfer: 'Τραπεζικό Έμβασμα' };
+    const bookingTypeLabels = { phone: 'Τηλεφωνική', prepaid: 'Προπληρωμένη', group: 'Γκρουπ', walkin: 'Walk-in' };
+    const deposit = parseFloat(r.Deposit) || 0;
+    const balance = parseFloat(r.TotalCost) - deposit;
     alert(
         `Λεπτομέρειες Κράτησης #${r.ReservationID}\n` +
         `───────────────\n` +
         `Πελάτης: ${name}\n` +
         `Τηλέφωνο: ${c.Phone || '—'}\n` +
         `Email: ${c.Email || '—'}\n` +
-        `Τύπος: ${c.IsGroup ? 'Γκρουπ' : 'Ιδιώτης'}\n` +
+        `Άτομα: ${r.NumberOfGuests || 1}\n` +
         `Check-in: ${r.CheckInDate}\n` +
         `Check-out: ${r.CheckOutDate}\n` +
         `Δωμάτιο: ${r._roomNumber}\n` +
+        `Τύπος Κράτησης: ${bookingTypeLabels[r.BookingType] || r.BookingType || '—'}\n` +
         `Σύνολο: €${Number(r.TotalCost).toFixed(2)}\n` +
+        `Προκαταβολή: €${deposit.toFixed(2)}\n` +
+        `Υπόλοιπο: €${balance.toFixed(2)}\n` +
         `Τρόπος Πληρωμής: ${paymentLabels[r.PaymentMethod] || r.PaymentMethod || '—'}\n` +
-        `Κατάσταση: ${statusLabels[r.Status] || r.Status}`
+        `Κατάσταση: ${statusLabels[r.Status] || r.Status}\n` +
+        `Σημειώσεις: ${r.Notes || '—'}`
     );
 };
 
