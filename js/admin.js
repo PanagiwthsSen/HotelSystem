@@ -207,7 +207,59 @@ function renderMap(filter) {
         d.style.cursor = 'pointer';
 
         d.addEventListener('click', () => {
-            alert(`Πληροφορίες Δωματίου\n--------------------\nΔωμάτιο: ${prefix}${r.id}\nΤύπος: ${r.type || 'Άγνωστος'}\nΚατάσταση: ${stateGr}`);
+            const existing = document.querySelector('.room-info-overlay');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.className = 'inv-overlay room-info-overlay';
+
+            const statusColors = {
+                'Έτοιμο για νέο πελάτη': '#1D9E75',
+                'Άδειο (χωρίς καθαριότητα)': '#EF9F27',
+                'Προσεχώς άδειο': '#D85A30',
+                'Κατειλημμένο': '#991B1B'
+            };
+            const dotColor = statusColors[stateGr] || '#1D9E75';
+
+            overlay.innerHTML = `
+                <div class="inv-modal room-info-modal">
+                    <div class="room-info-colorbar" style="background:${dotColor}"></div>
+                    <div class="room-info-header">
+                        <h3>Δωμάτιο ${prefix}${r.id}</h3>
+                        <span class="room-info-close" id="room-info-close">&times;</span>
+                    </div>
+                    <div class="room-info-body">
+                        <div class="room-info-row">
+                            <span class="ri-label">Τύπος:</span>
+                            <span class="ri-value">${r.type || 'Άγνωστος'}</span>
+                        </div>
+                        <div class="room-info-row">
+                            <span class="ri-label">Κατάσταση:</span>
+                            <span class="ri-value">
+                                <span style="width:10px;height:10px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0"></span>
+                                ${stateGr}
+                            </span>
+                        </div>
+                        ${r.checkOutDate ? `
+                        <div class="room-info-row">
+                            <span class="ri-label">Αναχώρηση:</span>
+                            <span class="ri-value">${new Date(r.checkOutDate).toLocaleDateString('el-GR')}</span>
+                        </div>` : ''}
+                    </div>
+                    <div class="room-info-footer">
+                        <button class="room-info-btn" id="room-info-close-btn">Κλείσιμο</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            const closeRmInfo = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) closeRmInfo(); });
+            overlay.querySelector('#room-info-close').addEventListener('click', closeRmInfo);
+            overlay.querySelector('#room-info-close-btn').addEventListener('click', closeRmInfo);
+            const onKey = (e) => { if (e.key === 'Escape') closeRmInfo(); };
+            document.addEventListener('keydown', onKey);
         });
 
         rmap.appendChild(d);
@@ -2405,31 +2457,103 @@ appReady.then(ok => {
   if (document.getElementById('rentals-body')) fetchRentals();
   if (document.getElementById('payroll-body')) fetchPayroll();
   if (document.getElementById('special-pricing-rows')) loadSpecialPricing();
+  if (document.getElementById('specific-room-rows')) loadRoomSpecialPrices();
   initRevenueDates();
 });
 
 window.updateSpecificRooms = async function() {
+    const from = document.getElementById('sr-from').value;
+    const to = document.getElementById('sr-to').value;
     const roomsInput = document.getElementById('specific-room-ids').value;
     const priceInput = document.getElementById('specific-price').value;
 
+    if (!from || !to) {
+        showToast('Ορίστε ημερομηνίες περιόδου.', 'error');
+        return;
+    }
+    if (new Date(from) >= new Date(to)) {
+        showToast('Η από-ημερομηνία πρέπει να είναι πριν την έως.', 'error');
+        return;
+    }
     if (!roomsInput || !priceInput) {
-        showToast("Παρακαλώ συμπληρώστε δωμάτια και τιμή.", "warning");
+        showToast('Παρακαλώ συμπληρώστε δωμάτια και τιμή.', 'warning');
         return;
     }
 
     const roomNumbers = roomsInput.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+    if (roomNumbers.length === 0) {
+        showToast('Δεν βρέθηκαν έγκυροι αριθμοί δωματίων.', 'warning');
+        return;
+    }
+
+    if (!await window.showConfirm(`Αποθήκευση τιμολόγησης ${from} — ${to} για ${roomNumbers.length} δωμάτια (€${priceInput});`)) return;
+
+    const rows = roomNumbers.map(rn => ({ RoomNumber: rn, FromDate: from, ToDate: to, Price: priceInput }));
 
     try {
-        if (!await window.showConfirm(`Ενημέρωση τιμών για ${roomNumbers.length} δωμάτια;`)) return;
-        const { error } = await supabase
-            .from('ROOM')
-            .update({ BasePrice: priceInput })
-            .in('RoomNumber', roomNumbers);
-
+        const { error } = await supabase.from('ROOM_SPECIAL_PRICE').insert(rows);
         if (error) throw error;
-        showToast(`Ενημερώθηκαν ${roomNumbers.length} δωμάτια!`, "success");
+        showToast(`Αποθηκεύτηκαν ${roomNumbers.length} εξειδικευμένες τιμές δωματίων.`, 'success');
+        loadRoomSpecialPrices();
     } catch (err) {
-        showToast("Σφάλμα ενημέρωσης.", "error");
+        showToast('Αποτυχία: ' + err.message, 'error');
+    }
+};
+
+window.loadRoomSpecialPrices = async function() {
+    const container = document.getElementById('specific-room-rows');
+    if (!container) return;
+
+    if (!document.getElementById('sr-from').value) {
+        const today = new Date();
+        document.getElementById('sr-from').value = today.toISOString().split('T')[0];
+        const nextMonth = new Date(today);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        document.getElementById('sr-to').value = nextMonth.toISOString().split('T')[0];
+    }
+
+    const { data: rows } = await supabase.from('ROOM_SPECIAL_PRICE').select('*').order('SpecialPriceID', { ascending: false });
+    const data = rows || [];
+
+    if (data.length === 0) {
+        container.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--color-text-secondary)">Δεν υπάρχουν αποθηκευμένες ρυθμίσεις.</div>';
+        return;
+    }
+
+    container.innerHTML = `
+    <div style="margin:0 12px;padding-top:8px;border-top:1px solid var(--color-border-secondary)">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">Αποθηκευμένες Ρυθμίσεις</div>
+        <table style="width:100%;font-size:12px">
+            <thead><tr style="background:var(--color-background-secondary)">
+                <th style="padding:6px 8px;text-align:left">Δωμάτιο</th>
+                <th style="padding:6px 8px;text-align:left">Από</th>
+                <th style="padding:6px 8px;text-align:left">Έως</th>
+                <th style="padding:6px 8px;text-align:left">Τιμή</th>
+                <th style="padding:6px 8px;text-align:left">Ενέργειες</th>
+            </tr></thead>
+            <tbody>${data.map(r => `
+                <tr>
+                    <td style="padding:4px 8px">${r.RoomNumber}</td>
+                    <td style="padding:4px 8px">${r.FromDate}</td>
+                    <td style="padding:4px 8px">${r.ToDate}</td>
+                    <td style="padding:4px 8px">€${r.Price}</td>
+                    <td style="padding:4px 8px;white-space:nowrap">
+                        <button class="btn btn-sm" onclick="deleteRoomSpecialPrice(${r.SpecialPriceID})" title="Διαγραφή"><i class="ti ti-trash"></i></button>
+                    </td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    </div>`;
+};
+
+window.deleteRoomSpecialPrice = async function(id) {
+    if (!await window.showConfirm('Διαγραφή αυτής της τιμολόγησης;')) return;
+    try {
+        await supabase.from('ROOM_SPECIAL_PRICE').delete().eq('SpecialPriceID', id);
+        showToast('Διαγράφηκε.', 'success');
+        loadRoomSpecialPrices();
+    } catch (err) {
+        showToast('Αποτυχία διαγραφής.', 'error');
     }
 };
 
