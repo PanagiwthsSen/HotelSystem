@@ -173,6 +173,19 @@
         <button class="btn btn-dark" onclick="updateSpecificRooms()">Εφαρμογή</button>
       </div>
     </div>
+
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-calendar-dollar" aria-hidden="true"></i>Εξειδικευμένη Τιμολόγηση Περιόδου</div>
+        <button class="btn btn-dark btn-sm" onclick="saveSpecialPricing()"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 16px 0;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:500">Περίοδος:</span>
+        <input type="date" id="sp-from" style="padding:5px 8px;border:1px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-main);font-size:12px">
+        <span style="color:var(--color-text-secondary)">—</span>
+        <input type="date" id="sp-to" style="padding:5px 8px;border:1px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-main);font-size:12px">
+      </div>
+      <div id="special-pricing-rows" style="padding:6px 0 12px"></div>
+    </div>
   </div>
 
   <div class="view" id="v-rooms">

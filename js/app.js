@@ -109,16 +109,35 @@ const ROOM_TYPE_INFO = {
     }
 };
 
-function calcPriceBreakdown(basePrice, checkin, checkout) {
+function calcPriceBreakdown(basePrice, checkin, checkout, roomType, specialPricing) {
     const start = new Date(checkin + 'T12:00:00');
     const end = new Date(checkout + 'T12:00:00');
     const groups = {};
     let total = 0;
 
     for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
-        const mult = getMultiplier(d);
-        const label = getSeasonLabel(d);
-        const price = Math.round(basePrice * mult);
+        let price = basePrice;
+        let label = getSeasonLabel(d);
+
+        if (specialPricing && roomType) {
+            const rules = specialPricing[roomType];
+            if (rules) {
+                const found = rules.find(r => {
+                    const f = new Date(r.FromDate + 'T00:00:00');
+                    const t = new Date(r.ToDate + 'T23:59:59');
+                    return d >= f && d <= t;
+                });
+                if (found) {
+                    price = found.Price;
+                    label = 'Ειδική Τιμή';
+                }
+            }
+        }
+
+        if (label !== 'Ειδική Τιμή') {
+            const mult = getMultiplier(d);
+            price = Math.round(basePrice * mult);
+        }
 
         if (!groups[label]) {
             groups[label] = { label, pricePerNight: price, count: 0, subtotal: 0 };
@@ -170,6 +189,17 @@ async function fetchAndRenderRooms() {
             .lte('CheckInDate', checkout)
             .gte('CheckOutDate', checkin);
         if (resErr) throw resErr;
+
+        let specialPricing = {};
+        try {
+            const { data: spData } = await supabase.from('SPECIAL_PRICING').select('*');
+            if (spData) {
+                spData.forEach(r => {
+                    if (!specialPricing[r.RoomType]) specialPricing[r.RoomType] = [];
+                    specialPricing[r.RoomType].push(r);
+                });
+            }
+        } catch (_) { /* table may not exist */ }
 
         const bookedRooms = new Set();
         const typeBookedCount = {};
@@ -237,7 +267,7 @@ async function fetchAndRenderRooms() {
             }
 
             const cheapest = roomsOfType.reduce((a, b) => a.BasePrice < b.BasePrice ? a : b);
-            const breakdown = calcPriceBreakdown(cheapest.BasePrice, checkin, checkout);
+            const breakdown = calcPriceBreakdown(cheapest.BasePrice, checkin, checkout, type, specialPricing);
             const totalNights = breakdown.groups.reduce((s, g) => s + g.count, 0);
 
             const finalTotal = breakdown.total * roomsRequested;
