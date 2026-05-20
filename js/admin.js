@@ -2391,6 +2391,9 @@ window.updateSpecificRooms = async function() {
    ΕΞΕΙΔΙΚΕΥΜΕΝΗ ΤΙΜΟΛΟΓΗΣΗ ΠΕΡΙΟΔΟΥ (SPECIAL_PRICING)
    ============================================================== */
 const SP_TYPES = ['Μονόκλινο', 'Δίκλινο', 'Φαρδύκλινο', 'Σουίτα'];
+const SP_MINS = [50, 80, 100, 200];
+const SP_MAXS = [200, 300, 350, 600];
+const SP_DEFAULTS = [85, 140, 175, 380];
 
 async function loadSpecialPricing() {
     const container = document.getElementById('special-pricing-rows');
@@ -2400,60 +2403,63 @@ async function loadSpecialPricing() {
     try {
         const { data } = await supabase.from('SPECIAL_PRICING').select('*');
         if (data) data.forEach(r => specialData[r.RoomType] = r);
-    } catch (err) {
-        console.warn('loadSpecialPricing:', err);
+    } catch (_) {}
+
+    const first = SP_TYPES.find(t => specialData[t]);
+    if (first) {
+        document.getElementById('sp-from').value = specialData[first].FromDate;
+        document.getElementById('sp-to').value = specialData[first].ToDate;
     }
 
-    container.innerHTML = SP_TYPES.map(type => {
+    container.innerHTML = SP_TYPES.map((type, i) => {
         const sp = specialData[type];
         const checked = sp ? 'checked' : '';
-        const fromDate = sp ? sp.FromDate : '';
-        const toDate = sp ? sp.ToDate : '';
-        const price = sp ? sp.Price : '';
-        const hidden = sp ? '' : 'hidden';
-
+        const price = sp ? sp.Price : SP_DEFAULTS[i];
         return `
-        <div class="sp-row">
-            <input type="checkbox" class="sp-cb" data-type="${type}" ${checked} onchange="toggleSpecialPricing('${type}')">
+        <div class="sp-row${checked ? '' : ' disabled'}" id="sp-row-${i}">
+            <input type="checkbox" class="sp-cb" data-type="${type}" data-idx="${i}" ${checked} onchange="toggleSpecialPricing(this)">
             <span class="sp-lbl">${type}</span>
-            <div class="sp-fields ${hidden}" id="sp-fields-${type}">
-                <label>Από</label>
-                <input type="date" class="sp-from" data-type="${type}" value="${fromDate}">
-                <label>Έως</label>
-                <input type="date" class="sp-to" data-type="${type}" value="${toDate}">
-                <label>Τιμή (€)</label>
-                <input type="number" class="sp-price" data-type="${type}" min="0" value="${price}" placeholder="0">
-            </div>
+            <input type="range" class="sp-slider" data-idx="${i}" min="${SP_MINS[i]}" max="${SP_MAXS[i]}" value="${price}" step="1" ${checked ? '' : 'disabled'} oninput="document.getElementById('sp-val-${i}').textContent='€'+this.value">
+            <span class="sp-val" id="sp-val-${i}">€${price}</span>
         </div>`;
     }).join('');
 }
 
-window.toggleSpecialPricing = function(type) {
-    const cb = document.querySelector(`.sp-cb[data-type="${type}"]`);
-    const fields = document.getElementById(`sp-fields-${type}`);
-    if (fields) fields.classList.toggle('hidden', !cb.checked);
+window.toggleSpecialPricing = function(cb) {
+    const idx = cb.dataset.idx;
+    const row = document.getElementById(`sp-row-${idx}`);
+    const slider = row.querySelector('.sp-slider');
+    if (cb.checked) {
+        row.classList.remove('disabled');
+        slider.disabled = false;
+    } else {
+        row.classList.add('disabled');
+        slider.disabled = true;
+    }
 };
 
 window.saveSpecialPricing = async function() {
+    const from = document.getElementById('sp-from').value;
+    const to = document.getElementById('sp-to').value;
+
+    if (!from || !to) {
+        showToast('Ορίστε ημερομηνίες περιόδου.', 'error');
+        return;
+    }
+    if (new Date(from) >= new Date(to)) {
+        showToast('Η από-ημερομηνία πρέπει να είναι πριν την έως.', 'error');
+        return;
+    }
+
     const rows = [];
-    document.querySelectorAll('.sp-cb').forEach(cb => {
-        if (!cb.checked) return;
+    document.querySelectorAll('.sp-cb:checked').forEach(cb => {
         const type = cb.dataset.type;
-        const from = document.querySelector(`.sp-from[data-type="${type}"]`).value;
-        const to = document.querySelector(`.sp-to[data-type="${type}"]`).value;
-        const price = parseFloat(document.querySelector(`.sp-price[data-type="${type}"]`).value);
-        if (!from || !to || isNaN(price)) {
-            showToast(`Συμπληρώστε ημερομηνίες και τιμή για ${type}.`, 'error');
-            return;
-        }
-        if (new Date(from) >= new Date(to)) {
-            showToast(`Η από-ημερομηνία πρέπει να είναι πριν την έως για ${type}.`, 'error');
-            return;
-        }
+        const idx = cb.dataset.idx;
+        const price = parseInt(document.querySelector(`.sp-slider[data-idx="${idx}"]`).value, 10);
         rows.push({ RoomType: type, FromDate: from, ToDate: to, Price: price });
     });
 
-    if (!await window.showConfirm(`Αποθήκευση ${rows.length} εξειδικευμένων τιμολογήσεων;`)) return;
+    if (!await window.showConfirm(`Αποθήκευση τιμολόγησης για ${rows.length} τύπους δωματίων;`)) return;
 
     try {
         await supabase.from('SPECIAL_PRICING').delete().gte('SpecialID', 0);
