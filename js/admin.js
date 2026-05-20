@@ -1541,7 +1541,6 @@ async function fetchRentals() {
 
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση μισθώσεων...</td></tr>';
 
-        // Join RENTED_SHOP με LEASE_PAYMENT
         const { data, error } = await supabase
             .from('RENTED_SHOP')
             .select(`
@@ -1552,7 +1551,6 @@ async function fetchRentals() {
         if (error) throw error;
 
         tbody.innerHTML = data.map(shop => {
-            // Παίρνουμε την κατάσταση πληρωμής (αν υπάρχει εγγραφή)
             const payment = shop.LEASE_PAYMENT && shop.LEASE_PAYMENT.length > 0 ? shop.LEASE_PAYMENT[0] : null;
             const isDelayed = payment ? payment.IsDelayed : false;
 
@@ -1560,17 +1558,25 @@ async function fetchRentals() {
                 ? '<span class="pill p-r">Εκκρεμεί / Καθυστέρηση</span>' 
                 : '<span class="pill p-g">Πληρώθηκε</span>';
 
+            const shopName = shop.ShopName || 'Κατάστημα ' + shop.ShopID;
+            const safeName = shopName.replace(/'/g, "\\'");
+            const tenantName = shop.TenantName.replace(/'/g, "\\'");
+
             const actionBtn = isDelayed
-                ? `<button class="btn btn-dark btn-sm" onclick="sendNotice(this, 'legal')">Εξώδικο</button>`
-                : `<button class="btn btn-sm" onclick="sendNotice(this, 'friendly')">Υπενθύμιση</button>`;
+                ? `<button class="btn btn-dark btn-sm" onclick="sendReminder(${shop.ShopID}, '${safeName}', '${tenantName}')">Υπενθύμιση</button>`
+                : `<button class="btn btn-sm" disabled>Πληρωμένο ✓</button>`;
 
             return `
                 <tr>
-                    <td><strong>${shop.ShopName || 'Κατάστημα ' + shop.ShopID}</strong></td>
+                    <td><strong>${shopName}</strong></td>
                     <td>${shop.TenantName}</td>
                     <td>€${shop.MonthlyRent}</td>
                     <td>${statusHtml}</td>
-                    <td>${actionBtn}</td>
+                    <td style="white-space:nowrap">
+                        ${actionBtn}
+                        <button class="btn btn-sm" onclick="openRentalModal(${shop.ShopID})" title="Επεξεργασία"><i class="ti ti-pencil"></i></button>
+                        <button class="btn btn-sm" onclick="deleteRental(${shop.ShopID}, '${safeName}')" title="Διαγραφή"><i class="ti ti-trash"></i></button>
+                    </td>
                 </tr>
             `;
         }).join('');
@@ -1581,15 +1587,99 @@ async function fetchRentals() {
     }
 }
 
-// Εκθέτουμε τη συνάρτηση ειδοποιήσεων για το Vite
-window.sendNotice = function(btn, type) {
-    btn.disabled = true;
-    if(type === 'legal') {
-        btn.textContent = "Εστάλη Εξώδικο";
-        showToast("Το εξώδικο έχει σταλεί μέσω email στον νομικό σύμβουλο.", "warning");
-    } else {
-        btn.textContent = "Εστάλη";
-        showToast("Η φιλική υπενθύμιση εστάλη στον ενοικιαστή.", "success");
+window.sendReminder = async function(shopId, shopName, tenantName) {
+    if (!await window.showConfirm(`Αποστολή υπενθύμισης πληρωμής στον "${tenantName}" (${shopName});`)) return;
+    showToast(`Υπενθύμιση εστάλη στον ${tenantName}.`, "success");
+};
+
+window.openRentalModal = async function(shopId) {
+    let shop = null;
+    if (shopId) {
+        const { data } = await supabase
+            .from('RENTED_SHOP')
+            .select('ShopID, ShopName, TenantName, MonthlyRent')
+            .eq('ShopID', shopId)
+            .single();
+        shop = data;
+    }
+
+    const existing = document.querySelector('.inv-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'inv-overlay';
+    overlay.innerHTML = `
+        <div class="inv-modal">
+            <h3>${shop ? 'Επεξεργασία' : 'Νέο'} Κατάστημα</h3>
+            <div class="mform-group">
+                <label>Όνομα Καταστήματος</label>
+                <input type="text" id="rs-name" value="${shop?.ShopName || ''}" placeholder="π.χ. Kavala Fashion Boutique">
+            </div>
+            <div class="mform-group">
+                <label>Ενοικιαστής *</label>
+                <input type="text" id="rs-tenant" value="${shop?.TenantName || ''}" required>
+            </div>
+            <div class="mform-group">
+                <label>Μηνιαίο Μίσθωμα (€) *</label>
+                <input type="number" id="rs-rent" min="0" value="${shop?.MonthlyRent || 0}" required>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" id="rs-cancel">Ακύρωση</button>
+                <button class="btn btn-dark" id="rs-save">${shop ? 'Αποθήκευση' : 'Δημιουργία'}</button>
+            </div>
+        </div>
+    `;
+
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#rs-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#rs-save').addEventListener('click', async () => {
+        const name = overlay.querySelector('#rs-name').value.trim();
+        const tenant = overlay.querySelector('#rs-tenant').value.trim();
+        const rent = parseInt(overlay.querySelector('#rs-rent').value, 10);
+
+        if (!tenant || isNaN(rent)) {
+            showToast('Συμπληρώστε Ενοικιαστή και Μίσθωμα.', 'error');
+            return;
+        }
+
+        if (!await window.showConfirm(`${shop ? 'Ενημέρωση' : 'Δημιουργία'} καταστήματος "${tenant}";`)) return;
+
+        try {
+            const payload = { ShopName: name || null, TenantName: tenant, MonthlyRent: rent };
+            if (shop) {
+                const { error } = await supabase.from('RENTED_SHOP').update(payload).eq('ShopID', shop.ShopID);
+                if (error) throw error;
+                showToast(`Κατάστημα "${tenant}" ενημερώθηκε.`, 'success');
+            } else {
+                const { error } = await supabase.from('RENTED_SHOP').insert([payload]);
+                if (error) throw error;
+                showToast(`Κατάστημα "${tenant}" δημιουργήθηκε.`, 'success');
+            }
+            overlay.remove();
+            fetchRentals();
+        } catch (err) {
+            showToast('Αποτυχία: ' + err.message, 'error');
+        }
+    });
+
+    overlay.querySelector('#rs-tenant').focus();
+    overlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') overlay.querySelector('#rs-save').click();
+        if (e.key === 'Escape') overlay.remove();
+    });
+};
+
+window.deleteRental = async function(shopId, name) {
+    if (!await window.showConfirm(`Οριστική διαγραφή του "${name}"; Η ενέργεια είναι μη αναστρέψιμη.`)) return;
+    try {
+        const { error } = await supabase.from('RENTED_SHOP').delete().eq('ShopID', shopId);
+        if (error) throw error;
+        showToast(`Το κατάστημα "${name}" διαγράφηκε.`, 'success');
+        fetchRentals();
+    } catch (err) {
+        showToast('Αποτυχία διαγραφής: ' + err.message, 'error');
     }
 };
 
