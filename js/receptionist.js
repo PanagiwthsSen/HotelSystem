@@ -74,7 +74,8 @@ function isSoonCheckout(checkOutDate) {
 function roomStatusLabel(state, checkOutDate) {
   if (state === 'free' || state === 'clean') return 'Έτοιμο για νέο πελάτη';
   if (state === 'dirty') return 'Άδειο (χωρίς καθαριότητα)';
-  if (state === 'occ') return isSoonCheckout(checkOutDate) ? 'Προσεχώς άδειο' : 'Κατειλημμένο';
+  if (state === 'soon') return 'Προσεχώς άδειο';
+  if (state === 'occ') return 'Κατειλημμένο';
   return 'Ελεύθερο';
 }
 
@@ -123,13 +124,17 @@ async function fetchRoomsAndRender() {
 
         checkoutMap = await buildCheckoutMap();
 
-        hotelRooms = rooms.map(r => ({
-            id: r.RoomNumber,
-            type: r.RoomType,
-            state: mapDbStatusToUI(r.Status),
-            dbStatus: r.Status,
-            checkOutDate: checkoutMap[r.RoomNumber] || null
-        }));
+        hotelRooms = rooms.map(r => {
+            const state = mapDbStatusToUI(r.Status);
+            const checkOutDate = checkoutMap[r.RoomNumber] || null;
+            return {
+                id: r.RoomNumber,
+                type: r.RoomType,
+                state: state === 'occ' && isSoonCheckout(checkOutDate) ? 'soon' : state,
+                dbStatus: r.Status,
+                checkOutDate
+            };
+        });
 
         renderMap();
     } catch (err) {
@@ -628,12 +633,9 @@ function renderAvailableRooms(rooms, checkoutMap = {}) {
             : (hotelRooms.find(h => h.id == r.RoomNumber)?.state || 'free');
         let label, color;
         if (state === 'free') { label = 'Έτοιμο για νέο πελάτη'; color = '#1D9E75'; }
-        else if (state === 'dirty') { label = 'Άδειο (χωρίς καθαριότητα)'; color = '#EF9F27'; }
-        else if (state === 'occ') {
-          const soon = isSoonCheckout(checkoutMap[r.RoomNumber]);
-          label = soon ? 'Προσεχώς άδειο' : 'Κατειλημμένο';
-          color = soon ? '#D85A30' : '#991B1B';
-        }
+        else if (state === 'dirty') { label = 'Άδειο (χωρίς καθαριότητα)'; color = '#EAB308'; }
+        else if (state === 'soon') { label = 'Προσεχώς άδειο'; color = '#F97316'; }
+        else if (state === 'occ') { label = 'Κατειλημμένο'; color = '#DC2626'; }
         else { label = 'Έτοιμο για νέο πελάτη'; color = '#1D9E75'; }
         return `
         <div class="room-opt${selectedRoom === r.RoomNumber ? ' selected' : ''}"
@@ -1221,7 +1223,7 @@ function recalcEditPrice() {
     if (totalDisplayEl) totalDisplayEl.textContent = `€${total.toFixed(2)}`;
     if (depositDisplayEl) depositDisplayEl.textContent = `€${deposit.toFixed(2)}`;
     if (balanceEl) balanceEl.textContent = `€${balance.toFixed(2)}`;
-    if (balanceEl) balanceEl.style.color = balance <= 0 ? '#1D9E75' : '#D85A30';
+    if (balanceEl) balanceEl.style.color = balance <= 0 ? '#1D9E75' : '#DC2626';
 }
 
 window.openEditReservationModal = async function (reservationId) {
@@ -1403,7 +1405,7 @@ window.openEditReservationModal = async function (reservationId) {
                         <div>Διανυκτερεύσεις: <strong id="edit-nights">${nights}</strong></div>
                         <div>Συνολικό Κόστος: <strong id="edit-total-display">€${total.toFixed(2)}</strong></div>
                         <div>Προκαταβολή: <strong id="edit-deposit-display">€${deposit.toFixed(2)}</strong></div>
-                        <div>Υπόλοιπο: <strong id="edit-balance" style="color:${balance <= 0 ? '#1D9E75' : '#D85A30'}">€${balance.toFixed(2)}</strong></div>
+                        <div>Υπόλοιπο: <strong id="edit-balance" style="color:${balance <= 0 ? '#1D9E75' : '#DC2626'}">€${balance.toFixed(2)}</strong></div>
                     </div>
                     <div class="form-grid">
                         <div class="fg"><label>Συνολικό Κόστος (€)</label><input type="number" id="edit-total-cost" step="0.01" value="${total.toFixed(2)}" onchange="recalcEditPrice()"></div>

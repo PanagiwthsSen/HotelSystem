@@ -409,7 +409,7 @@ async function loadConsumptionItems() {
         const status = item.Quantity <= 0 ? 'Εξαντλήθηκε' :
                        item.Quantity <= item.MinThreshold ? 'Χαμηλό' : 'Απόθεμα';
         const statusColor = item.Quantity <= 0 ? '#E24B4A' :
-                            item.Quantity <= item.MinThreshold ? '#EF9F27' : 'var(--color-text-secondary)';
+                            item.Quantity <= item.MinThreshold ? '#F97316' : 'var(--color-text-secondary)';
         return `
             <div class="consumption-row">
                 <span class="item-name">${item.Name}</span>

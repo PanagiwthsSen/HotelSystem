@@ -76,7 +76,7 @@ tr.highlight-row{background:var(--color-background-secondary)}
 /* PILLS */
 .pill{display:inline-flex;align-items:center;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;white-space:nowrap}
 .p-g{background:#EAF3DE;color:#27500A}
-.p-a{background:#FAEEDA;color:#633806}
+.p-a{background:#FFF7ED;color:#C2410C}
 .p-r{background:#FCEBEB;color:#791F1F}
 .p-b{background:#E6F1FB;color:#0C447C}
 .p-gr{background:#F1EFE8;color:#444441}
@@ -92,9 +92,9 @@ tr.highlight-row{background:var(--color-background-secondary)}
 /* NOTIFICATIONS (Click to hide) */
 .ns{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:0 var(--border-radius-md) var(--border-radius-md) 0;border-left:3px solid;margin-bottom:7px;font-size:12px;background:var(--color-background-secondary);cursor:pointer;transition:opacity 0.3s;}
 .ns:hover{opacity:0.8;}
-.ns-w{border-color:#EF9F27}.ns-e{border-color:#E24B4A}.ns-ok{border-color:#1D9E75}
+.ns-w{border-color:#F97316}.ns-e{border-color:#E24B4A}.ns-ok{border-color:#1D9E75}
 .ns i{font-size:15px;flex-shrink:0;margin-top:1px}
-.ns-w i{color:#BA7517}.ns-e i{color:#E24B4A}.ns-ok i{color:#1D9E75}
+.ns-w i{color:#C2410C}.ns-e i{color:#E24B4A}.ns-ok i{color:#1D9E75}
 
 /* PROGRESS BAR */
 .prog{height:5px;background:var(--color-background-secondary);border-radius:3px;overflow:hidden;margin-top:5px}
@@ -140,10 +140,11 @@ input[type=range]::-moz-range-thumb:hover{box-shadow:0 2px 8px rgba(168,137,42,0
 }
 .rc:hover { transform: scale(1.15); z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 
-.rc-occ   { background: #D85A30; } 
+.rc-occ   { background: #DC2626; } 
 .rc-free  { background: #1D9E75; } 
-.rc-dirty { background: #EF9F27; color: #fff; } 
+.rc-dirty { background: #EAB308; color: #fff; } 
 .rc-clean { background: #1D9E75; } 
+.rc-soon  { background: #F97316; color: #fff; }
 
 /* =========================================================
    ΤΟ ΣΥΣΤΗΜΑ TOAST (ΑΝΑΔΥΟΜΕΝΕΣ ΕΙΔΟΠΟΙΗΣΕΙΣ ΠΑΝΩ ΔΕΞΙΑ)
@@ -176,13 +177,13 @@ input[type=range]::-moz-range-thumb:hover{box-shadow:0 2px 8px rgba(168,137,42,0
 
 .live-toast.error { border-left-color: #E24B4A; }
 .live-toast.info { border-left-color: #378ADD; }
-.live-toast.warning { border-left-color: #EF9F27; }
+.live-toast.warning { border-left-color: #F97316; }
 
 .live-toast i { font-size: 18px; }
 .live-toast.success i { color: #1D9E75; }
 .live-toast.error i { color: #E24B4A; }
 .live-toast.info i { color: #378ADD; }
-.live-toast.warning i { color: #EF9F27; }
+.live-toast.warning i { color: #F97316; }
 
 .live-toast.fade-out {
     animation: fadeOut 0.3s ease-in forwards;

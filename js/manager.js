@@ -50,7 +50,7 @@ function showToast(msg, type) {
   if (type === 'info') icon = 'ti-info-circle';
   if (type === 'warning') icon = 'ti-alert-triangle';
   toast.innerHTML = `<i class="ti ${icon}"></i><span>${msg}</span>`;
-  const borderColor = type === 'error' ? '#E24B4A' : type === 'info' ? '#378ADD' : type === 'warning' ? '#EF9F27' : '#1D9E75';
+  const borderColor = type === 'error' ? '#E24B4A' : type === 'info' ? '#378ADD' : type === 'warning' ? '#F97316' : '#1D9E75';
   toast.style.cssText = `background:#fff;border-left:4px solid ${borderColor};box-shadow:0 4px 12px rgba(0,0,0,0.15);padding:12px 20px;border-radius:6px;display:flex;align-items:center;gap:10px;font-size:13px;color:#111;font-weight:500;min-width:250px;transition:opacity 0.3s;`;
   container.appendChild(toast);
   setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3500);

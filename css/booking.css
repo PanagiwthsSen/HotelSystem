@@ -101,12 +101,12 @@ nav { display: flex; align-items: center; justify-content: space-between; paddin
 .live-toast { background: #ffffff; border-left: 4px solid #1D9E75; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 12px 20px; border-radius: 6px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #111827; font-weight: 500; animation: slideInRight 0.3s ease-out forwards; min-width: 250px; }
 .live-toast.error { border-left-color: #E24B4A; }
 .live-toast.info { border-left-color: #378ADD; }
-.live-toast.warning { border-left-color: #EF9F27; }
+.live-toast.warning { border-left-color: #F97316; }
 .live-toast i { font-size: 18px; }
 .live-toast.success i { color: #1D9E75; }
 .live-toast.error i { color: #E24B4A; }
 .live-toast.info i { color: #378ADD; }
-.live-toast.warning i { color: #EF9F27; }
+.live-toast.warning i { color: #F97316; }
 .live-toast.fade-out { animation: fadeOut 0.3s ease-in forwards; }
 @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }

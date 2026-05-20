@@ -63,7 +63,8 @@ async function buildCheckoutMap() {
 function getStatusLabel(state, checkoutDate) {
   if (state === 'free' || state === 'clean') return 'Έτοιμο για νέο πελάτη';
   if (state === 'dirty') return 'Άδειο (χωρίς καθαριότητα)';
-  if (state === 'occ') return isSoonCheckout(checkoutDate) ? 'Προσεχώς άδειο' : 'Κατειλημμένο';
+  if (state === 'soon') return 'Προσεχώς άδειο';
+  if (state === 'occ') return 'Κατειλημμένο';
   return 'Ελεύθερο';
 }
 
@@ -162,11 +163,14 @@ async function fetchRooms() {
             else if (dbStatus === 'dirty' || dbStatus.includes('cleaning')) uiState = 'dirty';
             else uiState = 'free';
 
+            const checkOutDate = checkoutMap[room.RoomNumber] || null;
+            if (uiState === 'occ' && isSoonCheckout(checkOutDate)) uiState = 'soon';
+
             return {
                 id: room.RoomNumber,
                 type: room.RoomType,
                 state: uiState,
-                checkOutDate: checkoutMap[room.RoomNumber] || null
+                checkOutDate
             };
         });
 
@@ -215,9 +219,9 @@ function renderMap(filter) {
 
             const statusColors = {
                 'Έτοιμο για νέο πελάτη': '#1D9E75',
-                'Άδειο (χωρίς καθαριότητα)': '#EF9F27',
-                'Προσεχώς άδειο': '#D85A30',
-                'Κατειλημμένο': '#991B1B'
+                'Άδειο (χωρίς καθαριότητα)': '#EAB308',
+                'Προσεχώς άδειο': '#F97316',
+                'Κατειλημμένο': '#DC2626'
             };
             const dotColor = statusColors[stateGr] || '#1D9E75';
 
@@ -2035,7 +2039,7 @@ function buildRevChart(labels, diamoni, estiatorio, loipa) {
             datasets: [
                 {label: 'Διαμονή', data: diamoni, backgroundColor: '#1D9E75'},
                 {label: 'Εστιατόριο', data: estiatorio, backgroundColor: '#378ADD'},
-                {label: 'Λοιπά', data: loipa, backgroundColor: '#EF9F27'}
+                {label: 'Λοιπά', data: loipa, backgroundColor: '#F97316'}
             ]
         },
         options: {
