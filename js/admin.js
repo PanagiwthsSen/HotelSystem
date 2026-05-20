@@ -1280,6 +1280,36 @@ async function fetchVehicles() {
             notifContainer.innerHTML = notifHtml;
         }
 
+        // Ειδοποιήσεις ανεφοδιασμού από το minibar
+        try {
+            const { data: restockNotifs } = await supabase
+                .from('NOTIFICATION')
+                .select(`
+                    NotificationID, Type, Message, CreatedAt,
+                    INVENTORY_ITEM (Name)
+                `)
+                .eq('TargetRole', 'both')
+                .eq('IsRead', false)
+                .order('CreatedAt', { ascending: false });
+
+            if (restockNotifs && restockNotifs.length > 0) {
+                let restockHtml = restockNotifs.map(n => {
+                    const itemName = n.INVENTORY_ITEM?.Name || 'άγνωστο';
+                    return `
+                    <div class="ns ns-w" id="restock-notif-${n.NotificationID}" style="display:flex;align-items:center;gap:12px">
+                        <i class="ti ti-package" aria-hidden="true"></i>
+                        <div style="flex:1">${n.Message}</div>
+                        <button class="btn btn-sm" onclick="dismissRestockNotif(${n.NotificationID})" style="flex-shrink:0">✓</button>
+                    </div>`;
+                }).join('');
+
+                if (notifContainer) {
+                    notifContainer.insertAdjacentHTML('beforeend', restockHtml);
+                    notifCount += restockNotifs.length;
+                }
+            }
+        } catch (_) {}
+
         updateNotifBadge(notifCount);
 
     } catch (err) {
@@ -1321,6 +1351,22 @@ window.dismissServiceNotif = function(vehicleId, el) {
         const remaining = container ? container.children.length : 0;
         updateNotifBadge(remaining);
     }, 300);
+};
+
+window.dismissRestockNotif = async function(notifId) {
+    try {
+        await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', notifId);
+    } catch (_) {}
+    const el = document.getElementById(`restock-notif-${notifId}`);
+    if (el) {
+        el.style.opacity = '0';
+        setTimeout(() => {
+            el.remove();
+            const container = document.getElementById('admin-notifications');
+            const remaining = container ? container.children.length : 0;
+            updateNotifBadge(remaining);
+        }, 300);
+    }
 };
 
 /* ==============================================================
@@ -2395,26 +2441,43 @@ const SP_MINS = [50, 80, 100, 200];
 const SP_MAXS = [200, 300, 350, 600];
 const SP_DEFAULTS = [85, 140, 175, 380];
 
+let allSpecialData = [];
+
 async function loadSpecialPricing() {
     const container = document.getElementById('special-pricing-rows');
     if (!container) return;
 
+    const { data: rawData } = await supabase.from('SPECIAL_PRICING').select('*');
+    allSpecialData = rawData || [];
+
+    // Διαγραφή ληγμένων περιόδων
+    await supabase.from('SPECIAL_PRICING').delete().lt('ToDate', new Date().toISOString().split('T')[0]);
+
     let specialData = {};
+    allSpecialData.forEach(r => specialData[r.RoomType] = r);
+
+    let priceMap = {};
     try {
-        const { data } = await supabase.from('SPECIAL_PRICING').select('*');
-        if (data) data.forEach(r => specialData[r.RoomType] = r);
+        const { data: roomPrices } = await supabase.from('ROOM').select('RoomType, BasePrice');
+        if (roomPrices) roomPrices.forEach(r => { if (!priceMap[r.RoomType]) priceMap[r.RoomType] = r.BasePrice; });
     } catch (_) {}
 
     const first = SP_TYPES.find(t => specialData[t]);
     if (first) {
         document.getElementById('sp-from').value = specialData[first].FromDate;
         document.getElementById('sp-to').value = specialData[first].ToDate;
+    } else {
+        const today = new Date();
+        document.getElementById('sp-from').value = today.toISOString().split('T')[0];
+        const nextMonth = new Date(today);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        document.getElementById('sp-to').value = nextMonth.toISOString().split('T')[0];
     }
 
     container.innerHTML = SP_TYPES.map((type, i) => {
         const sp = specialData[type];
         const checked = sp ? 'checked' : '';
-        const price = sp ? sp.Price : SP_DEFAULTS[i];
+        const price = sp ? sp.Price : (priceMap[type] || SP_DEFAULTS[i]);
         return `
         <div class="sp-row${checked ? '' : ' disabled'}" id="sp-row-${i}">
             <input type="checkbox" class="sp-cb" data-type="${type}" data-idx="${i}" ${checked} onchange="toggleSpecialPricing(this)">
@@ -2422,8 +2485,76 @@ async function loadSpecialPricing() {
             <input type="range" class="sp-slider" data-idx="${i}" min="${SP_MINS[i]}" max="${SP_MAXS[i]}" value="${price}" step="1" ${checked ? '' : 'disabled'} oninput="document.getElementById('sp-val-${i}').textContent='€'+this.value">
             <span class="sp-val" id="sp-val-${i}">€${price}</span>
         </div>`;
-    }).join('');
+    }).join('') + renderSpManageTable();
 }
+
+function renderSpManageTable() {
+    if (allSpecialData.length === 0) return '<div style="padding:12px;font-size:12px;color:var(--color-text-secondary)">Δεν υπάρχουν αποθηκευμένες ρυθμίσεις.</div>';
+    return `
+    <div style="margin:12px;padding-top:8px;border-top:1px solid var(--color-border-secondary)">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">Αποθηκευμένες Ρυθμίσεις</div>
+        <table style="width:100%;font-size:12px">
+            <thead><tr style="background:var(--color-background-secondary)">
+                <th style="padding:6px 8px;text-align:left">Τύπος</th>
+                <th style="padding:6px 8px;text-align:left">Από</th>
+                <th style="padding:6px 8px;text-align:left">Έως</th>
+                <th style="padding:6px 8px;text-align:left">Τιμή</th>
+                <th style="padding:6px 8px;text-align:left">Ενέργειες</th>
+            </tr></thead>
+            <tbody>${allSpecialData.map(r => `
+                <tr>
+                    <td style="padding:4px 8px">${r.RoomType}</td>
+                    <td style="padding:4px 8px">${r.FromDate}</td>
+                    <td style="padding:4px 8px">${r.ToDate}</td>
+                    <td style="padding:4px 8px">€${r.Price}</td>
+                    <td style="padding:4px 8px;white-space:nowrap">
+                        <button class="btn btn-sm" onclick="editSpecialPricing(${r.SpecialID})" title="Επεξεργασία"><i class="ti ti-pencil"></i></button>
+                        <button class="btn btn-sm" onclick="deleteSpecialPricing(${r.SpecialID}, '${r.RoomType.replace(/'/g, "\\'")}')" title="Διαγραφή"><i class="ti ti-trash"></i></button>
+                    </td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    </div>`;
+}
+
+window.editSpecialPricing = async function(specialId) {
+    const { data: row } = await supabase.from('SPECIAL_PRICING').select('*').eq('SpecialID', specialId).single();
+    if (!row) return;
+
+    document.getElementById('sp-from').value = row.FromDate;
+    document.getElementById('sp-to').value = row.ToDate;
+
+    document.querySelectorAll('.sp-cb').forEach(cb => {
+        const idx = parseInt(cb.dataset.idx);
+        const type = cb.dataset.type;
+        const checked = type === row.RoomType;
+        cb.checked = checked;
+        const rowEl = document.getElementById(`sp-row-${idx}`);
+        const slider = rowEl.querySelector('.sp-slider');
+        if (checked) {
+            rowEl.classList.remove('disabled');
+            slider.disabled = false;
+            slider.value = row.Price;
+        } else {
+            rowEl.classList.add('disabled');
+            slider.disabled = true;
+        }
+        document.getElementById(`sp-val-${idx}`).textContent = '€' + slider.value;
+    });
+    showToast(`Φορτώθηκε η ρύθμιση για ${row.RoomType}.`, 'info');
+};
+
+window.deleteSpecialPricing = async function(specialId, type) {
+    if (!await window.showConfirm(`Διαγραφή εξειδικευμένης τιμολόγησης για "${type}";`)) return;
+    try {
+        const { error } = await supabase.from('SPECIAL_PRICING').delete().eq('SpecialID', specialId);
+        if (error) throw error;
+        showToast(`Διαγράφηκε η ρύθμιση για "${type}".`, 'success');
+        loadSpecialPricing();
+    } catch (err) {
+        showToast('Αποτυχία διαγραφής: ' + err.message, 'error');
+    }
+};
 
 window.toggleSpecialPricing = function(cb) {
     const idx = cb.dataset.idx;
