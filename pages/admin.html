@@ -160,8 +160,16 @@
     </div>
 
     <div class="card" style="margin-top: 1.5rem;">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-home-cog" aria-hidden="true"></i>Εξειδικευμένη Τιμολόγηση (Ανά Δωμάτιο)</div></div>
-      <div style="padding: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-home-cog" aria-hidden="true"></i>Εξειδικευμένη Τιμολόγηση (Ανά Δωμάτιο)</div>
+        <button class="btn btn-dark btn-sm" onclick="updateSpecificRooms()"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 16px 0;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:500">Περίοδος:</span>
+        <input type="date" id="sr-from" style="padding:5px 8px;border:1px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-main);font-size:12px">
+        <span style="color:var(--color-text-secondary)">—</span>
+        <input type="date" id="sr-to" style="padding:5px 8px;border:1px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-main);font-size:12px">
+      </div>
+      <div style="padding: 0.75rem 1rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
         <div class="form-group">
           <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 5px;">Αριθμοί Δωματίων (π.χ. 101, 105)</label>
           <input type="text" id="specific-room-ids" placeholder="π.χ. 101, 105, 210" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-body); color: var(--text-main);">
@@ -170,8 +178,8 @@
           <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 5px;">Νέα Τιμή (€)</label>
           <input type="number" id="specific-price" placeholder="150" style="padding: 8px; width: 100px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-body); color: var(--text-main);">
         </div>
-        <button class="btn btn-dark" onclick="updateSpecificRooms()">Εφαρμογή</button>
       </div>
+      <div id="specific-room-rows" style="padding:0 0 12px"></div>
     </div>
 
     <div class="card" style="margin-top:1.5rem">
