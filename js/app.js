@@ -135,7 +135,19 @@ async function fetchAndRenderRooms() {
     const checkin = document.getElementById('s-in').value;
     const checkout = document.getElementById('s-out').value;
     const typeFilter = document.getElementById('s-type').value;
+    const pax = document.getElementById('s-pax').value;
+    const roomsRequested = parseInt(document.getElementById('s-rooms').value) || 1;
     const list = document.getElementById('rooms-list');
+
+    if (pax === 'group') {
+        list.innerHTML = `
+            <div style="text-align:center;padding:2rem;color:#856404;background-color:#fff3cd;border:1px solid #ffeeba;border-radius:8px;width:100%;margin-bottom:20px;">
+                <i class="ti ti-phone" style="font-size:2rem;display:block;margin-bottom:10px;"></i>
+                <strong>Κράτηση για Γκρουπ</strong><br>
+                Για κρατήσεις γκρουπ παρακαλούμε επικοινωνήστε μαζί μας τηλεφωνικά στο +30 2510 123456.
+            </div>`;
+        return;
+    }
 
     if (!checkin || !checkout || checkin >= checkout) {
         list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-secondary);width:100%;">Επιλέξτε έγκυρες ημερομηνίες.</div>';
@@ -202,7 +214,7 @@ async function fetchAndRenderRooms() {
 
             const effectiveCount = (availableCounts[type] || 0) - (typeBookedCount[type] || 0);
 
-            if (!roomsOfType || effectiveCount <= 0) {
+            if (!roomsOfType || effectiveCount < roomsRequested) {
                 html += `
                 <div class="room-card sold-out">
                     <div class="room-img">
@@ -216,7 +228,7 @@ async function fetchAndRenderRooms() {
                             ${info.features.map(f => `<div class="feat"><i class="ti ti-${f.icon}" aria-hidden="true"></i> ${f.label}</div>`).join('')}
                         </div>
                         <div class="room-footer">
-                            <div class="room-price" style="color:#9CA3AF;">Πλήρως κλεισμένο</div>
+                            <div class="room-price" style="color:#9CA3AF;">Δεν επαρκούν τα δωμάτια</div>
                             <button class="btn-book" disabled>Μη διαθέσιμο</button>
                         </div>
                     </div>
@@ -227,6 +239,8 @@ async function fetchAndRenderRooms() {
             const cheapest = roomsOfType.reduce((a, b) => a.BasePrice < b.BasePrice ? a : b);
             const breakdown = calcPriceBreakdown(cheapest.BasePrice, checkin, checkout);
             const totalNights = breakdown.groups.reduce((s, g) => s + g.count, 0);
+
+            const finalTotal = breakdown.total * roomsRequested;
 
             const groupsHtml = breakdown.groups.map(g =>
                 `<div style="font-size:13px;color:var(--color-text-secondary);margin:3px 0;display:flex;justify-content:space-between"><span>${g.count} νύχτες</span><span><strong>€${g.pricePerNight}</strong> <span style="display:inline-block;background:var(--color-background-secondary);padding:1px 8px;border-radius:4px;font-size:11px;margin-left:4px">${g.label}</span></span></div>`
@@ -249,11 +263,11 @@ async function fetchAndRenderRooms() {
                         ${hasMixed ? `<div style="background:#FFF3CD;border-radius:6px;padding:8px 10px;margin:10px 0;font-size:12px;color:#856404;display:flex;align-items:center;gap:6px"><i class="ti ti-info-circle"></i> Οι τιμές διαφέρουν ανάλογα με την εποχή του χρόνου</div>` : ''}
                         <div style="margin:10px 0;padding:10px;background:var(--color-background-secondary);border-radius:8px">
                             ${groupsHtml}
-                            <div style="border-top:1px solid var(--color-border-secondary);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:14px;font-weight:600"><span>Σύνολο</span><span style="color:#A8892A">€${breakdown.total.toLocaleString('el-GR')}</span></div>
+                            <div style="border-top:1px solid var(--color-border-secondary);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:14px;font-weight:600"><span>Σύνολο (ανά δωμάτιο)</span><span style="color:#A8892A">€${breakdown.total.toLocaleString('el-GR')}</span></div>
                         </div>
                         <div class="room-footer">
-                            <div class="room-price"><strong>€${breakdown.total.toLocaleString('el-GR')}</strong> συνολικά (${totalNights} νύχτες)</div>
-                            <button class="btn-book" onclick="bookRoomPage('${type}', ${breakdown.total}, '${checkin}', '${checkout}')">Κράτηση</button>
+                            <div class="room-price"><strong>€${finalTotal.toLocaleString('el-GR')}</strong> συνολικά (${roomsRequested} δωμάτια)</div>
+                            <button class="btn-book" onclick="bookRoomPage('${type}', ${finalTotal}, '${checkin}', '${checkout}')">Κράτηση</button>
                         </div>
                     </div>
                 </div>
@@ -274,11 +288,15 @@ async function fetchAndRenderRooms() {
 }
 
 window.bookRoomPage = function(roomType, totalCost, checkin, checkout) {
+    const roomsRequested = document.getElementById('s-rooms').value;
+    const pax = document.getElementById('s-pax').value;
     const queryParams = new URLSearchParams({
         room: roomType,
         totalCost: totalCost,
         checkin: checkin,
-        checkout: checkout
+        checkout: checkout,
+        rooms: roomsRequested,
+        pax: pax
     }).toString();
     window.location.href = `../pages/booking.html?${queryParams}`;
 };
@@ -293,11 +311,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const si = document.getElementById('s-in');
     const so = document.getElementById('s-out');
+    const sp = document.getElementById('s-pax');
+    const sr = document.getElementById('s-rooms');
+
     if (si) si.value = fmt(tomorrow);
     if (so) so.value = fmt(plus4);
 
     document.querySelector('.btn-search')?.addEventListener('click', () => fetchAndRenderRooms());
-    [si, so].forEach(el => el?.addEventListener('change', () => fetchAndRenderRooms()));
+    [si, so, sp, sr].forEach(el => el?.addEventListener('change', () => fetchAndRenderRooms()));
 
     fetchAndRenderRooms();
 });

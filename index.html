@@ -12,7 +12,7 @@
 <body>
   <h2 class="sr-only">Grand Kavala Hotel — Ιστοσελίδα κρατήσεων πελατών</h2>
   <div class="site">
-    <nav>
+  <nav>
       <div class="logo">Grand Kavala<span>Hotel & Suites</span></div>
       <div class="nav-links">
         <a href="#rooms">Δωμάτια</a>
@@ -20,7 +20,7 @@
         <a href="#location">Τοποθεσία</a>
         <a href="#contact">Επικοινωνία</a>
       </div>
-      <button class="nav-cta" onclick="window.open('../pages/login.html', 'Πύλη Προσωπικού')">Portal</button>
+      <button class="nav-cta" onclick="window.location.href='../pages/login.html'">Portal</button>
     </nav>
 
     <div class="hero">
@@ -55,10 +55,19 @@
             <option value="2" selected>2 άτομα</option>
             <option value="3">3 άτομα</option>
             <option value="4">4 άτομα</option>
+            <option value="group">Γκρουπ</option>
+          </select>
+        </div>
+        <div class="sb-field" id="rooms-field"><label>Δωμάτια</label>
+          <select id="s-rooms">
+            <option value="1" selected>1 δωμάτιο</option>
+            <option value="2">2 δωμάτια</option>
+            <option value="3">3 δωμάτια</option>
+            <option value="4">4+ δωμάτια</option>
           </select>
         </div>
       </div>
-      <button class="btn-search" onclick="searchRoomsPage()"><i class="ti ti-search" aria-hidden="true"></i> Εύρεση Δωματίων</button>
+      <button class="btn-search"><i class="ti ti-search" aria-hidden="true"></i> Εύρεση Δωματίων</button>
     </div>
 
     <div id="rooms" class="section-title">Διαθέσιμα Δωμάτια</div>

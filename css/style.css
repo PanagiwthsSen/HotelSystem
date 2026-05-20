@@ -54,7 +54,14 @@ nav { display: flex; align-items: center; justify-content: space-between; paddin
 
 .search-bar { margin: 16px 20px; padding: 16px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-lg); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
 .sb-title { font-size: 13px; font-weight: 500; margin-bottom: 12px; color: var(--color-text-primary); }
-.sb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+
+/* Νέες κλάσεις για το Group Notice */
+.group-notice { margin-top: 16px; padding: 20px; background: #FAF3DC; border: 1px solid #A8892A; border-radius: var(--border-radius-md); text-align: center; color: var(--color-text-primary); }
+.group-notice h3 { font-family: 'Cormorant Garamond', serif; font-size: 20px; color: #A8892A; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.group-notice p { font-size: 13px; margin-bottom: 12px; line-height: 1.5; color: var(--color-text-secondary); }
+.group-notice .contact-details p { font-size: 15px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 4px; }
+.group-notice .contact-details i { color: #A8892A; margin-right: 4px; }
 .sb-field { display: flex; flex-direction: column; gap: 3px; }
 .sb-field label { font-size: 11px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.8px; }
 .sb-field input, .sb-field select { padding: 8px 10px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); font-size: 13px; font-family: 'DM Sans', sans-serif; background: var(--color-background-primary); color: var(--color-text-primary); width: 100%; }
@@ -102,3 +109,6 @@ nav { display: flex; align-items: center; justify-content: space-between; paddin
 .room-card.sold-out .btn-book[disabled] { background: #D1D5DB; color: #9CA3AF; cursor: not-allowed; }
 .room-card.sold-out .btn-book[disabled]:hover { background: #D1D5DB; }
 .room-card.sold-out .room-tag { background: #9CA3AF; color: #fff; }
+#rooms-field { 
+  grid-column: 1 / -1; 
+}
