@@ -384,7 +384,8 @@ async function loadConsumptionItems() {
                 <span class="item-price">€${price.toFixed(2)}</span>
                 <input type="number" class="qty" min="0" value="0"
                     data-item-id="${item.ItemID}" data-price="${price}"
-                    oninput="refreshTotal()" onclick="this.select()">
+                    oninput="refreshTotal()" onclick="this.select()"
+                    ${item.Quantity <= 0 ? 'disabled' : ''}>
             </div>
         `;
     }).join('');
@@ -434,7 +435,7 @@ async function submitConsumption() {
     for (const item of items) {
         const { error: insertErr } = await supabase
             .from('MINIBAR_CONSUMPTION')
-            .insert([{ ReservationID: resId, ItemID: item.itemId, Quantity: item.qty, Charge: item.charge }]);
+            .insert({ ReservationID: resId, ItemID: item.itemId, Quantity: item.qty, Charge: item.charge });
 
         if (insertErr) {
             showToast(`Σφάλμα καταχώρησης: ${insertErr.message}`, 'error');
@@ -454,14 +455,21 @@ async function submitConsumption() {
                 .update({ Quantity: newQty })
                 .eq('ItemID', item.itemId);
 
-            // Auto-notify when stock drops to/below threshold
-            if (newQty <= invItem.data.MinThreshold) {
-                supabase.from('NOTIFICATION').insert([{
+            // Auto-notify when stock exhausted or below threshold
+            if (newQty === 0) {
+                supabase.from('NOTIFICATION').insert({
+                    TargetRole: 'both',
+                    Type: 'out_of_stock',
+                    Message: `Το ${item.name} έχει ΕΞΑΝΤΛΗΘΕΙ πλήρως`,
+                    ItemID: item.itemId
+                }).then();
+            } else if (newQty <= invItem.data.MinThreshold) {
+                supabase.from('NOTIFICATION').insert({
                     TargetRole: 'both',
                     Type: 'restock',
                     Message: `Το ${item.name} έχει πέσει κάτω από το ελάχιστο όριο (${newQty}/${invItem.data.MinThreshold})`,
                     ItemID: item.itemId
-                }]).then();
+                }).then();
             }
         }
 
@@ -500,12 +508,12 @@ async function requestRestock(btn) {
         const item = inventoryItems[itemName];
         if (item) {
             try {
-                await window.supabase.from('NOTIFICATION').insert([{
+                await window.supabase.from('NOTIFICATION').insert({
                     TargetRole: 'both',
                     Type: 'restock',
                     Message: `Αίτημα ανεφοδιασμού: ${itemName}`,
                     ItemID: item.ItemID
-                }]);
+                });
             } catch (err) {
                 showToast('Σφάλμα αποστολής ειδοποίησης.', 'error');
             }

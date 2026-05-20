@@ -107,6 +107,7 @@ tr:last-child td{border-bottom:none}
 .consumption-row .item-price{font-size:12px;color:#1D9E75;font-weight:600;min-width:45px;text-align:right}
 .consumption-row input.qty{width:70px;text-align:center;padding:6px 8px;border:1px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:14px;font-family:inherit;background:var(--color-background-primary);color:var(--color-text-primary)}
 .consumption-row input.qty:focus{outline:none;box-shadow:0 0 0 2px rgba(55,138,221,0.3);border-color:#378ADD}
+.consumption-row input.qty:disabled{background:#eee;cursor:not-allowed;opacity:.5}
 
 /* TOASTS (Popup) */
 .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
