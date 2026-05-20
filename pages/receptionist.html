@@ -39,6 +39,7 @@
       <div class="sb-group">Διαχείριση Κρατήσεων</div>
       <div class="sb-item" data-v="new-booking"><i class="ti ti-calendar-plus" aria-hidden="true"></i>Νέα Κράτηση</div>
       <div class="sb-item" data-v="room-search"><i class="ti ti-search" aria-hidden="true"></i>Αναζήτηση Δωματίων</div>
+      <div class="sb-item" data-v="bookings"><i class="ti ti-calendar-stats" aria-hidden="true"></i>Όλες οι Κρατήσεις</div>
       <div class="sb-item" data-v="arrivals"><i class="ti ti-door-enter" aria-hidden="true"></i>Αφίξεις (Check-in)</div>
       <div class="sb-item" data-v="departures"><i class="ti ti-door-exit" aria-hidden="true"></i>Αναχωρήσεις (Check-out)</div>
       
@@ -159,6 +160,13 @@
                 <option value="walkin">Walk-in (Άμεση Πληρωμή)</option>
               </select>
             </div>
+            <div class="fg"><label>Τρόπος Πληρωμής</label>
+              <select id="nb-payment">
+                <option value="cash" selected>Μετρητά (Cash)</option>
+                <option value="card">Κάρτα (Card)</option>
+                <option value="bank_transfer">Τραπεζικό Έμβασμα</option>
+              </select>
+            </div>
           </div>
 
           <div class="prepay-box" id="prepay-box"><i class="ti ti-info-circle" aria-hidden="true"></i> Προκαταβολή — <strong id="prepay-amt">--</strong></div>
@@ -206,6 +214,42 @@
               </tr>
             </thead>
             <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="view" id="v-bookings">
+        <div class="card">
+          <div class="card-hd">
+            <div class="card-hd-l"><i class="ti ti-calendar-stats" aria-hidden="true"></i>Όλες οι Κρατήσεις</div>
+            <div style="display:flex;gap:8px;">
+              <select id="bk-status-filter" class="search-input" style="max-width:160px;" onchange="filterBookings()">
+                <option value="all">Όλες οι καταστάσεις</option>
+                <option value="Confirmed">Επιβεβαιωμένες</option>
+                <option value="CheckedIn">Check-in</option>
+                <option value="CheckedOut">Check-out</option>
+                <option value="Cancelled">Ακυρωμένες</option>
+              </select>
+              <input type="text" id="bk-search" class="search-input" placeholder="Αναζήτηση πελάτη ή δωματίου" oninput="filterBookings()">
+              <button class="btn btn-sm" onclick="fetchAllReservations()"><i class="ti ti-refresh"></i> Ανανέωση</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;" id="bk-count"></div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:5%">ID</th>
+                <th style="width:18%">Πελάτης</th>
+                <th style="width:10%">Τύπος</th>
+                <th style="width:12%">Check-in</th>
+                <th style="width:12%">Check-out</th>
+                <th style="width:8%">Δωμ.</th>
+                <th style="width:10%">Σύνολο</th>
+                <th style="width:13%">Κατάσταση</th>
+                <th style="width:12%">Ενέργεια</th>
+              </tr>
+            </thead>
+            <tbody id="bk-body"></tbody>
           </table>
         </div>
       </div>
@@ -316,6 +360,13 @@
             <option value="prepaid">Προπληρωμένη (50% Προπληρωμή)</option>
             <option value="group">Γκρουπ (Ειδική Προκαταβολή)</option>
             <option value="walkin">Walk-in (Άμεση Πληρωμή)</option>
+          </select>
+        </div>
+        <div class="fg"><label>Τρόπος Πληρωμής</label>
+          <select id="rs-modal-payment">
+            <option value="cash" selected>Μετρητά (Cash)</option>
+            <option value="card">Κάρτα (Card)</option>
+            <option value="bank_transfer">Τραπεζικό Έμβασμα</option>
           </select>
         </div>
         <div class="fg" style="grid-column:span 2;">

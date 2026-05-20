@@ -29,6 +29,7 @@ const viewTitles = {
     dash: 'Επισκόπηση', rooms: 'Κατάσταση Δωματίων', 'new-booking': 'Νέα Κράτηση',
     'room-search': 'Αναζήτηση Δωματίων',
     arrivals: 'Αφίξεις (Check-in)', departures: 'Αναχωρήσεις (Check-out)', 
+    bookings: 'Όλες οι Κρατήσεις',
     minibar: 'Χρεώσεις Mini-bar', policies: 'Πολιτική Ξενοδοχείου'
 };
 
@@ -37,6 +38,7 @@ function navTo(id) {
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'v-' + id));
     document.getElementById('tb-title').textContent = viewTitles[id] || id;
     if (id === 'new-booking') fetchAvailableRooms();
+    if (id === 'bookings') fetchAllReservations();
 }
 
 document.querySelectorAll('.sb-item').forEach(el => {
@@ -428,6 +430,7 @@ async function submitBooking() {
     const checkIn = document.getElementById('nb-in')?.value;
     const checkOut = document.getElementById('nb-out')?.value;
     const bookingType = document.getElementById('nb-btype')?.value;
+    const paymentMethod = document.getElementById('nb-payment')?.value;
     const totalCostText = document.getElementById('sp-total').textContent;
     const totalCost = parseFloat(totalCostText.replace('€', ''));
 
@@ -473,6 +476,9 @@ async function submitBooking() {
         const resId = result?.ReservationID;
         if (resId && roomType) {
             await window.supabase.from('RESERVATION').update({ RoomType: roomType }).eq('ReservationID', resId);
+        }
+        if (resId && paymentMethod) {
+            await window.supabase.from('RESERVATION').update({ PaymentMethod: paymentMethod }).eq('ReservationID', resId);
         }
 
         showToast(`Η κράτηση καταχωρήθηκε! Εκχωρήθηκε το δωμάτιο ${selectedRoom}.`, 'success');
@@ -939,6 +945,7 @@ window.confirmRsBooking = async function () {
     const phone = document.getElementById('rs-modal-phone').value.trim();
     const email = document.getElementById('rs-modal-email').value.trim();
     const bookingType = document.getElementById('rs-modal-btype').value;
+    const paymentMethod = document.getElementById('rs-modal-payment').value;
 
     if (!firstName || !lastName || !phone || !email) {
         showToast('Παρακαλώ συμπληρώστε Όνομα, Επώνυμο, Τηλέφωνο και Email.', 'error');
@@ -990,6 +997,9 @@ window.confirmRsBooking = async function () {
         if (resId && rsState.roomType) {
             await window.supabase.from('RESERVATION').update({ RoomType: rsState.roomType }).eq('ReservationID', resId);
         }
+        if (resId && paymentMethod) {
+            await window.supabase.from('RESERVATION').update({ PaymentMethod: paymentMethod }).eq('ReservationID', resId);
+        }
 
         showToast('Η κράτηση ολοκληρώθηκε! Δωμάτιο ' + rsState.selectedRoom + ' ανατέθηκε.', 'success');
         closeRsModal();
@@ -1033,6 +1043,154 @@ function filterDepartures() {
 }
 
 /* ==============================================================
+   ALL BOOKINGS VIEW (v-bookings)
+   ============================================================== */
+let allReservations = [];
+
+async function fetchAllReservations() {
+    try {
+        const { data, error } = await window.supabase
+            .from('RESERVATION')
+            .select(`ReservationID, CheckInDate, CheckOutDate, TotalCost, Status, RoomType, CUSTOMER ( CustomerID, FirstName, LastName, Phone, Email, IsGroup )`);
+
+        if (error) throw error;
+
+        const ids = (data || []).map(r => r.ReservationID);
+        const roomMap = {};
+        if (ids.length > 0) {
+            const { data: rrData, error: rrErr } = await window.supabase
+                .from('RESERVATION_ROOM')
+                .select('ReservationID, RoomNumber')
+                .in('ReservationID', ids);
+            if (!rrErr && rrData) {
+                rrData.forEach(r => { roomMap[r.ReservationID] = r.RoomNumber; });
+            }
+        }
+
+        data.forEach(r => { r._roomNumber = roomMap[r.ReservationID] || '—'; });
+        allReservations = data;
+        renderAllBookings(data);
+    } catch (err) {
+        console.error('fetchAllReservations error:', err.message);
+        showToast('Σφάλμα φόρτωσης κρατήσεων: ' + err.message, 'error');
+    }
+}
+
+function renderAllBookings(reservations) {
+    const tbody = document.getElementById('bk-body');
+    const countEl = document.getElementById('bk-count');
+    if (!tbody) return;
+
+    if (!reservations || reservations.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--color-text-secondary);padding:24px;">Δεν βρέθηκαν κρατήσεις.</td></tr>';
+        if (countEl) countEl.textContent = '0 κρατήσεις';
+        return;
+    }
+
+    if (countEl) countEl.textContent = reservations.length + ' κρατήσεις';
+
+    const statusLabels = {
+        'Confirmed': { label: 'Επιβεβαιωμένη', cls: 'p-g' },
+        'CheckedIn': { label: 'Check-in', cls: 'p-b' },
+        'CheckedOut': { label: 'Check-out', cls: 'p-r' },
+        'Cancelled': { label: 'Ακυρωμένη', cls: 'p-a' }
+    };
+
+    tbody.innerHTML = reservations.map(r => {
+        const c = r.CUSTOMER || {};
+        const name = [c.FirstName, c.LastName].filter(Boolean).join(' ') || 'Άγνωστος';
+        const type = c.IsGroup ? 'Γκρουπ' : 'Ιδιώτης';
+        const st = statusLabels[r.Status] || { label: r.Status, cls: 'p-a' };
+        const safeName = name.replace(/'/g, "\\'");
+        const canCancel = r.Status === 'Confirmed';
+        const canCheckin = r.Status === 'Confirmed';
+        const isPast = new Date(r.CheckInDate) < new Date(new Date().toISOString().split('T')[0]);
+
+        return `<tr>
+            <td style="font-size:11px;color:var(--color-text-secondary)">${r.ReservationID}</td>
+            <td><strong>${name}</strong></td>
+            <td>${type}</td>
+            <td>${r.CheckInDate}</td>
+            <td>${r.CheckOutDate}</td>
+            <td>${r._roomNumber}</td>
+            <td>€${Number(r.TotalCost).toFixed(2)}</td>
+            <td><span class="pill ${st.cls}">${st.label}</span></td>
+            <td style="display:flex;gap:4px;flex-wrap:wrap;">
+                <button class="btn btn-sm" onclick="viewReservation(${r.ReservationID})" title="Λεπτομέρειες"><i class="ti ti-eye"></i></button>
+                ${canCheckin ? `<button class="btn btn-sm btn-dark" onclick="navTo('arrivals')" title="Check-in"><i class="ti ti-door-enter"></i></button>` : ''}
+                ${canCancel ? `<button class="btn btn-sm" style="color:#E24B4A;" onclick="cancelReservation(${r.ReservationID})" title="Ακύρωση"><i class="ti ti-x"></i></button>` : ''}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+window.filterBookings = function () {
+    const q = normalizeGreek(document.getElementById('bk-search')?.value || '');
+    const statusFilter = document.getElementById('bk-status-filter')?.value || 'all';
+
+    let filtered = allReservations;
+
+    if (statusFilter !== 'all') {
+        filtered = filtered.filter(r => r.Status === statusFilter);
+    }
+
+    if (q) {
+        filtered = filtered.filter(r => {
+            const c = r.CUSTOMER || {};
+            const name = normalizeGreek([c.FirstName, c.LastName].filter(Boolean).join(' '));
+            const room = normalizeGreek(String(r._roomNumber || ''));
+            return name.includes(q) || room.includes(q);
+        });
+    }
+
+    renderAllBookings(filtered);
+};
+
+window.cancelReservation = async function (reservationId) {
+    if (!await window.showConfirm('Είστε σίγουροι ότι θέλετε να ακυρώσετε αυτή την κράτηση;')) return;
+    try {
+        const { error } = await window.supabase
+            .from('RESERVATION')
+            .update({ Status: 'Cancelled' })
+            .eq('ReservationID', reservationId);
+
+        if (error) throw error;
+
+        showToast('Η κράτηση ακυρώθηκε επιτυχώς.', 'success');
+        fetchAllReservations();
+        fetchTodayReservations();
+    } catch (err) {
+        showToast('Σφάλμα ακύρωσης: ' + err.message, 'error');
+    }
+};
+
+window.viewReservation = function (reservationId) {
+    const r = allReservations.find(x => x.ReservationID === reservationId);
+    if (!r) return;
+    const c = r.CUSTOMER || {};
+    const name = [c.FirstName, c.LastName].filter(Boolean).join(' ') || 'Άγνωστος';
+    const statusLabels = {
+        'Confirmed': 'Επιβεβαιωμένη', 'CheckedIn': 'Check-in',
+        'CheckedOut': 'Check-out', 'Cancelled': 'Ακυρωμένη'
+    };
+    const paymentLabels = { cash: 'Μετρητά', card: 'Κάρτα', bank_transfer: 'Τραπεζικό Έμβασμα' };
+    alert(
+        `Λεπτομέρειες Κράτησης #${r.ReservationID}\n` +
+        `───────────────\n` +
+        `Πελάτης: ${name}\n` +
+        `Τηλέφωνο: ${c.Phone || '—'}\n` +
+        `Email: ${c.Email || '—'}\n` +
+        `Τύπος: ${c.IsGroup ? 'Γκρουπ' : 'Ιδιώτης'}\n` +
+        `Check-in: ${r.CheckInDate}\n` +
+        `Check-out: ${r.CheckOutDate}\n` +
+        `Δωμάτιο: ${r._roomNumber}\n` +
+        `Σύνολο: €${Number(r.TotalCost).toFixed(2)}\n` +
+        `Τρόπος Πληρωμής: ${paymentLabels[r.PaymentMethod] || r.PaymentMethod || '—'}\n` +
+        `Κατάσταση: ${statusLabels[r.Status] || r.Status}`
+    );
+};
+
+/* ==============================================================
    INITIALIZATION
    ============================================================== */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1044,6 +1202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     fetchRoomsAndRender();
     fetchTodayReservations();
+    fetchAllReservations();
 
     // Set default dates: today & today + 3 days
     const today = new Date();

@@ -1,4 +1,8 @@
 /* ΒΑΣΙΚΕΣ ΜΕΤΑΒΛΗΤΕΣ */
+/* BOOKINGS TABLE */
+#v-bookings table { table-layout: auto; }
+#v-bookings td:last-child { white-space: nowrap; }
+
 :root {
   --color-background-primary: #ffffff;
   --color-background-secondary: #f4f6f9;
