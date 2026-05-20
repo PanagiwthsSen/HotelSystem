@@ -17,6 +17,39 @@ function showToast(message, type = 'success') {
         setTimeout(() => toast.remove(), 300);
     }, 3500);
 }
+async function requestGeneralRestock() {
+    const supabase = window.supabase;
+    const { data: allItems } = await supabase
+        .from('INVENTORY_ITEM')
+        .select('*');
+
+    const items = (allItems || []).filter(
+        item => item.Quantity === 0 || item.Quantity <= item.MinThreshold
+    );
+
+    if (!items || items.length === 0) {
+        showToast('Όλα τα προϊόντα έχουν επαρκές απόθεμα.', 'info');
+        return;
+    }
+
+    let count = 0;
+    for (const item of items) {
+        const type = item.Quantity === 0 ? 'out_of_stock' : 'restock';
+        const msg = item.Quantity === 0
+            ? `Το ${item.Name} έχει ΕΞΑΝΤΛΗΘΕΙ πλήρως`
+            : `Το ${item.Name} έχει πέσει κάτω από το ελάχιστο όριο (${item.Quantity}/${item.MinThreshold})`;
+
+        await supabase.from('NOTIFICATION').insert({
+            TargetRole: 'both',
+            Type: type,
+            Message: msg,
+            ItemID: item.ItemID
+        });
+        count++;
+    }
+
+    showToast(`Στάλθηκαν ${count} ειδοποιήσεις ανεφοδιασμού`, 'success');
+}
 function triggerAction(msg, type) { showToast(msg, type); }
 
 /* ==============================================================
