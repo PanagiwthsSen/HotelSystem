@@ -109,7 +109,7 @@ const ROOM_TYPE_INFO = {
     }
 };
 
-function calcPriceBreakdown(basePrice, checkin, checkout, roomType, specialPricing) {
+function calcPriceBreakdown(basePrice, checkin, checkout, roomType, specialPricing, lowMultiplier) {
     const start = new Date(checkin + 'T12:00:00');
     const end = new Date(checkout + 'T12:00:00');
     const groups = {};
@@ -137,6 +137,10 @@ function calcPriceBreakdown(basePrice, checkin, checkout, roomType, specialPrici
         if (label !== 'Ειδική Τιμή') {
             const mult = getMultiplier(d);
             price = Math.round(basePrice * mult);
+        }
+        if (lowMultiplier && lowMultiplier < 1) {
+            price = Math.round(price * lowMultiplier);
+            label = `${label} (Χ. Πληρ. -15%)`;
         }
 
         if (!groups[label]) {
@@ -201,6 +205,21 @@ async function fetchAndRenderRooms() {
             }
         } catch (_) { /* table may not exist */ }
 
+        let lowMultiplier = 1.0;
+        try {
+            const { count: occCount, error: occErr } = await supabase
+                .from('ROOM')
+                .select('*', { count: 'exact', head: true })
+                .eq('Status', 'occ');
+            const { count: totalCount, error: totalErr } = await supabase
+                .from('ROOM')
+                .select('*', { count: 'exact', head: true });
+            if (!occErr && !totalErr && totalCount > 0) {
+                const occPct = (occCount / totalCount) * 100;
+                if (occPct < 60) lowMultiplier = 0.85;
+            }
+        } catch (_) { /* non-critical */ }
+
         const bookedRooms = new Set();
         const typeBookedCount = {};
         (reservations || []).forEach(r => {
@@ -218,6 +237,11 @@ async function fetchAndRenderRooms() {
         available.forEach(r => {
             availableCounts[r.RoomType] = (availableCounts[r.RoomType] || 0) + 1;
         });
+
+        let lowBannerHtml = '';
+        if (lowMultiplier < 1) {
+            lowBannerHtml = '<div style="background:#FFF3CD;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#856404;display:flex;align-items:center;gap:8px"><i class="ti ti-alert-triangle" style="font-size:1.2rem"></i><div><strong>Έκπτωση Χαμηλής Πληρότητας:</strong> Ισχύει αυτόματη έκπτωση 15% σε όλες τις τιμές λόγω χαμηλής πληρότητας (&lt;60%).</div></div>';
+        }
 
         if (available.length === 0) {
             list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-secondary);width:100%;">Δεν βρέθηκαν διαθέσιμα δωμάτια για τις επιλεγμένες ημερομηνίες.</div>';
@@ -267,7 +291,7 @@ async function fetchAndRenderRooms() {
             }
 
             const cheapest = roomsOfType.reduce((a, b) => a.BasePrice < b.BasePrice ? a : b);
-            const breakdown = calcPriceBreakdown(cheapest.BasePrice, checkin, checkout, type, specialPricing);
+            const breakdown = calcPriceBreakdown(cheapest.BasePrice, checkin, checkout, type, specialPricing, lowMultiplier);
             const totalNights = breakdown.groups.reduce((s, g) => s + g.count, 0);
 
             const finalTotal = breakdown.total * roomsRequested;
@@ -309,7 +333,7 @@ async function fetchAndRenderRooms() {
             return;
         }
 
-        list.innerHTML = html;
+        list.innerHTML = lowBannerHtml + html;
 
     } catch (err) {
         console.error(err);
