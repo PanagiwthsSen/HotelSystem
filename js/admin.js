@@ -107,7 +107,8 @@ const viewTitles = {
     dash: 'Πίνακας Ελέγχου', revenue: 'Έσοδα & Αναφορές', pricing: 'Δυναμική Τιμολόγηση',
     rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Εστιατόριο & Αποθήκες',
     vehicles: 'Οχήματα & Μεταφορές', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
-    payroll: 'Μισθοδοσία', users: 'Χρήστες & Ρόλοι', backup: 'Backup & Ασφάλεια'
+    payroll: 'Μισθοδοσία', users: 'Χρήστες & Ρόλοι', backup: 'Backup & Ασφάλεια',
+    'notif-history': 'Ιστορικό Ειδοποιήσεων'
 };
 
 function navTo(id) {
@@ -1361,10 +1362,9 @@ async function fetchVehicles() {
                 let restockHtml = restockNotifs.map(n => {
                     const itemName = n.INVENTORY_ITEM?.Name || 'άγνωστο';
                     return `
-                    <div class="ns ns-w" id="restock-notif-${n.NotificationID}" style="display:flex;align-items:center;gap:12px">
+                    <div class="ns ns-w" id="restock-notif-${n.NotificationID}" onclick="dismissRestockNotif(${n.NotificationID}, this)">
                         <i class="ti ti-package" aria-hidden="true"></i>
                         <div style="flex:1">${n.Message}</div>
-                        <button class="btn btn-sm" onclick="dismissRestockNotif(${n.NotificationID})" style="flex-shrink:0">✓</button>
                     </div>`;
                 }).join('');
 
@@ -1407,8 +1407,23 @@ function updateNotifBadge(count) {
     }
 }
 
+function saveNotifHistory(type, id, message, cls) {
+    const key = `notif_history_${type}_${id}`;
+    try {
+        localStorage.setItem(key, JSON.stringify({ message, cls, dismissedAt: Date.now() }));
+    } catch (_) {}
+}
+
+function removeNotifHistory(type, id) {
+    try { localStorage.removeItem(`notif_history_${type}_${id}`); } catch (_) {}
+}
+
 window.dismissServiceNotif = function(vehicleId, el) {
     localStorage.setItem(`dismissed_svc_${vehicleId}`, Date.now().toString());
+    const msgEl = el.querySelector('div');
+    const msg = msgEl ? msgEl.textContent.trim() : 'Ειδοποίηση service';
+    const cls = el.classList.contains('ns-e') ? 'ns-e' : 'ns-w';
+    saveNotifHistory('svc', vehicleId, msg, cls);
     el.style.opacity = '0';
     setTimeout(() => {
         el.remove();
@@ -1418,15 +1433,18 @@ window.dismissServiceNotif = function(vehicleId, el) {
     }, 300);
 };
 
-window.dismissRestockNotif = async function(notifId) {
+window.dismissRestockNotif = async function(notifId, el) {
     try {
         await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', notifId);
     } catch (_) {}
-    const el = document.getElementById(`restock-notif-${notifId}`);
-    if (el) {
-        el.style.opacity = '0';
+    const target = el || document.getElementById(`restock-notif-${notifId}`);
+    if (target) {
+        const msgEl = target.querySelector('div');
+        const msg = msgEl ? msgEl.textContent.trim() : 'Ειδοποίηση ανεφοδιασμού';
+        saveNotifHistory('restock', notifId, msg, 'ns-w');
+        target.style.opacity = '0';
         setTimeout(() => {
-            el.remove();
+            target.remove();
             const container = document.getElementById('admin-notifications');
             const remaining = container ? container.children.length : 0;
             updateNotifBadge(remaining);
@@ -1435,11 +1453,118 @@ window.dismissRestockNotif = async function(notifId) {
 };
 
 /* ==============================================================
+   ΙΣΤΟΡΙΚΟ ΕΙΔΟΠΟΙΗΣΕΩΝ
+   ============================================================== */
+window.loadNotifHistory = async function() {
+    const container = document.getElementById('notif-history-body');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση ιστορικού...</div>';
+
+    let sections = [];
+
+    // 1. Service notifications from localStorage
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key || !key.startsWith('notif_history_svc_')) continue;
+            const id = key.replace('notif_history_svc_', '');
+            try {
+                const entry = JSON.parse(localStorage.getItem(key));
+                sections.push({
+                    type: 'Υπηρεσία οχήματος',
+                    icon: 'ti ti-car',
+                    cls: entry.cls || 'ns-w',
+                    message: entry.message,
+                    dismissedAt: entry.dismissedAt,
+                    undo: `undoServiceNotif('${id}')`
+                });
+            } catch (_) {}
+        }
+    } catch (_) {}
+
+    // 2. Restock notifications from DB (IsRead = true)
+    try {
+        const { data: readNotifs } = await supabase
+            .from('NOTIFICATION')
+            .select('NotificationID, Message, Type, CreatedAt, INVENTORY_ITEM (Name)')
+            .in('TargetRole', ['both', 'admin'])
+            .eq('IsRead', true)
+            .order('CreatedAt', { ascending: false })
+            .limit(100);
+
+        if (readNotifs && readNotifs.length > 0) {
+            readNotifs.forEach(n => {
+                sections.push({
+                    type: 'Ανεφοδιασμός',
+                    icon: 'ti ti-package',
+                    cls: 'ns-w',
+                    message: n.Message,
+                    dismissedAt: n.CreatedAt ? new Date(n.CreatedAt).getTime() : null,
+                    undo: `undoRestockNotif(${n.NotificationID})`
+                });
+            });
+        }
+    } catch (_) {}
+
+    if (sections.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--text-muted);"><i class="ti ti-history" style="font-size:2rem;display:block;margin-bottom:10px;"></i>Δεν υπάρχει ιστορικό ειδοποιήσεων.</div>';
+        return;
+    }
+
+    sections.sort((a, b) => (b.dismissedAt || 0) - (a.dismissedAt || 0));
+
+    let html = `<div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary);">Σύνολο: ${sections.length} ειδοποιήσεις</div>`;
+    sections.forEach(s => {
+        const dateStr = s.dismissedAt ? new Date(s.dismissedAt).toLocaleString('el-GR') : '—';
+        html += `
+            <div class="ns ${s.cls}" style="cursor:default">
+                <i class="${s.icon}" aria-hidden="true"></i>
+                <div style="flex:1">
+                    <div style="font-weight:600;font-size:11px;color:var(--text-secondary);margin-bottom:2px;">${s.type} · ${dateStr}</div>
+                    <div>${s.message}</div>
+                </div>
+                <button class="btn btn-sm" onclick="${s.undo}" style="flex-shrink:0" title="Επαναφορά">↩</button>
+            </div>`;
+    });
+
+    container.innerHTML = html;
+};
+
+window.undoServiceNotif = function(vehicleId) {
+    localStorage.removeItem(`dismissed_svc_${vehicleId}`);
+    removeNotifHistory('svc', vehicleId);
+    showToast('Η ειδοποίηση service επαναφέρθηκε.', 'info');
+    loadNotifHistory();
+    const dashItem = document.querySelector('.sb-item[data-v="dash"]');
+    if (dashItem) dashItem.click();
+};
+
+window.undoRestockNotif = async function(notifId) {
+    try {
+        await supabase.from('NOTIFICATION').update({ IsRead: false }).eq('NotificationID', notifId);
+        removeNotifHistory('restock', notifId);
+        showToast('Η ειδοποίηση ανεφοδιασμού επαναφέρθηκε.', 'info');
+        loadNotifHistory();
+        fetchVehicles();
+        const dashItem = document.querySelector('.sb-item[data-v="dash"]');
+        if (dashItem) dashItem.click();
+    } catch (err) {
+        showToast('Αποτυχία επαναφοράς.', 'error');
+    }
+};
+
+/* ==============================================================
    ΔΡΟΜΟΛΟΓΙΑ — MODAL ΠΡΟΒΟΛΗΣ
    ============================================================== */
+function tripStatusPill(status) {
+    const map = { 'Confirmed': 'p-b', 'CheckedIn': 'p-g', 'CheckedOut': 'p-gr', 'Cancelled': 'p-r' };
+    const cls = map[status] || 'p-a';
+    return `<span class="pill ${cls}">${status}</span>`;
+}
+
 window.openTripModal = async function(vehicleId, plateNumber) {
     document.getElementById('trip-modal-title').textContent = `Δρομολόγια — ${plateNumber}`;
-    document.getElementById('trip-modal-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση δρομολογίων...</td></tr>';
+    document.getElementById('trip-modal-body').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση δρομολογίων...</td></tr>';
     document.getElementById('trip-modal').style.display = 'flex';
 
     try {
@@ -1448,7 +1573,8 @@ window.openTripModal = async function(vehicleId, plateNumber) {
             .select(`
                 TripID, Date, Destination, Cost, EndKm,
                 EMPLOYEE (FirstName, LastName),
-                CUSTOMER (FirstName, LastName)
+                CUSTOMER (FirstName, LastName),
+                RESERVATION (CheckInDate, CheckOutDate, RoomType, Status)
             `)
             .eq('VehicleID', vehicleId)
             .order('Date', { ascending: false });
@@ -1458,7 +1584,7 @@ window.openTripModal = async function(vehicleId, plateNumber) {
         const tbody = document.getElementById('trip-modal-body');
 
         if (!data || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν δρομολόγια για αυτό το όχημα.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν δρομολόγια για αυτό το όχημα.</td></tr>';
             return;
         }
 
@@ -1468,7 +1594,12 @@ window.openTripModal = async function(vehicleId, plateNumber) {
             const customer = t.CUSTOMER || {};
             const customerName = `${customer.FirstName || ''} ${customer.LastName || ''}`.trim() || '—';
             const dateStr = new Date(t.Date).toLocaleDateString('el-GR');
-            const cost = t.Cost ? `€${Number(t.Cost).toLocaleString('el-GR')}` : '—';
+
+            const res = t.RESERVATION || {};
+            const checkIn = res.CheckInDate ? new Date(res.CheckInDate).toLocaleDateString('el-GR') : '—';
+            const checkOut = res.CheckOutDate ? new Date(res.CheckOutDate).toLocaleDateString('el-GR') : '—';
+            const roomType = res.RoomType || '—';
+            const resStatus = res.Status ? tripStatusPill(res.Status) : '<span class="pill p-gr">—</span>';
             const endKm = t.EndKm != null ? `${Number(t.EndKm).toLocaleString()} km` : '<span class="pill p-y">Εκκρεμεί</span>';
 
             return `
@@ -1477,15 +1608,16 @@ window.openTripModal = async function(vehicleId, plateNumber) {
                     <td><strong>${t.Destination}</strong></td>
                     <td>${driverName}</td>
                     <td>${customerName}</td>
-                    <td><strong>${cost}</strong></td>
-                    <td>${endKm}</td>
+                    <td>${checkIn} → ${checkOut}</td>
+                    <td>${roomType}</td>
+                    <td style="white-space:nowrap">${resStatus} ${endKm}</td>
                 </tr>
             `;
         }).join('');
 
     } catch (err) {
         console.error("Σφάλμα φόρτωσης δρομολογίων:", err.message);
-        document.getElementById('trip-modal-body').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Σφάλμα φόρτωσης δεδομένων</td></tr>';
+        document.getElementById('trip-modal-body').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem;">Σφάλμα φόρτωσης δεδομένων</td></tr>';
     }
 };
 
@@ -2584,6 +2716,7 @@ appReady.then(ok => {
   document.querySelectorAll('.sb-item').forEach(el => {
     el.addEventListener('click', () => {
       if (el.dataset.v === 'revenue') setTimeout(buildRevChart, 50);
+      if (el.dataset.v === 'notif-history') setTimeout(loadNotifHistory, 50);
     });
   });
   const logoutBtn = document.getElementById('logout-btn');
