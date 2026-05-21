@@ -117,6 +117,7 @@ function setRoomSelect(roomNum) {
 
 let consumptionCount = 0;
 const checkedToday = new Set();
+let todayChargesTotal = 0;
 
 /* ==============================================================
    SUPABASE — CACHED DATA
@@ -137,39 +138,36 @@ async function loadDashboard() {
     const supabase = window.supabase;
     const today = new Date().toISOString().split('T')[0];
 
-    const [res1, res2, res3, res4] = await Promise.all([
+    const [res1, res3, res4] = await Promise.all([
         supabase.from('RESERVATION').select('ReservationID', { count: 'exact', head: true }).eq('Status', 'CheckedIn'),
-        supabase.from('MINIBAR_CONSUMPTION').select('Charge'),
         supabase.from('RESERVATION').select('ReservationID', { count: 'exact', head: true }).eq('Status', 'CheckedIn').eq('CheckOutDate', today),
         supabase.from('INVENTORY_ITEM').select('*')
     ]);
 
     const roomsToCheck = res1.count || 0;
-    const charges = res2.data || [];
-    const todayCharges = charges.reduce((s, c) => s + (c.Charge || 0), 0);
     const urgentDepartures = res3.count || 0;
     const allItems = res4.data || [];
     const lowStockCount = allItems.filter(i => i.Quantity < i.MinThreshold).length;
 
     document.getElementById('stat-rooms').textContent = roomsToCheck;
-    document.getElementById('stat-charges').textContent = `€${todayCharges.toFixed(2)}`;
-    document.getElementById('stat-urgent').textContent = urgentDepartures;
+    document.getElementById('stat-charges').textContent = `€${todayChargesTotal.toFixed(2)}`;
     document.getElementById('stat-lowstock').textContent = lowStockCount;
 
-    document.getElementById('urgent-count').textContent = urgentDepartures;
-    document.getElementById('done-count').textContent = consumptionCount;
+    document.getElementById('done-count').textContent = checkedToday.size;
 
     // Urgent notifications
     const notifContainer = document.getElementById('urgent-notifications');
     notifContainer.innerHTML = '';
 
+    let pendingUrgent = [];
     if (urgentDepartures > 0) {
         const { data: urgentRes } = await supabase
             .from('RESERVATION')
             .select('ReservationID, CheckOutDate, RESERVATION_ROOM(RoomNumber), CUSTOMER(FirstName, LastName)')
             .eq('Status', 'CheckedIn')
             .eq('CheckOutDate', today);
-        (urgentRes || []).forEach(res => {
+        pendingUrgent = (urgentRes || []).filter(r => !checkedToday.has(r.ReservationID));
+        pendingUrgent.forEach(res => {
             const roomData = res.RESERVATION_ROOM;
             const roomArr = Array.isArray(roomData) ? roomData : (roomData ? [roomData] : []);
             const room = roomArr.map(r => r.RoomNumber).filter(Boolean).join(', ') || '—';
@@ -190,6 +188,9 @@ async function loadDashboard() {
             notifContainer.appendChild(div);
         });
     }
+
+    document.getElementById('stat-urgent').textContent = pendingUrgent.length;
+    document.getElementById('urgent-count').textContent = pendingUrgent.length;
 
     // Priority list
     const priorityBody = document.getElementById('priority-list');
@@ -350,7 +351,6 @@ async function loadHistory() {
     });
 
     consumptionCount = records.length;
-    document.getElementById('done-count').textContent = consumptionCount;
 }
 
 /* ==============================================================
@@ -531,6 +531,7 @@ async function submitConsumption() {
     if (successCount > 0) {
         showToast(`Επιτυχία! Το ${room} ενημερώθηκε (${successCount} προϊόντα).`, 'success');
         checkedToday.add(resId);
+        todayChargesTotal += items.reduce((s, i) => s + i.charge, 0);
         setRoomSelect('');
         await loadItemMap();
         await loadConsumptionItems();
