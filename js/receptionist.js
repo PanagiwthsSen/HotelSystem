@@ -798,23 +798,354 @@ async function confirmCheckin() {
 }
 
 async function doCheckout(btn, name, reservationId, roomNumber) {
-    if (!await window.showConfirm(`Επιβεβαίωση check-out για ${name};`)) return;
     try {
-        // 1. Ενημέρωση κράτησης σε CheckedOut
+        // 1. Fetch full reservation with customer data
+        const { data: res, error: resErr } = await window.supabase
+            .from('RESERVATION')
+            .select('*, CUSTOMER ( FirstName, LastName, Phone, Email )')
+            .eq('ReservationID', reservationId)
+            .single();
+
+        if (resErr) throw resErr;
+        if (!res) throw new Error('Η κράτηση δεν βρέθηκε');
+
+        // 2. Fetch minibar consumption for this reservation
+        const { data: mbData, error: mbErr } = await window.supabase
+            .from('MINIBAR_CONSUMPTION')
+            .select('*, INVENTORY_ITEM ( Name )')
+            .eq('ReservationID', reservationId);
+
+        if (mbErr) throw mbErr;
+
+        // 3. Calculate totals
+        const roomCost = parseFloat(res.TotalCost) || 0;
+        const mbItems = mbData || [];
+        const minibarTotal = mbItems.reduce((s, r) => s + (parseFloat(r.Charge) || 0), 0);
+        const total = roomCost + minibarTotal;
+        const nights = Math.max(1, Math.round((new Date(res.CheckOutDate) - new Date(res.CheckInDate)) / 86400000));
+
+        // 4. Build receipt data
+        const receiptData = {
+            customerName: name,
+            reservationId,
+            roomNumber,
+            checkIn: res.CheckInDate,
+            checkOut: res.CheckOutDate,
+            nights,
+            roomCost,
+            minibarItems: mbItems,
+            minibarTotal,
+            total,
+            paymentMethod: res.PaymentMethod || 'cash',
+        };
+
+        // 5. Show rich receipt confirmation modal
+        const confirmed = await showReceiptModal(receiptData);
+        if (!confirmed) return;
+
+        // 6. Update reservation to CheckedOut
         await window.supabase.from('RESERVATION').update({ Status: 'CheckedOut' }).eq('ReservationID', reservationId);
-        
-        // 2. Αν υπάρχει δωμάτιο, το κάνουμε "dirty" (Υπό καθαρισμό)
+
+        // 7. Mark room as dirty
         if (roomNumber && roomNumber !== '-') {
             await window.supabase.from('ROOM').update({ Status: 'dirty' }).eq('RoomNumber', roomNumber);
         }
 
+        // 8. Generate and download receipt PDF (fire-and-forget with error toast)
+        generateReceiptPDF(receiptData).catch(e => console.error('Receipt PDF error:', e));
+
         showToast(`Επιτυχές Check-out! Το δωμάτιο ${roomNumber} στάλθηκε για καθάρισμα.`, 'success');
-        
         fetchTodayReservations();
         fetchRoomsAndRender();
 
     } catch (err) {
         showToast("Σφάλμα Check-out: " + err.message, "error");
+    }
+}
+
+/* ==============================================================
+   RECEIPT MODAL & PDF GENERATION
+   ============================================================== */
+
+function showReceiptModal(data) {
+    return new Promise((resolve) => {
+        const existing = document.querySelector('.receipt-overlay');
+        if (existing) existing.remove();
+
+        let mbRows = '';
+        if (data.minibarItems && data.minibarItems.length > 0) {
+            data.minibarItems.forEach(item => {
+                const name = item.INVENTORY_ITEM?.Name || 'Είδος';
+                mbRows += `<tr>
+                    <td>${name}</td>
+                    <td class="amount">${item.Quantity || 0}</td>
+                    <td class="amount">€${(item.Charge || 0).toFixed(2)}</td>
+                </tr>`;
+            });
+        } else {
+            mbRows = '<tr><td colspan="3" style="text-align:center;color:#9CA3AF;padding:10px 0;">Δεν υπάρχουν χρεώσεις mini-bar</td></tr>';
+        }
+
+        const paymentLabels = { cash: 'Μετρητά (Cash)', card: 'Κάρτα (Card)', bank_transfer: 'Τραπεζικό Έμβασμα' };
+        const paymentMethod = paymentLabels[data.paymentMethod] || data.paymentMethod || '—';
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay receipt-overlay';
+        overlay.innerHTML = `
+            <div class="pw-modal receipt-modal">
+                <div class="pw-head">
+                    <i class="ti ti-receipt"></i>
+                    <span>Απόδειξη Εξόδου — ${data.customerName}</span>
+                    <span class="pw-close" id="receipt-close">&times;</span>
+                </div>
+                <div class="receipt-body">
+                    <div class="receipt-paper">
+                        <div class="receipt-header">
+                            <h2>GRAND KAVALA</h2>
+                            <div class="sub">Luxury Hotel &amp; Resort</div>
+                            <div class="receipt-num">Απόδειξη #RCP-${data.reservationId}</div>
+                        </div>
+                        <div class="receipt-info">
+                            <div><span class="label">Πελάτης:</span> <span class="value">${data.customerName}</span></div>
+                            <div><span class="label">Δωμάτιο:</span> <span class="value">${data.roomNumber || '—'}</span></div>
+                            <div><span class="label">Άφιξη:</span> <span class="value">${data.checkIn || '—'}</span></div>
+                            <div><span class="label">Αναχώρηση:</span> <span class="value">${data.checkOut || '—'}</span></div>
+                            <div><span class="label">Διανυκτερεύσεις:</span> <span class="value">${data.nights}</span></div>
+                            <div><span class="label">Πληρωμή:</span> <span class="value">${paymentMethod}</span></div>
+                        </div>
+                        <table class="receipt-table">
+                            <thead>
+                                <tr><th style="width:55%">Περιγραφή</th><th style="width:15%" class="amount">Ποσ.</th><th style="width:30%" class="amount">Ποσό</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Διαμονή (${data.nights} διαν.)</td>
+                                    <td class="amount">${data.nights}</td>
+                                    <td class="amount">€${(data.roomCost || 0).toFixed(2)}</td>
+                                </tr>
+                                ${mbRows}
+                            </tbody>
+                            <tfoot>
+                                <tr class="total-row">
+                                    <td colspan="2">Σύνολο</td>
+                                    <td class="total-amount">€${(data.total || 0).toFixed(2)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <div class="receipt-footer">
+                            Ευχαριστούμε για την προτίμησή σας! — Grand Kavala Luxury Hotel &amp; Resort
+                        </div>
+                    </div>
+                </div>
+                <div class="pw-foot">
+                    <button class="btn" id="receipt-cancel">Ακύρωση</button>
+                    <button class="btn btn-dark" id="receipt-confirm"><i class="ti ti-file-download"></i> Επιβεβαίωση &amp; PDF</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const close = () => { overlay.remove(); resolve(false); };
+        const confirmAction = () => { overlay.remove(); resolve(true); };
+
+        overlay.querySelector('#receipt-cancel').addEventListener('click', close);
+        overlay.querySelector('#receipt-close').addEventListener('click', close);
+        overlay.querySelector('#receipt-confirm').addEventListener('click', confirmAction);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        overlay.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') close();
+            if (e.key === 'Enter') confirmAction();
+        });
+        overlay.querySelector('#receipt-confirm').focus();
+    });
+}
+
+async function generateReceiptPDF(data) {
+    const paymentLabels = { cash: 'Μετρητά (Cash)', card: 'Κάρτα (Card)', bank_transfer: 'Τραπεζικό Έμβασμα' };
+    const paymentMethod = paymentLabels[data.paymentMethod] || data.paymentMethod || '—';
+
+    let mbRows = '';
+    if (data.minibarItems && data.minibarItems.length > 0) {
+        data.minibarItems.forEach(item => {
+            const name = item.INVENTORY_ITEM?.Name || 'Είδος';
+            const charge = item.Charge || 0;
+            mbRows += `<tr>
+                <td style="padding:5px 4px;border-bottom:1px solid #F3F4F6;">${name}</td>
+                <td style="padding:5px 4px;border-bottom:1px solid #F3F4F6;text-align:center;">${item.Quantity || 0}</td>
+                <td style="padding:5px 4px;border-bottom:1px solid #F3F4F6;text-align:right;">€${charge.toFixed(2)}</td>
+            </tr>`;
+        });
+    }
+
+    const user = (() => { try { return JSON.parse(localStorage.getItem('hotel_user') || '{}'); } catch { return {}; } })();
+    const userName = user.name || 'Χρήστης';
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('el-GR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const filename = `GrandKavala_Receipt_${data.reservationId}`;
+
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+        <div style="width:190mm;padding:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;background:#FFFFFF;">
+
+            <!-- HEADER BAND -->
+            <div style="background:linear-gradient(135deg,#1A2B4C 0%,#0F1D33 100%);padding:28px 30px 22px 30px;text-align:center;">
+                <div style="color:#A8892A;font-size:10px;letter-spacing:3px;text-transform:uppercase;">Grand Kavala Luxury Hotel &amp; Resort</div>
+                <div style="color:#FFFFFF;font-size:24px;font-weight:300;margin-top:6px;letter-spacing:.5px;">ΑΠΟΔΕΙΞΗ ΕΞΟΔΟΥ</div>
+                <div style="color:rgba(255,255,255,.55);font-size:11px;margin-top:3px;">Check-out Receipt</div>
+            </div>
+
+            <div style="padding:24px 30px 10px 30px;">
+
+                <!-- META -->
+                <div style="display:flex;flex-wrap:wrap;gap:16px 28px;padding:0 0 18px 0;margin-bottom:22px;border-bottom:1px solid #E5E7EB;font-size:10px;color:#6B7280;">
+                    <span><strong style="color:#374151;">Απόδειξη #:</strong> RCP-${data.reservationId}</span>
+                    <span><strong style="color:#374151;">Ημερομηνία:</strong> ${dateStr}</span>
+                    <span><strong style="color:#374151;">Υπάλληλος:</strong> ${userName}</span>
+                </div>
+
+                <!-- CUSTOMER INFO -->
+                <div style="margin-bottom:20px;">
+                    <div style="font-size:11px;font-weight:600;color:#1A2B4C;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Στοιχεία Πελάτη</div>
+                    <table style="width:100%;font-size:11px;border-collapse:collapse;">
+                        <tr>
+                            <td style="padding:3px 8px 3px 0;color:#6B7280;width:100px;">Ονοματεπώνυμο</td>
+                            <td style="padding:3px 0;font-weight:500;">${data.customerName}</td>
+                            <td style="padding:3px 8px 3px 0;color:#6B7280;width:80px;">Δωμάτιο</td>
+                            <td style="padding:3px 0;font-weight:500;">${data.roomNumber || '—'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:3px 8px 3px 0;color:#6B7280;">Άφιξη</td>
+                            <td style="padding:3px 0;font-weight:500;">${data.checkIn || '—'}</td>
+                            <td style="padding:3px 8px 3px 0;color:#6B7280;">Αναχώρηση</td>
+                            <td style="padding:3px 0;font-weight:500;">${data.checkOut || '—'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:3px 8px 3px 0;color:#6B7280;">Διανυκτερεύσεις</td>
+                            <td style="padding:3px 0;font-weight:500;">${data.nights}</td>
+                            <td style="padding:3px 8px 3px 0;color:#6B7280;">Πληρωμή</td>
+                            <td style="padding:3px 0;font-weight:500;">${paymentMethod}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- CHARGES TABLE -->
+                <div style="margin-bottom:16px;">
+                    <div style="font-size:11px;font-weight:600;color:#1A2B4C;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Αναλυτική Χρέωση</div>
+                    <table style="width:100%;font-size:11px;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#F9FAFB;">
+                                <th style="padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#6B7280;font-weight:500;">Περιγραφή</th>
+                                <th style="padding:7px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#6B7280;font-weight:500;width:60px;">Ποσ.</th>
+                                <th style="padding:7px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#6B7280;font-weight:500;width:90px;">Ποσό</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6;">Διαμονή — ${data.nights} διανυκτερεύσεις</td>
+                                <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6;text-align:center;">${data.nights}</td>
+                                <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6;text-align:right;">€${(data.roomCost || 0).toFixed(2)}</td>
+                            </tr>
+                            ${mbRows || '<tr><td style="padding:6px 8px;border-bottom:1px solid #F3F4F6;color:#9CA3AF;" colspan="3">Δεν υπάρχουν χρεώσεις mini-bar</td></tr>'}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td style="padding:8px 8px 4px;font-weight:600;font-size:13px;border-top:2px solid #1A2B4C;" colspan="2">Σύνολο</td>
+                                <td style="padding:8px 8px 4px;text-align:right;font-weight:700;font-size:16px;color:#1A2B4C;border-top:2px solid #1A2B4C;">€${(data.total || 0).toFixed(2)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+            </div>
+
+            <!-- FOOTER -->
+            <div style="padding:14px 30px;background:#F9FAFB;border-top:1px solid #E5E7EB;text-align:center;font-size:9px;color:#9CA3AF;line-height:1.7;">
+                Grand Kavala Luxury Hotel &amp; Resort — Απόδειξη #RCP-${data.reservationId} — ${dateStr}
+                <br>Ευχαριστούμε για την προτίμησή σας!
+                <br>Έγγραφο δημιουργήθηκε από ${userName} — Εμπιστευτικό
+            </div>
+        </div>
+    `;
+
+    try {
+        showToast('Η απόδειξη PDF δημιουργείται...', 'success');
+
+        if (typeof html2pdf === 'undefined') {
+            throw new Error('Η βιβλιοθήκη html2pdf δεν είναι φορτωμένη');
+        }
+
+        const opt = {
+            margin: 10,
+            filename: `${filename}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        await html2pdf().set(opt).from(wrap).save();
+
+        showToast(`Η απόδειξη #RCP-${data.reservationId} αποθηκεύτηκε ως ${filename}.pdf`, 'success');
+
+    } catch (err) {
+        console.error('PDF generation error:', err);
+        showToast('Σφάλμα κατά τη δημιουργία PDF: ' + err.message + '. Γίνεται λήψη εναλλακτικής μορφής...', 'error');
+
+        // Fallback: create a plain text receipt and save as .txt
+        try {
+            const lines = [
+                '========================================',
+                '  GRAND KAVALA LUXURY HOTEL & RESORT',
+                '  ΑΠΟΔΕΙΞΗ ΕΞΟΔΟΥ / CHECK-OUT RECEIPT',
+                '========================================',
+                '',
+                `Απόδειξη #: RCP-${data.reservationId}`,
+                `Ημερομηνία: ${dateStr}`,
+                `Υπάλληλος: ${userName}`,
+                '',
+                '--- ΣΤΟΙΧΕΙΑ ΠΕΛΑΤΗ ---',
+                `Ονοματεπώνυμο: ${data.customerName}`,
+                `Δωμάτιο: ${data.roomNumber || '—'}`,
+                `Άφιξη: ${data.checkIn || '—'}`,
+                `Αναχώρηση: ${data.checkOut || '—'}`,
+                `Διανυκτερεύσεις: ${data.nights}`,
+                `Πληρωμή: ${paymentMethod}`,
+                '',
+                '--- ΧΡΕΩΣΕΙΣ ---',
+                `Διαμονή (${data.nights} διαν.): €${(data.roomCost || 0).toFixed(2)}`,
+            ];
+            if (data.minibarItems && data.minibarItems.length > 0) {
+                data.minibarItems.forEach(item => {
+                    const name = item.INVENTORY_ITEM?.Name || 'Είδος';
+                    lines.push(`Mini-bar - ${name}: €${(item.Charge || 0).toFixed(2)}`);
+                });
+            }
+            lines.push(
+                '',
+                `ΣΥΝΟΛΟ: €${(data.total || 0).toFixed(2)}`,
+                '',
+                '========================================',
+                'Ευχαριστούμε για την προτίμησή σας!',
+                'Grand Kavala Luxury Hotel & Resort',
+                '========================================'
+            );
+
+            const blob = new Blob(["\ufeff" + lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${filename}.txt`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            showToast(`Η απόδειξη αποθηκεύτηκε ως ${filename}.txt (εναλλακτική μορφή)`, 'success');
+        } catch (fallbackErr) {
+            console.error('Fallback download error:', fallbackErr);
+            showToast('Αδυναμία λήψης της απόδειξης. Δοκιμάστε ξανά.', 'error');
+        }
     }
 }
 

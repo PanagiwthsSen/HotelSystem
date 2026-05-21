@@ -12,6 +12,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="../js/export.js" defer></script>
+    <script src="../js/scheduler.js" defer></script>
 </head>
 <body>
 
@@ -123,7 +124,7 @@
             <input type="date" id="rev-end-date" class="btn btn-sm" style="background:var(--bg-body); border:1px solid var(--border-color);">
           </div>
           <button class="btn btn-sm btn-dark" onclick="exportRevenueToCSV()">
-            <i class="ti ti-download" aria-hidden="true"></i> Εξαγωγή CSV
+            <i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Εξαγωγή Excel
           </button>
         </div>
       </div>
@@ -209,6 +210,7 @@
           <button class="btn btn-sm active-filter" data-filter="all" onclick="filterRooms('all',this)">Όλα</button>
           <button class="btn btn-sm" data-filter="free" onclick="filterRooms('free',this)">Έτοιμο για νέο πελάτη</button>
           <button class="btn btn-sm" data-filter="dirty" onclick="filterRooms('dirty',this)">Άδειο (χωρίς καθαριότητα)</button>
+          <button class="btn btn-sm" data-filter="soon" onclick="filterRooms('soon',this)">Προσεχώς άδειο</button>
           <button class="btn btn-sm" data-filter="occ" onclick="filterRooms('occ',this)">Κατειλημμένο</button>
         </div>
       </div>
@@ -292,7 +294,7 @@
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-car" aria-hidden="true"></i> Στόλος Οχημάτων</div><button class="btn btn-dark btn-sm" onclick="openVehicleModal()">+ Προσθήκη</button></div>
       <table id="vehicles-table">
-        <thead><tr><th style="width:25%">Όχημα / Μοντέλο</th><th style="width:15%">Πινακίδα</th><th style="width:18%">Κατάσταση</th><th style="width:22%">Επόμενο Service</th><th style="width:20%">Ενέργειες</th></tr></thead>
+        <thead><tr><th style="width:20%">Όχημα / Μοντέλο</th><th style="width:12%">Πινακίδα</th><th style="width:13%">Χιλιόμετρα</th><th style="width:15%">Κατάσταση</th><th style="width:20%">Επόμενο Service</th><th style="width:20%">Ενέργειες</th></tr></thead>
         <tbody id="vehicles-body"></tbody>
       </table>
     </div>
@@ -360,17 +362,49 @@
     <div class="modal-body" style="padding:4px 14px">
       <table style="width:100%">
         <thead><tr>
-          <th style="width:15%">Ημερομηνία</th>
-          <th style="width:25%">Προορισμός</th>
-          <th style="width:20%">Οδηγός</th>
-          <th style="width:20%">Πελάτης</th>
-          <th style="width:20%">Κόστος</th>
+          <th style="width:12%">Ημερομηνία</th>
+          <th style="width:22%">Προορισμός</th>
+          <th style="width:18%">Οδηγός</th>
+          <th style="width:18%">Πελάτης</th>
+          <th style="width:15%">Κόστος</th>
+          <th style="width:15%">Τελ. Χλμ</th>
         </tr></thead>
         <tbody id="trip-modal-body"></tbody>
       </table>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeTripModal()">Κλείσιμο</button>
+    </div>
+  </div>
+</div>
+
+<div id="logkm-modal" class="modal-overlay" style="display:none" onclick="closeLogKmModal(event)">
+  <div class="modal-content" style="max-width:480px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title" id="logkm-modal-title">Καταχώρηση Χιλιομέτρων</span>
+      <span class="modal-close" onclick="closeLogKmModal()">&times;</span>
+    </div>
+    <div class="modal-body" style="padding:10px 14px">
+      <div class="mform-group">
+        <label>Όχημα</label>
+        <div id="logkm-vehicle-name" style="font-weight:600;font-size:14px;padding:6px 0;">—</div>
+      </div>
+      <div class="mform-group">
+        <label>Τρέχοντα χιλιόμετρα οχήματος</label>
+        <div id="logkm-current" style="font-size:14px;padding:6px 0;">—</div>
+      </div>
+      <div class="mform-group">
+        <label>Τελευταίο δρομολόγιο</label>
+        <div id="logkm-last-trip" style="font-size:12px;padding:6px 0;color:var(--text-secondary);">—</div>
+      </div>
+      <div class="mform-group">
+        <label>Νέες ενδείξεις χιλιομέτρων *</label>
+        <input type="number" id="logkm-input" min="0" step="1" placeholder="π.χ. 45230">
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" onclick="closeLogKmModal()">Ακύρωση</button>
+      <button class="btn btn-dark" id="logkm-save">Καταχώρηση</button>
     </div>
   </div>
 </div>
