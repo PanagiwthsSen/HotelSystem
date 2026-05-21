@@ -450,6 +450,97 @@ const prepayMap = {
     walkin: { txt: 'Walk-in (100% κατά την άφιξη)', pct: 100 }
 };
 
+/* ==============================================================
+   CARD VALIDATION
+   ============================================================== */
+
+function validateCardNumber(num) {
+    const digits = num.replace(/\s/g, '');
+    if (!/^\d{16}$/.test(digits)) return false;
+    let sum = 0;
+    for (let i = 0; i < digits.length; i++) {
+        let d = parseInt(digits[i], 10);
+        if (i % 2 === 0) { d *= 2; if (d > 9) d -= 9; }
+        sum += d;
+    }
+    return sum % 10 === 0;
+}
+
+function validateExpiry(exp) {
+    if (!/^\d{2}\/\d{2}$/.test(exp)) return false;
+    const [mm, yy] = exp.split('/').map(Number);
+    if (mm < 1 || mm > 12) return false;
+    const now = new Date();
+    const expDate = new Date(2000 + yy, mm);
+    return expDate > now;
+}
+
+function validateCVV(cvv) {
+    return /^\d{3,4}$/.test(cvv);
+}
+
+function validateCardholderName(name) {
+    return name && name.trim().length >= 2 && /^[A-Za-zΑ-Ωα-ωάέήίόύώϊϋΐΰΆΈΉΊΌΎΏ\s'-]+$/.test(name.trim());
+}
+
+function clearCardErrors(form) {
+    const ids = ['card-name', 'card-number', 'card-exp', 'card-cvv'];
+    ids.forEach(f => {
+        const el = document.getElementById(form + '-' + f);
+        if (el) el.classList.remove('card-input-error');
+    });
+    document.querySelectorAll('#' + form + '-card-section .card-error-msg').forEach(el => el.remove());
+}
+
+function validateAllCardFields(form) {
+    clearCardErrors(form);
+    const errors = [];
+
+    const name = document.getElementById(form + '-card-name')?.value || '';
+    if (!validateCardholderName(name)) {
+        errors.push('Παρακαλώ συμπληρώστε το όνομα κατόχου κάρτας.');
+        const el = document.getElementById(form + '-card-name');
+        if (el) { el.classList.add('card-input-error'); el.focus(); }
+        return { valid: false, errors };
+    }
+
+    const cardNum = document.getElementById(form + '-card-number')?.value || '';
+    if (!validateCardNumber(cardNum)) {
+        errors.push('Ο αριθμός κάρτας δεν είναι έγκυρος.');
+        const el = document.getElementById(form + '-card-number');
+        if (el) { el.classList.add('card-input-error'); el.focus(); }
+        return { valid: false, errors };
+    }
+
+    const exp = document.getElementById(form + '-card-exp')?.value || '';
+    if (!validateExpiry(exp)) {
+        errors.push('Η ημερομηνία λήξης δεν είναι έγκυρη ή έχει λήξει.');
+        const el = document.getElementById(form + '-card-exp');
+        if (el) { el.classList.add('card-input-error'); el.focus(); }
+        return { valid: false, errors };
+    }
+
+    const cvv = document.getElementById(form + '-card-cvv')?.value || '';
+    if (!validateCVV(cvv)) {
+        errors.push('Το CVV δεν είναι έγκυρο (3-4 ψηφία).');
+        const el = document.getElementById(form + '-card-cvv');
+        if (el) { el.classList.add('card-input-error'); el.focus(); }
+        return { valid: false, errors };
+    }
+
+    return { valid: true, errors: [] };
+}
+
+function toggleCardSection(form) {
+    const btype = document.getElementById(form + '-btype')?.value;
+    const payment = document.getElementById(form + '-payment')?.value;
+    const section = document.getElementById(form + '-card-section');
+    if (!section) return;
+    const show = btype === 'phone' && payment === 'card';
+    section.style.display = show ? 'block' : 'none';
+    if (!show) clearCardErrors(form);
+}
+
 function calcNights() {
     const i = document.getElementById('nb-in')?.value;
     const o = document.getElementById('nb-out')?.value;
@@ -623,6 +714,14 @@ async function submitBooking() {
     if (roomNumbers.length === 0) {
         showToast('Δεν βρέθηκαν διαθέσιμα δωμάτια.', 'error');
         return;
+    }
+
+    if (bookingType === 'phone' && paymentMethod === 'card') {
+        const cardResult = validateAllCardFields('nb');
+        if (!cardResult.valid) {
+            showToast(cardResult.errors[0], 'error');
+            return;
+        }
     }
 
     try {
@@ -1594,6 +1693,14 @@ window.confirmRsBooking = async function () {
         sameType.slice(0, roomsNeeded - 1).forEach(n => roomNumbers.push(n));
     }
 
+    if (bookingType === 'phone' && paymentMethod === 'card') {
+        const cardResult = validateAllCardFields('rs-modal');
+        if (!cardResult.valid) {
+            showToast(cardResult.errors[0], 'error');
+            return;
+        }
+    }
+
     if (!await window.showConfirm(`Επιβεβαίωση κράτησης για ${totalGuests} άτομα — ${roomNumbers.join(', ')};`)) return;
 
     try {
@@ -2387,4 +2494,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (rsIn) rsIn.value = fmt(today);
     if (rsOut) rsOut.value = fmt(plus3);
     if (document.getElementById('nb-rtype')) updatePrice();
+
+    // Card section toggles
+    document.getElementById('nb-btype')?.addEventListener('change', () => toggleCardSection('nb'));
+    document.getElementById('nb-payment')?.addEventListener('change', () => toggleCardSection('nb'));
+    document.getElementById('rs-modal-btype')?.addEventListener('change', () => toggleCardSection('rs-modal'));
+    document.getElementById('rs-modal-payment')?.addEventListener('change', () => toggleCardSection('rs-modal'));
+
+    // Card number auto-format
+    ['nb-card-number', 'rs-modal-card-number'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', function () {
+            this.value = this.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim().slice(0, 19);
+        });
+    });
+
+    // Expiry auto-format (MM/YY)
+    ['nb-card-exp', 'rs-modal-card-exp'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', function () {
+            const v = this.value.replace(/\D/g, '').slice(0, 4);
+            this.value = v.length > 2 ? v.slice(0, 2) + '/' + v.slice(2) : v;
+        });
+    });
+
+    // CVV numeric only
+    ['nb-card-cvv', 'rs-modal-card-cvv'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', function () {
+            this.value = this.value.replace(/\D/g, '').slice(0, 4);
+        });
+    });
 });
