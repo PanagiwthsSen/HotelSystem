@@ -521,22 +521,47 @@ async function fetchRestockNotifs() {
   const supabase = window.supabase;
   if (!supabase) return;
 
-  const { data } = await supabase
+  const user = JSON.parse(localStorage.getItem('hotel_user'));
+  const role = user ? user.Role : '';
+
+  let query = supabase
     .from('NOTIFICATION')
     .select('*')
-    .in('TargetRole', ['manager', 'both'])
     .eq('IsRead', false)
     .order('CreatedAt', { ascending: false });
+
+  if (role === 'external_manager') {
+    query = query.eq('TargetRole', 'external_manager');
+  } else {
+    query = query.in('TargetRole', ['manager', 'both', 'internal_manager']);
+  }
+
+  const { data } = await query;
 
   let html = '';
   (data || []).forEach(n => {
     const time = n.CreatedAt
       ? new Date(n.CreatedAt).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })
       : '';
-    const isFault = n.Type === 'vehicle_fault';
-    const icon = isFault ? 'ti ti-alert-triangle' : 'ti ti-package';
-    const label = isFault ? 'Αναφορά Βλάβης:' : 'Αίτημα Ανεφοδιασμού:';
-    const cls = isFault ? 'ns ns-e' : 'ns ns-w';
+
+    let icon = 'ti ti-package';
+    let label = 'Αίτημα Ανεφοδιασμού:';
+    let cls = 'ns ns-w';
+
+    if (n.Type === 'vehicle_fault') {
+      icon = 'ti ti-alert-triangle';
+      label = 'Αναφορά Βλάβης:';
+      cls = 'ns ns-e';
+    } else if (n.Type === 'fault') {
+      icon = 'ti ti-tool';
+      label = 'Βλάβη Κήπου:';
+      cls = 'ns ns-e';
+    } else if (n.Type === 'supply_request') {
+      icon = 'ti ti-seeding';
+      label = 'Αίτημα Προμηθειών Κήπου:';
+      cls = 'ns ns-w';
+    }
+
     html += '<div class="' + cls + '" onclick="dismissNotif(' + n.NotificationID + ', this)" style="cursor:pointer">'
       + '<i class="' + icon + '"></i>'
       + '<div><strong>' + label + '</strong> ' + n.Message + '</div>'
