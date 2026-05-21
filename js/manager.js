@@ -1,4 +1,4 @@
-const vT={overview:'Πίνακας Ελέγχου',fleet:'Στόλος Οχημάτων',schedule:'Πρόγραμμα Οδηγών',payroll:'Κόστη & Πληρωμές Οδηγών',inventory:'Υλικά & Ελλείψεις'};
+const vT={overview:'Πίνακας Ελέγχου',fleet:'Στόλος Οχημάτων',schedule:'Πρόγραμμα Οδηγών','new-trip':'Νέα Μεταφορά','trip-logs':'Αρχείο Μεταφορών',payroll:'Κόστη & Πληρωμές Οδηγών',inventory:'Υλικά & Ελλείψεις'};
 function navTo(id){
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.toggle('active',i.dataset.v===id));
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='v-'+id));
@@ -44,7 +44,10 @@ async function fetchOverview() {
   const supabase = window.supabase;
   if (!supabase) return;
 
-  const today = new Date().toISOString().split('T')[0];
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date();
+  dayEnd.setHours(24, 0, 0, 0);
 
   // Drivers
   const { data: drivers } = await supabase
@@ -57,10 +60,12 @@ async function fetchOverview() {
 
   const { data: tripsToday } = await supabase
     .from('TRIP')
-    .select('TripID, DriverID')
-    .eq('Date', today);
+    .select('TripID, DriverID, Status')
+    .gte('Date', dayStart.toISOString())
+    .lt('Date', dayEnd.toISOString());
 
-  const busyDrivers = tripsToday ? new Set(tripsToday.map(t => t.DriverID)).size : 0;
+  const activeTrips = (tripsToday || []).filter(t => t.Status !== 'completed');
+  const busyDrivers = activeTrips.length > 0 ? new Set(activeTrips.map(t => t.DriverID)).size : 0;
   const available = totalDrivers - busyDrivers;
 
   document.getElementById('driver-availability').textContent = available + '/' + totalDrivers;
@@ -138,7 +143,10 @@ async function fetchDriverSchedule() {
   const supabase = window.supabase;
   if (!supabase) return;
 
-  const today = new Date().toISOString().split('T')[0];
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date();
+  dayEnd.setHours(24, 0, 0, 0);
 
   const { data: drivers } = await supabase
     .from('EMPLOYEE')
@@ -148,12 +156,15 @@ async function fetchDriverSchedule() {
 
   const { data: trips } = await supabase
     .from('TRIP')
-    .select('TripID, DriverID, Destination, Cost, Date')
-    .eq('Date', today);
+    .select('TripID, DriverID, Destination, Cost, Date, Status')
+    .gte('Date', dayStart.toISOString())
+    .lt('Date', dayEnd.toISOString());
+
+  const activeTrips = (trips || []).filter(t => t.Status !== 'completed');
 
   const { data: vehicles } = await supabase
     .from('VEHICLE')
-    .select('VehicleID, LicensePlate, Status');
+    .select('VehicleID, PlateNumber, Status');
 
   const container = document.getElementById('driver-schedule-list');
   if (!container) return;
@@ -161,13 +172,13 @@ async function fetchDriverSchedule() {
   let html = '';
   (drivers || []).forEach(d => {
     const name = (d.FirstName || '') + ' ' + (d.LastName || '');
-    const driverTrips = (trips || []).filter(t => t.DriverID === d.EmpID);
+    const driverTrips = (activeTrips || []).filter(t => t.DriverID === d.EmpID);
     const isBusy = driverTrips.length > 0;
-    const vehicle = (vehicles || []).find(v => v.Status === 'in_use') || { LicensePlate: '—' };
+    const vehicle = (vehicles || []).find(v => v.Status === 'in_use') || { PlateNumber: '—' };
 
     let tripInfo = 'Καμία προγραμματισμένη αποστολή';
     if (isBusy) {
-      tripInfo = 'Τρέχουσα Αποστολή: ' + driverTrips[0].Destination || 'Μεταφορά';
+      tripInfo = 'Τρέχουσα Αποστολή: ' + (driverTrips[0].Destination || 'Μεταφορά');
     }
 
     const pillClass = isBusy ? 'p-a' : 'p-g';
@@ -176,7 +187,7 @@ async function fetchDriverSchedule() {
     html += '<div class="room-card">'
       + '<div class="room-info">'
       + '<div style="font-weight:600; font-size:14px">Οδηγός: ' + name + '</div>'
-      + '<div class="room-type">Όχημα: ' + (vehicle.LicensePlate || '—') + '</div>'
+      + '<div class="room-type">Όχημα: ' + (vehicle.PlateNumber || '—') + '</div>'
       + '<div class="room-guest" style="color:' + (isBusy ? '#0EA5E9' : 'inherit') + '; font-weight:' + (isBusy ? 'bold' : 'normal') + '">' + tripInfo + '</div>'
       + '</div>'
       + '<span class="pill ' + pillClass + '">' + pillText + '</span>'
@@ -219,7 +230,7 @@ async function fetchFleetMaintenance() {
       : '<span style="color:#1D9E75">OK</span>';
 
     rows += '<tr style="border-bottom:1px solid var(--color-border-tertiary)">'
-      + '<td style="padding:8px; font-weight:500">' + (v.LicensePlate || v.VehicleID) + '</td>'
+      + '<td style="padding:8px; font-weight:500">' + (v.PlateNumber || v.VehicleID) + '</td>'
       + '<td style="padding:8px">—</td>'
       + '<td style="padding:8px">' + lastDate + '</td>'
       + '<td style="padding:8px">' + statusHtml + '</td>'
@@ -297,6 +308,211 @@ async function fetchPayroll() {
 }
 
 /* ==============================================================
+   NEW TRIP
+   ============================================================== */
+async function fetchTripFormData() {
+  const supabase = window.supabase;
+  if (!supabase) return;
+
+  const [driversRes, vehiclesRes, customersRes, maxTripRes] = await Promise.all([
+    supabase.from('EMPLOYEE').select('EmpID, FirstName, LastName').eq('Role', 'driver').eq('isActive', true).order('FirstName'),
+    supabase.from('VEHICLE').select('VehicleID, PlateNumber, PlateNumber').neq('Status', 'maintenance').order('PlateNumber'),
+    supabase.from('CUSTOMER').select('CustomerID, FirstName, LastName').order('FirstName'),
+    supabase.from('TRIP').select('TripID', { count: 'exact', head: true }).order('TripID', { ascending: false }).limit(1)
+  ]);
+
+  const drivers = driversRes.data || [];
+  const vehicles = vehiclesRes.data || [];
+  const customers = customersRes.data || [];
+
+  const driverSel = document.getElementById('trip-driver');
+  if (driverSel) {
+    driverSel.innerHTML = '<option value="">— Επιλέξτε Οδηγό —</option>';
+    drivers.forEach(d => {
+      driverSel.innerHTML += '<option value="' + d.EmpID + '">' + (d.FirstName || '') + ' ' + (d.LastName || '').trim() + '</option>';
+    });
+  }
+
+  const vehicleSel = document.getElementById('trip-vehicle');
+  if (vehicleSel) {
+    vehicleSel.innerHTML = '<option value="">— Επιλέξτε Όχημα —</option>';
+    vehicles.forEach(v => {
+      vehicleSel.innerHTML += '<option value="' + v.VehicleID + '">' + (v.PlateNumber || v.VehicleID) + '</option>';
+    });
+  }
+
+  const custSel = document.getElementById('trip-customer');
+  if (custSel) {
+    customers.forEach(c => {
+      custSel.innerHTML += '<option value="' + c.CustomerID + '">' + (c.FirstName || '') + ' ' + (c.LastName || '').trim() + '</option>';
+    });
+  }
+
+  // Set default date to now (local datetime)
+  const dateInput = document.getElementById('trip-date');
+  if (dateInput) {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    dateInput.value = now.toISOString().slice(0, 16);
+  }
+}
+
+window.submitTrip = async function() {
+  const supabase = window.supabase;
+  if (!supabase) return;
+
+  const driverId = document.getElementById('trip-driver').value;
+  const vehicleId = document.getElementById('trip-vehicle').value;
+  const destination = document.getElementById('trip-destination').value.trim();
+  const tripDate = document.getElementById('trip-date').value;
+  const cost = parseFloat(document.getElementById('trip-cost').value);
+  const customerId = document.getElementById('trip-customer').value;
+
+  if (!driverId || !vehicleId || !destination || !tripDate || isNaN(cost) || cost <= 0) {
+    showToast('Συμπληρώστε όλα τα υποχρεωτικά πεδία.', 'error');
+    return;
+  }
+
+  // Get next TripID
+  const { data: maxData } = await supabase
+    .from('TRIP')
+    .select('TripID')
+    .order('TripID', { ascending: false })
+    .limit(1);
+
+  const nextId = (maxData && maxData.length > 0) ? maxData[0].TripID + 1 : 1;
+
+  const tripPayload = {
+    TripID: nextId,
+    DriverID: parseInt(driverId),
+    VehicleID: parseInt(vehicleId),
+    Destination: destination,
+    Date: tripDate,
+    Cost: cost,
+    Status: 'pending'
+  };
+
+  if (customerId) {
+    tripPayload.CustomerID = parseInt(customerId);
+  }
+
+  const { error } = await supabase.from('TRIP').insert(tripPayload);
+
+  if (error) {
+    showToast('Σφάλμα κατά την καταχώρηση: ' + error.message, 'error');
+    return;
+  }
+
+  // Update vehicle status to in_use
+  await supabase.from('VEHICLE').update({ Status: 'in_use' }).eq('VehicleID', parseInt(vehicleId));
+
+  showToast('Η μεταφορά καταχωρήθηκε επιτυχώς!', 'info');
+
+  // Update the schedule view if visible
+  fetchDriverSchedule();
+  fetchOverview();
+
+  // Reset form
+  window.resetTripForm();
+};
+
+window.resetTripForm = function() {
+  document.getElementById('trip-driver').selectedIndex = 0;
+  document.getElementById('trip-vehicle').selectedIndex = 0;
+  document.getElementById('trip-customer').selectedIndex = 0;
+  document.getElementById('trip-destination').value = '';
+  document.getElementById('trip-cost').value = '';
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('trip-date').value = now.toISOString().slice(0, 16);
+};
+
+/* ==============================================================
+   TRIP LOGS
+   ============================================================== */
+async function fetchTripLogs() {
+  const supabase = window.supabase;
+  if (!supabase) return;
+
+  const { data: trips, error } = await supabase
+    .from('TRIP')
+    .select('TripID, DriverID, VehicleID, Destination, Date, Cost, Status, CustomerID, EMPLOYEE(FirstName, LastName), VEHICLE(PlateNumber), CUSTOMER(FirstName, LastName)')
+    .order('Date', { ascending: false });
+
+  if (error) {
+    showToast('Σφάλμα φόρτωσης αρχείου: ' + error.message, 'error');
+    return;
+  }
+
+  const countEl = document.getElementById('trip-log-count');
+  if (countEl) countEl.textContent = 'Σύνολο: ' + (trips ? trips.length : 0);
+
+  const tbody = document.getElementById('trip-log-body');
+  if (!tbody) return;
+
+  let html = '';
+  (trips || []).forEach(t => {
+    const driver = t.EMPLOYEE || {};
+    const driverName = ((driver.FirstName || '') + ' ' + (driver.LastName || '')).trim() || '—';
+    const vehicle = t.VEHICLE || {};
+    const plate = vehicle.PlateNumber || '—';
+    const customer = t.CUSTOMER || {};
+    const custName = ((customer.FirstName || '') + ' ' + (customer.LastName || '')).trim() || '—';
+    const dateStr = t.Date ? new Date(t.Date).toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+    const costStr = t.Cost != null ? t.Cost + '€' : '—';
+    const status = t.Status || 'pending';
+    const isCompleted = status === 'completed';
+    const statusHtml = isCompleted
+      ? '<span class="pill p-g"><i class="ti ti-check" style="font-size:10px"></i> Ολοκληρώθηκε</span>'
+      : '<span class="pill p-a"><i class="ti ti-clock" style="font-size:10px"></i> Εκκρεμεί</span>';
+
+    html += '<tr style="border-bottom:1px solid var(--color-border-tertiary)">'
+      + '<td style="padding:8px;font-weight:500">#' + t.TripID + '</td>'
+      + '<td style="padding:8px">' + driverName + '</td>'
+      + '<td style="padding:8px">' + plate + '</td>'
+      + '<td style="padding:8px">' + (t.Destination || '—') + '</td>'
+      + '<td style="padding:8px;white-space:nowrap">' + dateStr + '</td>'
+      + '<td style="padding:8px;font-weight:500">' + costStr + '</td>'
+      + '<td style="padding:8px">' + custName + '</td>'
+      + '<td style="padding:8px">' + statusHtml + '</td>'
+      + '<td style="padding:8px"><button class="btn btn-sm" style="color:var(--color-danger,#E53E3E)" onclick="window.deleteTrip(' + t.TripID + ')"><i class="ti ti-trash"></i></button></td>'
+      + '</tr>';
+    });
+
+  tbody.innerHTML = html || '<tr><td style="padding:16px;color:var(--color-text-secondary);text-align:center" colspan="9">Δεν υπάρχουν καταχωρημένες μεταφορές.</td></tr>';
+}
+
+/* ==============================================================
+   DELETE TRIPS
+   ============================================================== */
+window.deleteTrip = async function(tripId) {
+  if (!await window.showConfirm('Διαγραφή αυτής της μεταφοράς;')) return;
+  try {
+    const { error } = await window.supabase.from('TRIP').delete().eq('TripID', tripId);
+    if (error) throw error;
+    showToast('Η μεταφορά διαγράφηκε.', 'info');
+    fetchTripLogs();
+  } catch (err) {
+    showToast('Σφάλμα διαγραφής: ' + err.message, 'error');
+  }
+};
+
+window.deleteAllTrips = async function() {
+  const { data: trips } = await window.supabase.from('TRIP').select('TripID');
+  if (!trips || trips.length === 0) { showToast('Δεν υπάρχουν μεταφορές προς διαγραφή.', 'info'); return; }
+  if (!await window.showConfirm('Διαγραφή όλων των μεταφορών; Η ενέργεια είναι μη αναστρέψιμη.')) return;
+  try {
+    const ids = trips.map(t => t.TripID);
+    const { error } = await window.supabase.from('TRIP').delete().in('TripID', ids);
+    if (error) throw error;
+    showToast('Όλες οι μεταφορές διαγράφηκαν.', 'info');
+    fetchTripLogs();
+  } catch (err) {
+    showToast('Σφάλμα διαγραφής: ' + err.message, 'error');
+  }
+};
+
+/* ==============================================================
    NOTIFICATIONS (από υπάρχον)
    ============================================================== */
 async function fetchRestockNotifs() {
@@ -317,9 +533,13 @@ async function fetchRestockNotifs() {
     const time = n.CreatedAt
       ? new Date(n.CreatedAt).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })
       : '';
-    html += '<div class="ns ns-w" onclick="dismissNotif(' + n.NotificationID + ', this)" style="cursor:pointer">'
-      + '<i class="ti ti-package"></i>'
-      + '<div><strong>Αίτημα Ανεφοδιασμού:</strong> ' + n.Message + '</div>'
+    const isFault = n.Type === 'vehicle_fault';
+    const icon = isFault ? 'ti ti-alert-triangle' : 'ti ti-package';
+    const label = isFault ? 'Αναφορά Βλάβης:' : 'Αίτημα Ανεφοδιασμού:';
+    const cls = isFault ? 'ns ns-e' : 'ns ns-w';
+    html += '<div class="' + cls + '" onclick="dismissNotif(' + n.NotificationID + ', this)" style="cursor:pointer">'
+      + '<i class="' + icon + '"></i>'
+      + '<div><strong>' + label + '</strong> ' + n.Message + '</div>'
       + '<span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary)">' + time + '</span>'
       + '</div>';
   });
@@ -370,6 +590,8 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchDriverSchedule();
   fetchFleetMaintenance();
   fetchPayroll();
+  fetchTripFormData();
+  fetchTripLogs();
   fetchRestockNotifs();
   setInterval(fetchRestockNotifs, 30000);
 });

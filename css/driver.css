@@ -67,6 +67,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--color-background-tertiary
 .btn-dark{background:#0A1628;color:#EEE4CC;border-color:#0A1628}
 .btn-teal{background:#E1F5EE;color:#085041;border-color:#9FE1CB}
 .btn-sm{font-size:10px;padding:2px 6px}
+.btn-del{background:none;border:none;cursor:pointer;color:var(--color-text-secondary);padding:4px;font-size:13px;font-family:inherit}
 
 .fg{display:flex;flex-direction:column;gap:3px;margin-bottom:9px}
 .fg label{font-size:11px;color:var(--color-text-secondary);text-transform:uppercase}
