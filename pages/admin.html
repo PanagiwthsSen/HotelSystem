@@ -53,6 +53,7 @@
     <div class="sb-group">Σύστημα</div>
     <div class="sb-item" data-v="users"><i class="ti ti-lock" aria-hidden="true"></i>Χρήστες & Ρόλοι</div>
     <div class="sb-item" data-v="backup"><i class="ti ti-database" aria-hidden="true"></i>Backup & Ασφάλεια</div>
+    <div class="sb-item" data-v="notif-history"><i class="ti ti-history" aria-hidden="true"></i>Ιστορικό Ειδοποιήσεων</div>
   </nav>
   <div class="sb-foot">
     <div class="sb-av">
@@ -311,6 +312,13 @@
       </table>
     </div>
   </div>
+
+  <div class="view" id="v-notif-history">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-history" aria-hidden="true"></i>Ιστορικό Ειδοποιήσεων</div><div style="font-size:11px;color:var(--text-secondary);">Πατήστε ↩ για επαναφορά ειδοποίησης</div></div>
+      <div id="notif-history-body"></div>
+    </div>
+  </div>
   
   </div>
 </div>
@@ -362,12 +370,13 @@
     <div class="modal-body" style="padding:4px 14px">
       <table style="width:100%">
         <thead><tr>
-          <th style="width:12%">Ημερομηνία</th>
-          <th style="width:22%">Προορισμός</th>
-          <th style="width:18%">Οδηγός</th>
-          <th style="width:18%">Πελάτης</th>
-          <th style="width:15%">Κόστος</th>
-          <th style="width:15%">Τελ. Χλμ</th>
+          <th style="width:10%">Ημερομηνία</th>
+          <th style="width:15%">Προορισμός</th>
+          <th style="width:11%">Οδηγός</th>
+          <th style="width:14%">Πελάτης</th>
+          <th style="width:18%">Διαμονή</th>
+          <th style="width:10%">Δωμάτιο</th>
+          <th style="width:22%">Κατάσταση / Χλμ</th>
         </tr></thead>
         <tbody id="trip-modal-body"></tbody>
       </table>
