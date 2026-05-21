@@ -20,11 +20,20 @@ document.addEventListener('DOMContentLoaded', () => {
         loginForm.addEventListener('submit', async (event) => {
             event.preventDefault();
 
+            const btn = loginForm.querySelector('.btn-login');
+            const originalText = 'Είσοδος';
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Σύνδεση...';
+
             const usernameInput = document.getElementById('username').value.trim();
             const passwordInput = document.getElementById('password').value.trim();
 
+            const restoreBtn = () => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            };
+
             try {
-                // Αναζήτηση στον πίνακα EMPLOYEE
                 const { data, error } = await supabase
                     .from('EMPLOYEE')
                     .select('EmpID, FirstName, LastName, Role, isActive')
@@ -36,24 +45,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (data) {
                     if (!data.isActive) {
+                        restoreBtn();
                         alert("Ο λογαριασμός σας είναι ανενεργός.");
                         return;
                     }
 
                     const displayName = `${data.FirstName || ''} ${data.LastName || ''}`.trim();
 
-                    // Αποθήκευση συνεδρίας (session)
                     localStorage.setItem('hotel_user', JSON.stringify({
                         id: data.EmpID,
                         name: displayName,
                         Role: data.Role
                     }));
 
-                    alert(`Καλωσήρθες, ${displayName}!`);
                     redirectToRole(data.Role);
+                } else {
+                    restoreBtn();
+                    showError();
                 }
             } catch (err) {
                 console.error("Σφάλμα:", err.message);
+                restoreBtn();
                 showError();
             }
         });

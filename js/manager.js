@@ -4,7 +4,6 @@ function navTo(id){
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='v-'+id));
   document.getElementById('tb-title').textContent=vT[id]||id;
 }
-document.querySelectorAll('.sb-item').forEach(el=>el.addEventListener('click',()=>navTo(el.dataset.v)));
 
 function showToast2(id){
   const el=document.getElementById(id);
@@ -85,6 +84,11 @@ async function fetchRestockNotifs() {
   else container.innerHTML = '';
 }
 
+window.logout = function() {
+  localStorage.removeItem('hotel_user');
+  window.location.href = '/pages/login.html';
+};
+
 window.dismissNotif = async function(id, el) {
   try {
     await window.supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
@@ -97,6 +101,17 @@ window.dismissNotif = async function(id, el) {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    const loader = document.getElementById('app-loader');
+    if (loader) loader.style.display = 'none';
+    const app = document.querySelector('.app');
+    if (app) app.style.display = 'flex';
+  }, 800);
+
+  document.querySelectorAll('.sb-item').forEach(item => {
+    item.addEventListener('click', () => navTo(item.dataset.v));
+  });
+
   fetchRestockNotifs();
   setInterval(fetchRestockNotifs, 30000);
 });
