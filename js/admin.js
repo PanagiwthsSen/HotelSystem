@@ -2053,7 +2053,7 @@ function buildRevChart(labels, diamoni, estiatorio, loipa) {
     });
 }
 
-// 4. Εξαγωγή σε CSV με διόρθωση Ελληνικών (BOM)
+// 4. Εξαγωγή σε Excel (πρώην CSV) — styled workbook
 window.exportRevenueToCSV = async function() {
     const startDate = document.getElementById('rev-start-date').value;
     const endDate = document.getElementById('rev-end-date').value;
@@ -2070,20 +2070,56 @@ window.exportRevenueToCSV = async function() {
         return;
     }
 
-    let csvContent = "Ημερομηνία,Κατηγορία,Ποσό (€)\n";
-    data.forEach(r => {
-        csvContent += `${r.PaymentDate},${r.Category},${r.Amount}\n`;
+    // Υπολογισμός στατιστικών
+    const total = data.reduce((s, r) => s + (r.Amount || 0), 0);
+    const avg = total / data.length;
+    const amounts = data.map(r => r.Amount || 0);
+    const highest = Math.max(...amounts);
+    const lowest = Math.min(...amounts);
+
+    // Δημιουργία workbook
+    const wb = XLSX.utils.book_new();
+
+    // ── Sheet 1: Executive Summary ──
+    const summaryRows = [
+        ['Grand Kavala Luxury Hotel & Resort'],
+        ['Executive Summary — Αναφορά Εσόδων'],
+        [],
+        ['Περίοδος', `${startDate} έως ${endDate}`],
+        ['Ημερομηνία εξαγωγής', new Date().toLocaleDateString('el-GR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })],
+        [],
+        ['Σύνολο Εσόδων', `€${total.toFixed(2)}`],
+        ['Μέσος Όρος Ημέρας', `€${avg.toFixed(2)}`],
+        ['Υψηλότερη Ημέρα', `€${highest.toFixed(2)}`],
+        ['Χαμηλότερη Ημέρα', `€${lowest.toFixed(2)}`],
+        ['Αριθμός Συναλλαγών', data.length],
+        [],
+        ['Κατηγορίες', ''],
+    ];
+
+    // Ομαδοποίηση ανά κατηγορία
+    const catMap = {};
+    data.forEach(r => { catMap[r.Category] = (catMap[r.Category] || 0) + (r.Amount || 0); });
+    Object.entries(catMap).forEach(([cat, amt]) => {
+        summaryRows.push([`  ${cat}`, `€${amt.toFixed(2)}`]);
     });
 
-    // Προσθήκη BOM (\uFEFF) για σωστή ανάγνωση Ελληνικών από το Excel
-    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Revenue_Report_${startDate}_to_${endDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const wsSum = XLSX.utils.aoa_to_sheet(summaryRows);
+    wsSum['!cols'] = [{ wch: 32 }, { wch: 42 }];
+    XLSX.utils.book_append_sheet(wb, wsSum, 'Executive Summary');
+
+    // ── Sheet 2: Αναλυτικά Δεδομένα ──
+    const dataRows = [['Ημερομηνία', 'Κατηγορία', 'Ποσό (€)']];
+    data.forEach(r => dataRows.push([r.PaymentDate, r.Category, r.Amount]));
+    dataRows.push([]);
+    dataRows.push(['', 'Σύνολο', total]);
+
+    const wsData = XLSX.utils.aoa_to_sheet(dataRows);
+    wsData['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, wsData, 'Αποδείξεις');
+
+    // Αποθήκευση
+    XLSX.writeFile(wb, `Revenue_Report_${startDate}_to_${endDate}.xlsx`);
 };
 
 // 5. Σύνδεση με το μενού (Sidebar Click)
