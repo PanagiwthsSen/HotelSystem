@@ -105,13 +105,8 @@ window.triggerAction = function(msg, type) {
    ============================================================== */
 const viewTitles = {
     dash: 'Πίνακας Ελέγχου', revenue: 'Έσοδα & Αναφορές', pricing: 'Δυναμική Τιμολόγηση',
-<<<<<<< HEAD
     rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Minibar & Αποθήκες',
-    vehicles: 'Οχήματα & Μεταφορές', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
-=======
-    rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Εστιατόριο & Αποθήκες',
     vehicles: 'Οχήματα & Μεταφορές', trips: 'Δρομολόγια Οχημάτων', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
->>>>>>> b31125c7ae77d5e3de0db4f24cbaf449b566141e
     payroll: 'Μισθοδοσία', users: 'Χρήστες & Ρόλοι', backup: 'Backup & Ασφάλεια',
     'notif-history': 'Ιστορικό Ειδοποιήσεων'
 };
@@ -1781,7 +1776,6 @@ window.loadNotifHistory = async function() {
 
         if (readNotifs && readNotifs.length > 0) {
             readNotifs.forEach(n => {
-<<<<<<< HEAD
                 if (n.Type === 'pricing') {
                     _notifHistoryData.push({
                         type: 'Δυναμική Τιμολόγηση',
@@ -1790,6 +1784,15 @@ window.loadNotifHistory = async function() {
                         message: n.Message,
                         dismissedAt: n.CreatedAt ? new Date(n.CreatedAt).getTime() : null,
                         undo: `undoPricingNotif(${n.NotificationID})`
+                    });
+                } else if (n.Type === 'vehicle_fault') {
+                    _notifHistoryData.push({
+                        type: 'Βλάβη οχήματος',
+                        icon: 'ti ti-alert-octagon',
+                        cls: 'ns-e',
+                        message: n.Message,
+                        dismissedAt: n.CreatedAt ? new Date(n.CreatedAt).getTime() : null,
+                        undo: `undoRestockNotif(${n.NotificationID})`
                     });
                 } else {
                     _notifHistoryData.push({
@@ -1801,17 +1804,6 @@ window.loadNotifHistory = async function() {
                         undo: `undoRestockNotif(${n.NotificationID})`
                     });
                 }
-=======
-const isFault = n.Type === 'vehicle_fault';
-                _notifHistoryData.push({
-                    type: isFault ? 'Βλάβη οχήματος' : 'Ανεφοδιασμός',
-                    icon: isFault ? 'ti ti-alert-octagon' : 'ti ti-package',
-                    cls: isFault ? 'ns-e' : 'ns-w',
-                    message: n.Message,
-                    dismissedAt: n.CreatedAt ? new Date(n.CreatedAt).getTime() : null,
-                    undo: `undoRestockNotif(${n.NotificationID})`
-                });
->>>>>>> b31125c7ae77d5e3de0db4f24cbaf449b566141e
             });
         }
     } catch (_) {}
