@@ -141,7 +141,11 @@
                   <option value="380">Σουίτα</option>
                 </select>
               </div>
+              <div class="fg"><label>Αριθμός Ατόμων *</label>
+                <input type="number" id="nb-guests" value="1" min="1" max="20" onchange="updatePrice(); updateRoomSummary();">
+              </div>
             </div>
+            <div id="nb-rooms-summary" style="margin-bottom:12px;"></div>
             <div class="fg" style="margin-bottom:15px;">
               <label>Επιλεγμένα Δωμάτια</label>
               <div id="avail-rooms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:4px;min-height:36px;"></div>
@@ -193,6 +197,9 @@
           <div class="form-grid" style="margin-top:15px;">
             <div class="fg"><label>Ημερομηνία Άφιξης *</label><input type="date" id="rs-checkin"></div>
             <div class="fg"><label>Ημερομηνία Αναχώρησης *</label><input type="date" id="rs-checkout"></div>
+            <div class="fg"><label>Αριθμός Ατόμων *</label>
+              <input type="number" id="rs-guests" value="1" min="1" max="20">
+            </div>
           </div>
           <div style="display:flex;gap:7px;margin-bottom:15px;">
             <button class="btn btn-dark" onclick="searchAvailableRooms()"><i class="ti ti-search"></i> Αναζήτηση</button>
@@ -370,13 +377,18 @@
             <option value="bank_transfer">Τραπεζικό Έμβασμα</option>
           </select>
         </div>
+        <div class="fg"><label>Αριθμός Ατόμων *</label>
+          <input type="number" id="rs-modal-guests" value="1" min="1" max="20">
+        </div>
         <div class="fg" style="grid-column:span 2;">
           <div class="sum-box" style="margin-bottom:0;">
             <div class="sum-row"><span>Δωμάτιο</span><span id="rs-modal-room-type"></span></div>
             <div class="sum-row"><span>Διανυκτερεύσεις</span><span id="rs-modal-nights"></span></div>
             <div class="sum-row"><span>Τιμή / Διαν.</span><span id="rs-modal-rate"></span></div>
+            <div class="sum-row"><span>Δωμάτια</span><span id="rs-modal-rooms">1</span></div>
             <div class="sum-row tot"><span>Σύνολο</span><span id="rs-modal-total"></span></div>
           </div>
+          <div id="rs-modal-summary" style="margin-top:8px;font-size:11px;"></div>
         </div>
       </div>
     </div>
