@@ -1236,7 +1236,7 @@ async function fetchVehicles() {
         const tbody = document.getElementById('vehicles-body');
         if (!tbody) return;
 
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση στόλου οχημάτων...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση στόλου οχημάτων...</td></tr>';
 
         const { data, error } = await supabase
             .from('VEHICLE')
@@ -1254,7 +1254,7 @@ async function fetchVehicles() {
         let notifHtml = '';
 
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Δεν υπάρχουν καταχωρημένα οχήματα.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Δεν υπάρχουν καταχωρημένα οχήματα.</td></tr>';
             updateNotifBadge(notifCount);
             return;
         }
@@ -1266,7 +1266,9 @@ async function fetchVehicles() {
             let statusHtml = '';
             const dbStatus = v.Status ? v.Status.toLowerCase() : '';
 
-            if (dbStatus === 'available') {
+            if (v.PendingKmUpdate) {
+                statusHtml = '<span class="pill p-y">Μη Διαθέσιμο — Εκκρεμεί χλμ</span>';
+            } else if (dbStatus === 'available') {
                 statusHtml = '<span class="pill p-g">Διαθέσιμο</span>';
             } else if (dbStatus === 'in_use') {
                 statusHtml = '<span class="pill p-b">Σε Δρομολόγιο</span>';
@@ -1275,6 +1277,11 @@ async function fetchVehicles() {
             } else {
                 statusHtml = `<span class="pill p-a">${v.Status}</span>`;
             }
+
+            const kmDisplay = v.CurrentKm != null ? `${Number(v.CurrentKm).toLocaleString()} km` : '—';
+            const logKmBtn = v.VehicleID && v.PendingKmUpdate
+                ? `<button class="btn btn-sm btn-warn" onclick="openLogKmModal(${v.VehicleID},'${(v.PlateNumber || v.Type || '').replace(/'/g,"\\'")}',${v.CurrentKm || 0})" title="Καταχώρηση χιλιομέτρων"><i class="ti ti-speedometer"></i></button>`
+                : '';
 
             let serviceHtml = '<span class="pill p-g">—</span>';
             if (v.VEHICLE_SERVICE && v.VEHICLE_SERVICE.length > 0) {
@@ -1313,10 +1320,12 @@ async function fetchVehicles() {
                 <tr>
                     <td><strong>${v.Type}</strong></td>
                     <td><code style="background:var(--bg-card); padding:2px 6px; border-radius:4px;">${v.PlateNumber}</code></td>
+                    <td>${kmDisplay}</td>
                     <td>${statusHtml}</td>
                     <td>${serviceHtml}</td>
                     <td style="white-space:nowrap">
-                        <button class="btn btn-sm btn-dark" onclick="openTripModal(${v.VehicleID}, '${v.PlateNumber || v.Type}')" title="Δρομολόγια">
+                        ${logKmBtn}
+                        <button class="btn btn-sm btn-dark" onclick="openTripModal(${v.VehicleID}, '${(v.PlateNumber || v.Type || '').replace(/'/g,"\\'")}')" title="Δρομολόγια">
                             <i class="ti ti-route"></i>
                         </button>
                         <button class="btn btn-sm" onclick="openVehicleModal(${v.VehicleID})" title="Επεξεργασία">
@@ -1430,14 +1439,14 @@ window.dismissRestockNotif = async function(notifId) {
    ============================================================== */
 window.openTripModal = async function(vehicleId, plateNumber) {
     document.getElementById('trip-modal-title').textContent = `Δρομολόγια — ${plateNumber}`;
-    document.getElementById('trip-modal-body').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση δρομολογίων...</td></tr>';
+    document.getElementById('trip-modal-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση δρομολογίων...</td></tr>';
     document.getElementById('trip-modal').style.display = 'flex';
 
     try {
         const { data, error } = await supabase
             .from('TRIP')
             .select(`
-                TripID, Date, Destination, Cost,
+                TripID, Date, Destination, Cost, EndKm,
                 EMPLOYEE (FirstName, LastName),
                 CUSTOMER (FirstName, LastName)
             `)
@@ -1449,7 +1458,7 @@ window.openTripModal = async function(vehicleId, plateNumber) {
         const tbody = document.getElementById('trip-modal-body');
 
         if (!data || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν δρομολόγια για αυτό το όχημα.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν δρομολόγια για αυτό το όχημα.</td></tr>';
             return;
         }
 
@@ -1460,6 +1469,7 @@ window.openTripModal = async function(vehicleId, plateNumber) {
             const customerName = `${customer.FirstName || ''} ${customer.LastName || ''}`.trim() || '—';
             const dateStr = new Date(t.Date).toLocaleDateString('el-GR');
             const cost = t.Cost ? `€${Number(t.Cost).toLocaleString('el-GR')}` : '—';
+            const endKm = t.EndKm != null ? `${Number(t.EndKm).toLocaleString()} km` : '<span class="pill p-y">Εκκρεμεί</span>';
 
             return `
                 <tr>
@@ -1468,13 +1478,14 @@ window.openTripModal = async function(vehicleId, plateNumber) {
                     <td>${driverName}</td>
                     <td>${customerName}</td>
                     <td><strong>${cost}</strong></td>
+                    <td>${endKm}</td>
                 </tr>
             `;
         }).join('');
 
     } catch (err) {
         console.error("Σφάλμα φόρτωσης δρομολογίων:", err.message);
-        document.getElementById('trip-modal-body').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">Σφάλμα φόρτωσης δεδομένων</td></tr>';
+        document.getElementById('trip-modal-body').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Σφάλμα φόρτωσης δεδομένων</td></tr>';
     }
 };
 
@@ -1523,6 +1534,10 @@ window.openVehicleModal = async function(vehicleId) {
                 <input type="text" id="v-plate" value="${vehicle ? (vehicle.PlateNumber || '') : ''}" placeholder="π.χ. ΚΑΒ-1234">
             </div>
             <div class="mform-group">
+                <label>Χιλιόμετρα</label>
+                <input type="number" id="v-km" min="0" value="${vehicle ? (vehicle.CurrentKm || 0) : 0}" placeholder="π.χ. 15000">
+            </div>
+            <div class="mform-group">
                 <label>Επόμενο Service</label>
                 <input type="date" id="v-service-date" value="${serviceRecord?.NextServiceDate ? serviceRecord.NextServiceDate.split('T')[0] : ''}">
             </div>
@@ -1540,6 +1555,8 @@ window.openVehicleModal = async function(vehicleId) {
     overlay.querySelector('#v-save').addEventListener('click', async () => {
         const type = overlay.querySelector('#v-type').value.trim();
         const plate = overlay.querySelector('#v-plate').value.trim();
+        const kmInput = overlay.querySelector('#v-km').value;
+        const currentKm = kmInput !== '' ? parseInt(kmInput, 10) : 0;
         const nextServiceDate = overlay.querySelector('#v-service-date').value || null;
 
         if (!type || !plate) {
@@ -1553,7 +1570,7 @@ window.openVehicleModal = async function(vehicleId) {
             if (vehicle) {
                 const { error: vehErr } = await supabase
                     .from('VEHICLE')
-                    .update({ Type: type, PlateNumber: plate })
+                    .update({ Type: type, PlateNumber: plate, CurrentKm: currentKm })
                     .eq('VehicleID', vehicle.VehicleID);
                 if (vehErr) throw vehErr;
 
@@ -1574,7 +1591,7 @@ window.openVehicleModal = async function(vehicleId) {
             } else {
                 const { data: newVeh, error: vehErr } = await supabase
                     .from('VEHICLE')
-                    .insert([{ Type: type, PlateNumber: plate, Status: 'available', LicensePlate: plate }])
+                    .insert([{ Type: type, PlateNumber: plate, Status: 'available', LicensePlate: plate, CurrentKm: currentKm }])
                     .select()
                     .single();
                 if (vehErr) throw vehErr;
@@ -1632,6 +1649,94 @@ window.deleteVehicle = async function(vehicleId) {
         showToast('Αποτυχία διαγραφής: ' + err.message, 'error');
     }
 };
+
+/* ==============================================================
+   ΚΑΤΑΧΩΡΗΣΗ ΧΙΛΙΟΜΕΤΡΩΝ (SR-02)
+   ============================================================== */
+let _logKmVehicleId = null;
+
+window.openLogKmModal = async function(vehicleId, plateNumber, currentKm) {
+    _logKmVehicleId = vehicleId;
+    document.getElementById('logkm-modal-title').textContent = `Καταχώρηση Χιλιομέτρων — ${plateNumber}`;
+    document.getElementById('logkm-vehicle-name').textContent = plateNumber;
+    document.getElementById('logkm-current').textContent = currentKm ? `${Number(currentKm).toLocaleString()} km` : '0 km';
+
+    // Find the latest trip without EndKm
+    const { data: trips } = await supabase
+        .from('TRIP')
+        .select('TripID, Date, Destination, EndKm')
+        .eq('VehicleID', vehicleId)
+        .order('Date', { ascending: false })
+        .limit(1);
+
+    const tripEl = document.getElementById('logkm-last-trip');
+    if (trips && trips.length > 0) {
+        const t = trips[0];
+        const dateStr = new Date(t.Date).toLocaleDateString('el-GR');
+        tripEl.textContent = `${dateStr} — ${t.Destination}${t.EndKm ? ` (καταχωρήθηκαν ${t.EndKm} km)` : ' (εκκρεμεί καταχώρηση)'}`;
+    } else {
+        tripEl.textContent = '—';
+    }
+
+    document.getElementById('logkm-input').value = '';
+    document.getElementById('logkm-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('logkm-input').focus(), 100);
+};
+
+window.closeLogKmModal = function(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('logkm-modal').style.display = 'none';
+    _logKmVehicleId = null;
+};
+
+// Wire up log-km save (called from init since module scripts miss DOMContentLoaded)
+function initLogKmSave() {
+    const saveBtn = document.getElementById('logkm-save');
+    if (!saveBtn) return;
+    saveBtn.addEventListener('click', async () => {
+        const vid = _logKmVehicleId;
+        if (!vid) return;
+        const input = document.getElementById('logkm-input');
+        const km = parseInt(input.value, 10);
+        if (isNaN(km) || km < 0) {
+            showToast('Παρακαλώ συμπληρώστε έγκυρες ενδείξεις χιλιομέτρων.', 'error');
+            return;
+        }
+
+        if (!await window.showConfirm('Καταχώρηση χιλιομέτρων για το όχημα;')) return;
+
+        try {
+            const { data: tripData } = await supabase
+                .from('TRIP')
+                .select('TripID')
+                .eq('VehicleID', vid)
+                .is('EndKm', null)
+                .order('Date', { ascending: false })
+                .limit(1);
+
+            const latestTrip = tripData && tripData.length > 0 ? tripData[0] : null;
+            if (latestTrip) {
+                const { error: tripErr } = await supabase
+                    .from('TRIP')
+                    .update({ EndKm: km })
+                    .eq('TripID', latestTrip.TripID);
+                if (tripErr) throw tripErr;
+            }
+
+            const { error: vehErr } = await supabase
+                .from('VEHICLE')
+                .update({ CurrentKm: km, PendingKmUpdate: false })
+                .eq('VehicleID', vid);
+            if (vehErr) throw vehErr;
+
+            showToast('Χιλιόμετρα καταχωρήθηκαν επιτυχώς.', 'success');
+            closeLogKmModal();
+            fetchVehicles();
+        } catch (err) {
+            showToast('Αποτυχία: ' + err.message, 'error');
+        }
+    });
+}
 
 /* ==============================================================
    ΕΝΟΙΚΙΑΖΟΜΕΝΑ ΚΑΤΑΣΤΗΜΑΤΑ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
@@ -2499,6 +2604,12 @@ appReady.then(ok => {
   if (document.getElementById('special-pricing-rows')) loadSpecialPricing();
   if (document.getElementById('specific-room-rows')) loadRoomSpecialPrices();
   initRevenueDates();
+  initLogKmSave();
+  if (window.HotelScheduler) {
+    HotelScheduler.registerTask('roomSync', fetchRooms, 300000);
+    HotelScheduler.registerTask('vehicleSync', fetchVehicles, 300000);
+    HotelScheduler.start();
+  }
 });
 
 window.updateSpecificRooms = async function() {

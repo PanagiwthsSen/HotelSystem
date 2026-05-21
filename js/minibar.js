@@ -43,7 +43,8 @@ async function requestGeneralRestock() {
             TargetRole: 'both',
             Type: type,
             Message: msg,
-            ItemID: item.ItemID
+            ItemID: item.ItemID,
+            IsRead: false
         });
         count++;
     }
@@ -494,14 +495,16 @@ async function submitConsumption() {
                     TargetRole: 'both',
                     Type: 'out_of_stock',
                     Message: `Το ${item.name} έχει ΕΞΑΝΤΛΗΘΕΙ πλήρως`,
-                    ItemID: item.itemId
+                    ItemID: item.itemId,
+                    IsRead: false
                 }).then();
             } else if (newQty <= invItem.data.MinThreshold) {
                 supabase.from('NOTIFICATION').insert({
                     TargetRole: 'both',
                     Type: 'restock',
                     Message: `Το ${item.name} έχει πέσει κάτω από το ελάχιστο όριο (${newQty}/${invItem.data.MinThreshold})`,
-                    ItemID: item.itemId
+                    ItemID: item.itemId,
+                    IsRead: false
                 }).then();
             }
         }
@@ -545,7 +548,8 @@ async function requestRestock(btn) {
                     TargetRole: 'both',
                     Type: 'restock',
                     Message: `Αίτημα ανεφοδιασμού: ${itemName}`,
-                    ItemID: item.ItemID
+                    ItemID: item.ItemID,
+                    IsRead: false
                 });
             } catch (err) {
                 showToast('Σφάλμα αποστολής ειδοποίησης.', 'error');
