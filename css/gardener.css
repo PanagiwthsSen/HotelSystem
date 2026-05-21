@@ -101,6 +101,8 @@ body{font-family:var(--font-sans,'DM Sans',sans-serif);background:var(--color-ba
 .room-list{display:flex;flex-direction:column;gap:8px}
 .room-card{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:11px 13px;display:flex;align-items:center;gap:12px}
 .room-card.urgent{border-color:#F7C1C1;background:#FFF8F8}
+.room-card.done{border-color:#C0DD97;background:#EAF3DE}
+.room-card.done .room-num i{color:#1D9E75}
 .room-num{font-size:18px;font-weight:500;min-width:54px; color:var(--color-text-secondary)}
 .room-type{font-size:11px;color:var(--color-text-secondary);margin-top:1px}
 .room-info{flex:1}
