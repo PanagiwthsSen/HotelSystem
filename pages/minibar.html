@@ -126,7 +126,7 @@
 
   <div class="view" id="v-history">
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-history" aria-hidden="true"></i>Ιστορικό Χρεώσεων</div></div>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-history" aria-hidden="true"></i>Ιστορικό Χρεώσεων</div><input type="text" id="history-search" placeholder="Αναζήτηση δωματίου..." oninput="filterHistory()" style="max-width:200px;padding:6px 10px;border:1px solid var(--color-border-secondary);border-radius:6px;font-size:12px;font-family:inherit;"></div>
       <table id="history-table">
         <thead><tr><th style="width:10%">#</th><th style="width:15%">Δωμάτιο</th><th style="width:45%">Προϊόν</th><th style="width:15%">Ποσό</th><th style="width:10%">Status</th></tr></thead>
         <tbody id="history-list"></tbody>
