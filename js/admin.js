@@ -106,7 +106,7 @@ window.triggerAction = function(msg, type) {
 const viewTitles = {
     dash: 'Πίνακας Ελέγχου', revenue: 'Έσοδα & Αναφορές', pricing: 'Δυναμική Τιμολόγηση',
     rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Εστιατόριο & Αποθήκες',
-    vehicles: 'Οχήματα & Μεταφορές', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
+    vehicles: 'Οχήματα & Μεταφορές', trips: 'Δρομολόγια Οχημάτων', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
     payroll: 'Μισθοδοσία', users: 'Χρήστες & Ρόλοι', backup: 'Backup & Ασφάλεια',
     'notif-history': 'Ιστορικό Ειδοποιήσεων'
 };
@@ -1346,31 +1346,30 @@ async function fetchVehicles() {
             notifContainer.innerHTML = notifHtml;
         }
 
-        // Ειδοποιήσεις ανεφοδιασμού από το minibar
+        // Ειδοποιήσεις από τη βάση (ανεφοδιασμός, βλάβες οχημάτων κλπ.)
         try {
-            const { data: restockNotifs } = await supabase
+            const { data: dbNotifs } = await supabase
                 .from('NOTIFICATION')
-                .select(`
-                    NotificationID, Type, Message, CreatedAt,
-                    INVENTORY_ITEM (Name)
-                `)
-                .eq('TargetRole', 'both')
+                .select('NotificationID, Type, Message, CreatedAt')
+                .in('TargetRole', ['both', 'admin'])
                 .eq('IsRead', false)
                 .order('CreatedAt', { ascending: false });
 
-            if (restockNotifs && restockNotifs.length > 0) {
-                let restockHtml = restockNotifs.map(n => {
-                    const itemName = n.INVENTORY_ITEM?.Name || 'άγνωστο';
+            if (dbNotifs && dbNotifs.length > 0) {
+                let extraHtml = dbNotifs.map(n => {
+                    const isFault = n.Type === 'vehicle_fault';
+                    const icon = isFault ? 'ti ti-alert-octagon' : 'ti ti-package';
+                    const cls = isFault ? 'ns-e' : 'ns-w';
                     return `
-                    <div class="ns ns-w" id="restock-notif-${n.NotificationID}" onclick="dismissRestockNotif(${n.NotificationID}, this)">
-                        <i class="ti ti-package" aria-hidden="true"></i>
+                    <div class="ns ${cls}" id="restock-notif-${n.NotificationID}" onclick="dismissRestockNotif(${n.NotificationID}, this)">
+                        <i class="${icon}" aria-hidden="true"></i>
                         <div style="flex:1">${n.Message}</div>
                     </div>`;
                 }).join('');
 
                 if (notifContainer) {
-                    notifContainer.insertAdjacentHTML('beforeend', restockHtml);
-                    notifCount += restockNotifs.length;
+                    notifContainer.insertAdjacentHTML('beforeend', extraHtml);
+                    notifCount += dbNotifs.length;
                 }
             }
         } catch (_) {}
@@ -1455,12 +1454,69 @@ window.dismissRestockNotif = async function(notifId, el) {
 /* ==============================================================
    ΙΣΤΟΡΙΚΟ ΕΙΔΟΠΟΙΗΣΕΩΝ
    ============================================================== */
+let _notifHistoryData = [];
+let _notifHistoryPage = 0;
+const _notifHistoryPerPage = 30;
+
+function renderNotifHistory(page) {
+    const container = document.getElementById('notif-history-body');
+    if (!container) return;
+
+    const total = _notifHistoryData.length;
+    const start = page * _notifHistoryPerPage;
+    const end = Math.min(start + _notifHistoryPerPage, total);
+    const pageItems = _notifHistoryData.slice(start, end);
+
+    let html = `<div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary);">Εμφάνιση ${total > 0 ? start + 1 : 0}–${end} από ${total} ειδοποιήσεις</div>`;
+
+    pageItems.forEach(s => {
+        const dateStr = s.dismissedAt ? new Date(s.dismissedAt).toLocaleString('el-GR') : '—';
+        html += `
+            <div class="ns ${s.cls}" style="cursor:default">
+                <i class="${s.icon}" aria-hidden="true"></i>
+                <div style="flex:1">
+                    <div style="font-weight:600;font-size:11px;color:var(--text-secondary);margin-bottom:2px;">${s.type} · ${dateStr}</div>
+                    <div>${s.message}</div>
+                </div>
+                <button class="btn btn-sm" onclick="${s.undo}" style="flex-shrink:0" title="Επαναφορά">↩</button>
+            </div>`;
+    });
+
+    // Pagination controls
+    const totalPages = Math.ceil(total / _notifHistoryPerPage);
+    if (totalPages > 1) {
+        let pagesHtml = '';
+        // Show first, last, and pages around current
+        const range = 2;
+        for (let p = 0; p < totalPages; p++) {
+            if (p === 0 || p === totalPages - 1 || Math.abs(p - page) <= range) {
+                pagesHtml += `<button class="btn btn-sm ${p === page ? 'btn-dark' : ''}" onclick="pageNotifHistory(${p})">${p + 1}</button>`;
+            } else if (pagesHtml.slice(-12) !== '·</span>') {
+                pagesHtml += '<span style="padding:0 4px;color:var(--text-secondary);">·</span>';
+            }
+        }
+        html += `<div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;flex-wrap:wrap;font-size:12px;">
+            <button class="btn btn-sm" onclick="pageNotifHistory(${page - 1})" ${page === 0 ? 'disabled' : ''}>‹ Πίσω</button>
+            ${pagesHtml}
+            <button class="btn btn-sm" onclick="pageNotifHistory(${page + 1})" ${end >= total ? 'disabled' : ''}>Επόμενο ›</button>
+        </div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+window.pageNotifHistory = function(page) {
+    _notifHistoryPage = page;
+    renderNotifHistory(page);
+};
+
 window.loadNotifHistory = async function() {
     const container = document.getElementById('notif-history-body');
     if (!container) return;
     container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση ιστορικού...</div>';
 
-    let sections = [];
+    _notifHistoryData = [];
+    _notifHistoryPage = 0;
 
     // 1. Service notifications from localStorage
     try {
@@ -1470,7 +1526,7 @@ window.loadNotifHistory = async function() {
             const id = key.replace('notif_history_svc_', '');
             try {
                 const entry = JSON.parse(localStorage.getItem(key));
-                sections.push({
+                _notifHistoryData.push({
                     type: 'Υπηρεσία οχήματος',
                     icon: 'ti ti-car',
                     cls: entry.cls || 'ns-w',
@@ -1490,14 +1546,15 @@ window.loadNotifHistory = async function() {
             .in('TargetRole', ['both', 'admin'])
             .eq('IsRead', true)
             .order('CreatedAt', { ascending: false })
-            .limit(100);
+            .limit(200);
 
         if (readNotifs && readNotifs.length > 0) {
             readNotifs.forEach(n => {
-                sections.push({
-                    type: 'Ανεφοδιασμός',
-                    icon: 'ti ti-package',
-                    cls: 'ns-w',
+const isFault = n.Type === 'vehicle_fault';
+                _notifHistoryData.push({
+                    type: isFault ? 'Βλάβη οχήματος' : 'Ανεφοδιασμός',
+                    icon: isFault ? 'ti ti-alert-octagon' : 'ti ti-package',
+                    cls: isFault ? 'ns-e' : 'ns-w',
                     message: n.Message,
                     dismissedAt: n.CreatedAt ? new Date(n.CreatedAt).getTime() : null,
                     undo: `undoRestockNotif(${n.NotificationID})`
@@ -1506,28 +1563,13 @@ window.loadNotifHistory = async function() {
         }
     } catch (_) {}
 
-    if (sections.length === 0) {
+    if (_notifHistoryData.length === 0) {
         container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--text-muted);"><i class="ti ti-history" style="font-size:2rem;display:block;margin-bottom:10px;"></i>Δεν υπάρχει ιστορικό ειδοποιήσεων.</div>';
         return;
     }
 
-    sections.sort((a, b) => (b.dismissedAt || 0) - (a.dismissedAt || 0));
-
-    let html = `<div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary);">Σύνολο: ${sections.length} ειδοποιήσεις</div>`;
-    sections.forEach(s => {
-        const dateStr = s.dismissedAt ? new Date(s.dismissedAt).toLocaleString('el-GR') : '—';
-        html += `
-            <div class="ns ${s.cls}" style="cursor:default">
-                <i class="${s.icon}" aria-hidden="true"></i>
-                <div style="flex:1">
-                    <div style="font-weight:600;font-size:11px;color:var(--text-secondary);margin-bottom:2px;">${s.type} · ${dateStr}</div>
-                    <div>${s.message}</div>
-                </div>
-                <button class="btn btn-sm" onclick="${s.undo}" style="flex-shrink:0" title="Επαναφορά">↩</button>
-            </div>`;
-    });
-
-    container.innerHTML = html;
+    _notifHistoryData.sort((a, b) => (b.dismissedAt || 0) - (a.dismissedAt || 0));
+    renderNotifHistory(0);
 };
 
 window.undoServiceNotif = function(vehicleId) {
@@ -1624,6 +1666,190 @@ window.openTripModal = async function(vehicleId, plateNumber) {
 window.closeTripModal = function(e) {
     if (e && e.target !== e.currentTarget) return;
     document.getElementById('trip-modal').style.display = 'none';
+};
+
+/* ==============================================================
+   ΔΡΟΜΟΛΟΓΙΑ — CRUD (ΔΙΑΧΕΙΡΙΣΗ ΑΠΟ ADMIN)
+   ============================================================== */
+async function fetchTrips() {
+    const tbody = document.getElementById('trips-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση δρομολογίων...</td></tr>';
+
+    try {
+        const [tripRes, vehRes, empRes, custRes] = await Promise.all([
+            supabase.from('TRIP').select('*').order('Date', { ascending: false }),
+            supabase.from('VEHICLE').select('*'),
+            supabase.from('EMPLOYEE').select('*'),
+            supabase.from('CUSTOMER').select('*')
+        ]);
+
+        if (tripRes.error) throw tripRes.error;
+
+        const data = tripRes.data || [];
+        const vehMap = Object.fromEntries((vehRes.data || []).map(v => [v.VehicleID, v]));
+        const empMap = Object.fromEntries((empRes.data || []).map(e => [e.EmpID, e]));
+        const custMap = Object.fromEntries((custRes.data || []).map(c => [c.CustomerID, c]));
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν δρομολόγια.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(t => {
+            const veh = vehMap[t.VehicleID] || {};
+            const vehicleName = `${veh.Type || ''} ${veh.LicensePlate || veh.PlateNumber || ''}`.trim() || '—';
+            const driver = empMap[t.DriverID] || {};
+            const driverName = `${driver.FirstName || ''} ${driver.LastName || ''}`.trim() || '—';
+            const customer = custMap[t.CustomerID] || {};
+            const customerName = `${customer.FirstName || ''} ${customer.LastName || ''}`.trim() || '—';
+            const dateStr = new Date(t.Date).toLocaleDateString('el-GR');
+            const cost = t.Cost != null ? `€${t.Cost}` : '—';
+            const statusLabel = t.Status === 'completed' ? '<span class="pill p-g">Ολοκληρώθηκε</span>' : '<span class="pill p-a">Εκκρεμεί</span>';
+            return `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td><strong>${t.Destination}</strong></td>
+                    <td>${vehicleName}</td>
+                    <td>${driverName}</td>
+                    <td>${customerName}</td>
+                    <td>${cost}</td>
+                    <td>${statusLabel}</td>
+                    <td><button class="btn btn-sm" onclick="deleteTrip(${t.TripID})" title="Διαγραφή"><i class="ti ti-trash"></i></button></td>
+                </tr>`;
+        }).join('');
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης δρομολογίων:", err.message);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem;">Σφάλμα φόρτωσης</td></tr>';
+    }
+}
+
+async function checkTripStatusColumn() {
+    const { error } = await supabase.from('TRIP').select('Status').limit(0).maybeSingle();
+    window._tripHasStatus = !error;
+}
+
+async function populateTripFormDropdowns() {
+    await checkTripStatusColumn();
+    try {
+        const [vehRes, empRes, custRes] = await Promise.all([
+            supabase.from('VEHICLE').select('*').order('VehicleID'),
+            supabase.from('EMPLOYEE').select('*').eq('Role', 'driver').eq('isActive', true).order('FirstName'),
+            supabase.from('CUSTOMER').select('*').order('FirstName')
+        ]);
+
+        const vehSelect = document.getElementById('trip-vehicle');
+        if (vehSelect && vehRes.data) {
+            vehSelect.innerHTML = '<option value="">— Επιλέξτε Όχημα —</option>' +
+                vehRes.data.map(v =>
+                    `<option value="${v.VehicleID}">${v.Type || 'Όχημα'} (${v.LicensePlate || v.PlateNumber || '—'})${v.Status === 'maintenance' ? ' [Συντήρηση]' : ''}</option>`
+                ).join('');
+        }
+
+        const drvSelect = document.getElementById('trip-driver');
+        if (drvSelect && empRes.data) {
+            if (empRes.data.length === 0) {
+                drvSelect.innerHTML = '<option value="">— Δεν υπάρχουν ενεργοί οδηγοί —</option>';
+            } else {
+                drvSelect.innerHTML = '<option value="">— Επιλέξτε Οδηγό —</option>' +
+                    empRes.data.map(e =>
+                        `<option value="${e.EmpID}">${e.FirstName || ''} ${e.LastName || ''}</option>`
+                    ).join('');
+            }
+        }
+
+        const custSelect = document.getElementById('trip-customer');
+        if (custSelect && custRes.data) {
+            custSelect.innerHTML = '<option value="">— Κανένας —</option>' +
+                custRes.data.map(c =>
+                    `<option value="${c.CustomerID}">${c.FirstName || ''} ${c.LastName || ''}${c.IsGroup ? ' (Group)' : ''}</option>`
+                ).join('');
+        }
+
+        const now = new Date();
+        now.setMinutes(0, 0, 0);
+        now.setHours(now.getHours() + 1);
+        const pad = (n) => String(n).padStart(2, '0');
+        const dateInput = document.getElementById('trip-date');
+        if (dateInput) dateInput.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης dropdown:", err.message);
+    }
+}
+
+window.createTrip = async function() {
+    const vehicleId = parseInt(document.getElementById('trip-vehicle')?.value);
+    const driverId = parseInt(document.getElementById('trip-driver')?.value);
+    const customerId = parseInt(document.getElementById('trip-customer')?.value) || null;
+        const rawDate = document.getElementById('trip-date')?.value;
+        let date = '';
+        if (rawDate) {
+            const offset = -new Date().getTimezoneOffset();
+            const oh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+            const om = String(Math.abs(offset) % 60).padStart(2, '0');
+            const tz = `${offset >= 0 ? '+' : '-'}${oh}:${om}`;
+            date = `${rawDate}:00${tz}`;
+        }
+    const destination = document.getElementById('trip-destination')?.value?.trim();
+    const cost = parseFloat(document.getElementById('trip-cost')?.value);
+
+    if (!vehicleId) { showToast('Επιλέξτε όχημα.', 'error'); return; }
+    if (!driverId) { showToast('Επιλέξτε οδηγό.', 'error'); return; }
+    if (!date) { showToast('Επιλέξτε ημερομηνία.', 'error'); return; }
+    if (!destination) { showToast('Συμπληρώστε προορισμό.', 'error'); return; }
+    if (!cost || cost <= 0) { showToast('Συμπληρώστε έγκυρο κόστος.', 'error'); return; }
+
+    try {
+        const { data: maxTrip } = await supabase
+            .from('TRIP')
+            .select('TripID')
+            .order('TripID', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        const nextId = (maxTrip?.TripID || 0) + 1;
+
+        const insertFields = {
+            TripID: nextId,
+            VehicleID: vehicleId,
+            DriverID: driverId,
+            CustomerID: customerId,
+            Date: date,
+            Cost: cost,
+            Destination: destination
+        };
+
+        if (window._tripHasStatus) {
+            insertFields.Status = 'pending';
+        }
+
+        const { error } = await supabase
+            .from('TRIP')
+            .insert([insertFields]);
+
+        if (error) throw error;
+
+        showToast('Το δρομολόγιο καταχωρήθηκε επιτυχώς!', 'success');
+        document.getElementById('trip-destination').value = '';
+        document.getElementById('trip-cost').value = '';
+        fetchTrips();
+    } catch (err) {
+        showToast('Σφάλμα καταχώρησης: ' + err.message, 'error');
+    }
+};
+
+window.deleteTrip = async function(tripId) {
+    if (!await window.showConfirm('Διαγραφή δρομολογίου;')) return;
+    try {
+        const { error } = await supabase
+            .from('TRIP')
+            .delete()
+            .eq('TripID', tripId);
+        if (error) throw error;
+        showToast('Το δρομολόγιο διαγράφηκε.', 'info');
+        fetchTrips();
+    } catch (err) {
+        showToast('Σφάλμα διαγραφής: ' + err.message, 'error');
+    }
 };
 
 /* ==============================================================
@@ -2153,30 +2379,118 @@ window.payEmployee = async function(btn, id, name, iban) {
 };
 
 /* ==============================================================
-   ΚΟΥΜΠΙΑ: BACKUP SYSTEM
+   BACKUP SYSTEM — Λήψη όλων των δεδομένων από τη βάση
    ============================================================== */
-window.runBackup = function(btn) {
-    showToast("Η λειτουργία backup δεν είναι ακόμα συνδεδεμένη με το σύστημα αρχείων.", "info");
-}
+const BACKUP_TABLES = [
+    { name: 'CUSTOMER', label: 'Πελάτες' },
+    { name: 'EMPLOYEE', label: 'Υπάλληλοι' },
+    { name: 'RESERVATION', label: 'Κρατήσεις' },
+    { name: 'RESERVATION_ROOM', label: 'Δωμάτια_Κράτησης' },
+    { name: 'ROOM', label: 'Δωμάτια' },
+    { name: 'RECEIPT', label: 'Αποδείξεις' },
+    { name: 'COMPLAINT', label: 'Παράπονα' },
+    { name: 'MINIBAR_CONSUMPTION', label: 'Κατανάλωση_MiniBar' },
+    { name: 'INVENTORY_ITEM', label: 'Απόθεμα' },
+    { name: 'NOTIFICATION', label: 'Ειδοποιήσεις' },
+    { name: 'RENTED_SHOP', label: 'Ενοικιαζόμενα' },
+    { name: 'LEASE_PAYMENT', label: 'Πληρωμές_Ενοικίων' },
+    { name: 'SHIFT', label: 'Βάρδιες' },
+    { name: 'VEHICLE', label: 'Οχήματα' },
+    { name: 'VEHICLE_SERVICE', label: 'Service_Οχημάτων' },
+    { name: 'TRIP', label: 'Δρομολόγια' }
+];
 
-// Απλό animation για το κουμπί backup
-const style = document.createElement('style');
-style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } }
-.mult-input{width:60px;padding:4px 6px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-body);color:var(--text-main);font-weight:500;text-align:center;font-size:13px}
-.mult-input:focus{outline:2px solid var(--accent)}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
-.modal-content{background:var(--color-background-primary);border-radius:12px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
-.modal-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;border-bottom:1px solid var(--border-color)}
-.modal-title{font-weight:600;font-size:1.1rem}
-.modal-close{cursor:pointer;font-size:1.5rem;color:var(--text-muted);line-height:1;padding:0 4px}
-.modal-close:hover{color:var(--text-main)}
-.modal-body{padding:1.5rem;line-height:1.7}
-.modal-body .field{margin-bottom:12px}
-.modal-body .field-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
-.modal-body .field-value{font-size:14px;color:var(--text-main)}
-.modal-body .desc-box{padding:12px;background:var(--bg-body);border-radius:8px;margin-top:4px;font-size:14px;line-height:1.6;white-space:pre-wrap}
-.modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:1rem 1.5rem;border-top:1px solid var(--border-color)}`;
-document.head.appendChild(style);
+window.runBackup = async function(btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> Δημιουργία...';
+    showToast('Εκκίνηση δημιουργίας αντιγράφου ασφαλείας...', 'info');
+
+    try {
+        // 1. Fetch all tables in parallel
+        const results = await Promise.all(BACKUP_TABLES.map(t =>
+            supabase.from(t.name).select('*').then(r => ({
+                label: t.label,
+                name: t.name,
+                data: r.data || [],
+                error: r.error
+            }))
+        ));
+
+        const wb = XLSX.utils.book_new();
+        const summaryRows = [['Πίνακας', 'Εγγραφές']];
+        let totalRows = 0;
+
+        // 2. Build one sheet per table
+        results.forEach(r => {
+            summaryRows.push([r.label, r.data.length]);
+            totalRows += r.data.length;
+
+            const sheet = XLSX.utils.json_to_sheet(r.data);
+            const sheetLabel = r.label.slice(0, 31);
+            XLSX.utils.book_append_sheet(wb, sheet, sheetLabel);
+        });
+
+        // 3. Executive Summary sheet
+        summaryRows.push(['Σύνολο', totalRows]);
+        const wsSum = XLSX.utils.aoa_to_sheet(summaryRows);
+        wsSum['!cols'] = [{ wch: 28 }, { wch: 12 }];
+        XLSX.utils.book_append_sheet(wb, wsSum, 'Σύνοψη');
+
+        // 4. Estimate file size
+        const rawSize = JSON.stringify(results.map(r => r.data)).length;
+        const estimatedKB = Math.max(1, Math.round(rawSize / 1024));
+        const sizeStr = estimatedKB >= 1024 ? `${(estimatedKB / 1024).toFixed(1)} MB` : `${estimatedKB} KB`;
+
+        // 5. Download
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+        const filename = `GrandKavala_Backup_${ts}.xlsx`;
+        XLSX.writeFile(wb, filename);
+
+        // 6. Save history
+        const history = JSON.parse(localStorage.getItem('backup_history') || '[]');
+        history.unshift({
+            date: `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()}`,
+            time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+            medium: 'Excel',
+            size: sizeStr,
+            status: 'Ολοκληρώθηκε'
+        });
+        localStorage.setItem('backup_history', JSON.stringify(history.slice(0, 50)));
+
+        showToast(`Αντίγραφο ασφαλείας δημιουργήθηκε (${sizeStr}, ${totalRows} εγγραφές).`, 'success');
+    } catch (err) {
+        console.error('Backup error:', err);
+        showToast('Αποτυχία δημιουργίας αντιγράφου: ' + err.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-player-play" aria-hidden="true"></i> Εκτέλεση τώρα';
+    loadBackupHistory();
+};
+
+function loadBackupHistory() {
+    const tbody = document.getElementById('backup-tbody');
+    if (!tbody) return;
+
+    const history = JSON.parse(localStorage.getItem('backup_history') || '[]');
+    if (history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχει ιστορικό backup.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = history.map(h => `
+        <tr>
+            <td>${h.date}</td>
+            <td>${h.time}</td>
+            <td><span class="pill p-b">${h.medium}</span></td>
+            <td>${h.size}</td>
+            <td><span class="pill p-g">${h.status}</span></td>
+            <td style="text-align:center;color:#0F6E56">✓</td>
+        </tr>
+    `).join('');
+}
 
 
 /* ==============================================================
@@ -2717,6 +3031,7 @@ appReady.then(ok => {
     el.addEventListener('click', () => {
       if (el.dataset.v === 'revenue') setTimeout(buildRevChart, 50);
       if (el.dataset.v === 'notif-history') setTimeout(loadNotifHistory, 50);
+      if (el.dataset.v === 'trips') { fetchTrips(); populateTripFormDropdowns(); }
     });
   });
   const logoutBtn = document.getElementById('logout-btn');
@@ -2738,6 +3053,7 @@ appReady.then(ok => {
   if (document.getElementById('specific-room-rows')) loadRoomSpecialPrices();
   initRevenueDates();
   initLogKmSave();
+  loadBackupHistory();
   if (window.HotelScheduler) {
     HotelScheduler.registerTask('roomSync', fetchRooms, 300000);
     HotelScheduler.registerTask('vehicleSync', fetchVehicles, 300000);
