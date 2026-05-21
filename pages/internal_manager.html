@@ -15,6 +15,7 @@
     <div class="loader-logo">Grand Kavala</div>
     <div class="loader-sub">Εσωτερική Διαχείριση</div>
     <div class="loader-spin"><i class="ti ti-loader"></i></div>
+    <div class="loader-msg">Φόρτωση...</div>
   </div>
 </div>
 
@@ -38,8 +39,8 @@
   <div class="sb-foot">
     <div class="av">
       <div class="av-circle" style="color:#8B5CF6">ΜΕ</div>
-      <div><div class="av-name">Μαρία Ε.</div><div class="av-shift">Διαχειριστής Εσωτ.</div></div>
-      <i class="ti ti-logout" style="cursor:pointer;"></i>
+      <div><div class="av-name" id="user-name"></div><div class="av-shift" id="user-role"></div></div>
+      <i class="ti ti-logout" id="logout-btn" style="cursor:pointer;" onclick="logout()" title="Αποσύνδεση"></i>
     </div>
   </div>
 </aside>
@@ -49,7 +50,7 @@
     <div class="tb-l">
       <div>
         <div class="tb-title" id="tb-title">Επισκόπηση Εσωτερικών Λειτουργιών</div>
-        <div class="tb-meta">Πληρότητα: 58% · Σύνολο Δωματίων: 510</div>
+        <div class="tb-meta" id="tb-meta">Πληρότητα: 58% · Σύνολο Δωματίων: 510</div>
       </div>
     </div>
     <div class="tb-r">

@@ -59,7 +59,7 @@ function triggerAction(msg, type) { showToast(msg, type); }
 function logoutMinibar() {
     localStorage.removeItem('hotel_user');
     showToast("Γίνεται αποσύνδεση... Καλή ξεκούραση.", "info");
-    setTimeout(() => { window.location.href = "login.html"; }, 1500);
+    setTimeout(() => { window.location.href = "/pages/login.html"; }, 1500);
 }
 
 /* ==============================================================

@@ -42,8 +42,10 @@
     <div class="sb-group">Τμήματα</div>
     <div class="sb-item" data-v="rooms"><i class="ti ti-building" aria-hidden="true"></i>Δωμάτια (510)</div>
     <div class="sb-item" data-v="staff"><i class="ti ti-users" aria-hidden="true"></i>Προσωπικό</div>
-    <div class="sb-item" data-v="restaurant"><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i>Εστιατόριο</div>
+    <div class="sb-item" data-v="restaurant"><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i>Minibar</div>
     <div class="sb-item" data-v="vehicles"><i class="ti ti-bus" aria-hidden="true"></i>Οχήματα</div>
+    <div class="sb-item" data-v="trips"><i class="ti ti-route" aria-hidden="true"></i>Δρομολόγια</div>
+    <div class="sb-item" data-v="reservations"><i class="ti ti-calendar-event" aria-hidden="true"></i>Κρατήσεις</div>
     <div class="sb-item" data-v="gardens"><i class="ti ti-plant" aria-hidden="true"></i>Κήποι</div>
     
     <div class="sb-group">Οικονομικά</div>
@@ -146,8 +148,14 @@
 
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-calendar-event" aria-hidden="true"></i>Συντελεστές Εποχικότητας</div></div>
+      <div class="tab-row" style="padding:0 16px">
+        <div class="tab season-type-btn" onclick="selectSeasonalityRoomType('Μονόκλινο',this)">Μονόκλινο</div>
+        <div class="tab season-type-btn active" onclick="selectSeasonalityRoomType('Δίκλινο',this)">Δίκλινο</div>
+        <div class="tab season-type-btn" onclick="selectSeasonalityRoomType('Φαρδύκλινο',this)">Φαρδύκλινο</div>
+        <div class="tab season-type-btn" onclick="selectSeasonalityRoomType('Σουίτα',this)">Σουίτα</div>
+      </div>
       <table>
-        <thead><tr><th style="width:30%">Περίοδος</th><th style="width:20%">Πολλαπλ.</th><th style="width:30%">Τιμή Πόρτας (Δίκλινο)</th><th style="width:20%">Κατάσταση</th></tr></thead>
+        <thead><tr><th style="width:30%">Περίοδος</th><th style="width:20%">Πολλαπλ.</th><th style="width:30%">Τιμή Πόρτας (<span id="season-type-label">Δίκλινο</span>)</th><th style="width:20%">Κατάσταση</th></tr></thead>
         <tbody>
           <tr><td>Καλοκαίρι (Ιούν–Αύγ)</td><td><input type="number" id="mult-summer" class="mult-input" value="1.6" step="0.1" min="0" max="5"></td><td id="calc-summer">€224/βράδυ</td><td><span class="pill p-g" id="status-summer">Ενεργό</span></td></tr>
           <tr><td>Χριστούγεννα</td><td><input type="number" id="mult-xmas" class="mult-input" value="1.4" step="0.1" min="0" max="5"></td><td id="calc-xmas">€196/βράδυ</td><td><span class="pill p-r" id="status-xmas">Ανενεργό</span></td></tr>
@@ -221,17 +229,26 @@
 
   <div class="view" id="v-staff">
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-users" aria-hidden="true"></i>Ιστορικό & Αξιολόγηση Προσωπικού</div></div>
-      <div class="tab-row">
-        <div class="tab active" onclick="stTab('all',this)">Όλοι</div>
-        <div class="tab" onclick="stTab('reception',this)">Υποδοχή</div>
-        <div class="tab" onclick="stTab('clean',this)">Καθαριότητα</div>
-        <div class="tab" onclick="stTab('restaurant',this)">Εστιατόριο</div>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-users" aria-hidden="true"></i>Ιστορικό & Αξιολόγηση Προσωπικού</div><button class="btn btn-sm" id="sort-complaints-btn" onclick="toggleComplaintSort()"><i class="ti ti-arrow-down" aria-hidden="true"></i> Περισσότερα παράπονα</button></div>
+      <div id="staff-tab-row" class="tab-row"></div>
+      <div id="staff-body" class="staff-grid"></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-calendar-time" aria-hidden="true"></i>Διαχείριση Αδειών</div></div>
+      <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;padding:4px 0">
+        <div style="flex:2;min-width:180px">
+          <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px;font-weight:500">Υπάλληλος</label>
+          <select id="leave-emp" style="width:100%;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:13px;background:var(--color-background-primary);color:var(--color-text-primary)">
+            <option value="">— Επιλέξτε —</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:80px">
+          <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px;font-weight:500">Ημέρες</label>
+          <input type="number" id="leave-days" min="1" value="1" style="width:100%;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:13px;outline:none;box-sizing:border-box">
+        </div>
+        <button class="btn btn-dark" onclick="addLeaveDays()" style="margin-bottom:1px"><i class="ti ti-plus" aria-hidden="true"></i> Προσθήκη</button>
+        <button class="btn" onclick="removeLeaveDays()" style="margin-bottom:1px"><i class="ti ti-minus" aria-hidden="true"></i> Αφαίρεση</button>
       </div>
-      <table>
-        <thead><tr><th style="width:22%">Υπάλληλος</th><th style="width:16%">Τμήμα</th><th style="width:14%">Απασχόληση</th><th style="width:14%">Άδειες</th><th style="width:16%">Μισθός</th><th style="width:11%">Αξιολ.</th><th style="width:7%"></th></tr></thead>
-        <tbody id="staff-body"></tbody>
-      </table>
     </div>
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-message-report" aria-hidden="true"></i>Παράπονα Πελατών</div></div>
@@ -297,6 +314,52 @@
       <table id="vehicles-table">
         <thead><tr><th style="width:20%">Όχημα / Μοντέλο</th><th style="width:12%">Πινακίδα</th><th style="width:13%">Χιλιόμετρα</th><th style="width:15%">Κατάσταση</th><th style="width:20%">Επόμενο Service</th><th style="width:20%">Ενέργειες</th></tr></thead>
         <tbody id="vehicles-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-trips">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-list" aria-hidden="true"></i> Όλα τα Δρομολόγια</div></div>
+      <table>
+        <thead><tr><th>Ημερομηνία</th><th>Προορισμός</th><th>Όχημα</th><th>Οδηγός</th><th>Πελάτης</th><th>Κόστος</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
+        <tbody id="trips-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-reservations">
+    <div class="card">
+      <div class="card-hd">
+        <div class="card-hd-l"><i class="ti ti-calendar-event" aria-hidden="true"></i>Όλες οι Κρατήσεις</div>
+        <div style="display:flex;gap:8px;">
+          <select id="res-status-filter" class="search-input" style="max-width:160px;" onchange="renderReservations()">
+            <option value="all">Όλες οι καταστάσεις</option>
+            <option value="Confirmed">Επιβεβαιωμένες</option>
+            <option value="CheckedIn">Check-in</option>
+            <option value="CheckedOut">Check-out</option>
+            <option value="Cancelled">Ακυρωμένες</option>
+          </select>
+          <input type="text" id="res-search" class="search-input" placeholder="Αναζήτηση πελάτη, δωματίου ή ID" oninput="renderReservations()">
+          <button class="btn btn-sm" onclick="fetchReservations()"><i class="ti ti-refresh"></i> Ανανέωση</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;" id="res-count"></div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:5%">ID</th>
+            <th style="width:18%">Πελάτης</th>
+            <th style="width:12%">Check-in</th>
+            <th style="width:12%">Check-out</th>
+            <th style="width:10%">Τύπος Δωματίου</th>
+            <th style="width:8%">Δωμ.</th>
+            <th style="width:10%">Σύνολο</th>
+            <th style="width:13%">Κατάσταση</th>
+            <th style="width:12%">Ενέργεια</th>
+          </tr>
+        </thead>
+        <tbody id="reservations-body"></tbody>
       </table>
     </div>
   </div>
@@ -414,6 +477,19 @@
     <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn" onclick="closeLogKmModal()">Ακύρωση</button>
       <button class="btn btn-dark" id="logkm-save">Καταχώρηση</button>
+    </div>
+  </div>
+</div>
+
+<div id="emp-modal" class="modal-overlay" style="display:none" onclick="closeEmpModal(event)">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title" id="emp-modal-title">Υπάλληλος</span>
+      <span class="modal-close" onclick="closeEmpModal()">&times;</span>
+    </div>
+    <div class="modal-body" id="emp-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeEmpModal()">Κλείσιμο</button>
     </div>
   </div>
 </div>

@@ -69,7 +69,14 @@ function getStatusLabel(state, checkoutDate) {
 }
 
 /* ==============================================================
-   TOAST NOTIFICATION SYSTEM (ΖΩΝΤΑΝΕΣ ΕΙΔΟΠΟΙΗΣΕΙΣ)
+   SHARED UTILITIES
+   ============================================================== */
+function normalizeString(str) {
+    return str.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+}
+
+/* ==============================================================
+   TOAST NOTIFICATION SYSTEM
    ============================================================== */
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
@@ -105,8 +112,8 @@ window.triggerAction = function(msg, type) {
    ============================================================== */
 const viewTitles = {
     dash: 'Πίνακας Ελέγχου', revenue: 'Έσοδα & Αναφορές', pricing: 'Δυναμική Τιμολόγηση',
-    rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Εστιατόριο & Αποθήκες',
-    vehicles: 'Οχήματα & Μεταφορές', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
+    rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Minibar & Αποθήκες',
+    vehicles: 'Οχήματα & Μεταφορές',     trips: 'Δρομολόγια Οχημάτων', reservations: 'Κρατήσεις', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
     payroll: 'Μισθοδοσία', users: 'Χρήστες & Ρόλοι', backup: 'Backup & Ασφάλεια',
     'notif-history': 'Ιστορικό Ειδοποιήσεων'
 };
@@ -518,12 +525,31 @@ function updateLivePrices() {
     });
 }
 
+let _prevLowOccupancyActive = null;
+
 function checkDynamicPricing(occPct) {
     const statusLow = document.getElementById('status-low');
     const pricingAlert = document.getElementById('pricing-alert');
     if(!statusLow || !pricingAlert) return;
 
-    if (occPct < 60) {
+    const isActive = occPct < 60;
+
+    if (_prevLowOccupancyActive !== null && isActive !== _prevLowOccupancyActive) {
+        const message = isActive
+            ? `Η έκπτωση χαμηλής πληρότητας (-15%) ενεργοποιήθηκε (πληρότητα ${occPct}%).`
+            : `Η έκπτωση χαμηλής πληρότητας (-15%) απενεργοποιήθηκε (πληρότητα ${occPct}%).`;
+        try {
+            supabase.from('NOTIFICATION').insert({
+                TargetRole: 'admin',
+                Type: 'pricing',
+                Message: message,
+                IsRead: false
+            }).then(() => { fetchVehicles(); });
+        } catch(_) {}
+    }
+    _prevLowOccupancyActive = isActive;
+
+    if (isActive) {
         statusLow.className = 'pill p-g'; statusLow.textContent = 'Ενεργό';
         pricingAlert.className = 'ns ns-e';
         pricingAlert.innerHTML = `<i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>ΠΡΟΣΟΧΗ:</strong> Πληρότητα ${occPct}% (<60%). Εφαρμόζεται αυτόματη έκπτωση 15% σε όλες τις τιμές.</div>`;
@@ -596,8 +622,21 @@ function getCurrentSeason() {
     return getSeasonForDate(new Date());
 }
 
+let _seasonalityRoomType = 'Δίκλινο';
+
+window.selectSeasonalityRoomType = function(type, btn) {
+    _seasonalityRoomType = type;
+    document.querySelectorAll('.season-type-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    const label = document.getElementById('season-type-label');
+    if (label) label.textContent = type;
+    updateSeasonality();
+};
+
 function updateSeasonality() {
-    const basePrice = parseInt(document.getElementById('price-d').value) || 140;
+    const sliderMap = { 'Μονόκλινο': 'price-m', 'Δίκλινο': 'price-d', 'Φαρδύκλινο': 'price-f', 'Σουίτα': 'price-s' };
+    const sliderId = sliderMap[_seasonalityRoomType] || 'price-d';
+    const basePrice = parseInt(document.getElementById(sliderId).value) || 140;
     const activeSeason = getCurrentSeason();
 
     const seasonTextEl = document.getElementById('season-text');
@@ -766,48 +805,71 @@ let staffData = [];
 let complaintsData = [];
 let currentComplaintFilter = 'all';
 
+let _roleDeptMap = {};
+let _deptToRoles = {};
+let _activeStaffFilter = 'all';
+let _complaintSortOrder = 'desc';
+
 // 1. Fetch δεδομένων από τη βάση
 async function fetchStaff() {
     try {
-        const tbody = document.getElementById('staff-body');
-        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem;"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 1.5rem;"></i><br>Φόρτωση προσωπικού...</td></tr>';
+        const container = document.getElementById('staff-body');
+        if (container) container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);grid-column:1/-1"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;display:block;margin-bottom:10px;"></i>Φόρτωση προσωπικού...</div>';
 
-        // Τραβάμε μόνο τους ενεργούς (isActive = true) υπαλλήλους
         const { data, error } = await supabase
             .from('EMPLOYEE')
-            .select('FirstName, LastName, Role, Salary, Leaves, Score')
+            .select('EmpID, FirstName, LastName, Role, Salary, Leaves')
             .eq('isActive', true)
             .order('Role', { ascending: true });
 
         if (error) throw error;
 
-        // 2. Μετατροπή και προσαρμογή δεδομένων για το UI
+        const complaintCounts = {};
+        try {
+            const { data: comps } = await supabase.from('COMPLAINT').select('EmpID');
+            if (comps) comps.forEach(c => { complaintCounts[c.EmpID] = (complaintCounts[c.EmpID] || 0) + 1; });
+        } catch (_) {}
+
         staffData = data.map(emp => {
             const roleKey = emp.Role ? emp.Role.toLowerCase().trim() : '';
-            let deptGR = emp.Role; // Default αν δεν ταιριάζει κάτι
+            let deptGR = emp.Role;
 
-            // Μετάφραση των αγγλικών ρόλων της βάσης σε ελληνικά τμήματα
             if (roleKey === 'receptionist') deptGR = 'Υποδοχή';
             else if (roleKey === 'maid') deptGR = 'Καθαριότητα';
-            else if (roleKey === 'minibar' || roleKey === 'restaurant') deptGR = 'Εστιατόριο';
+            else if (roleKey === 'minibar') deptGR = 'Minibar';
+            else if (roleKey === 'driver') deptGR = 'Οδηγοί';
+            else if (roleKey === 'gardener') deptGR = 'Κηπουροί';
             else if (roleKey === 'admin' || roleKey === 'manager') deptGR = 'Διοίκηση';
 
             return {
+                id: emp.EmpID,
+                firstName: emp.FirstName || '',
+                lastName: emp.LastName || '',
                 n: `${emp.FirstName || ''} ${emp.LastName || ''}`.trim() || 'Χωρίς Όνομα',
                 dept: deptGR,
                 dbRole: roleKey,
                 since: '2024',
-                leaves: emp.Leaves !== null ? `${emp.Leaves} ημ.` : '0 ημ.', // <--- Από τη βάση
+                leaves: emp.Leaves !== null ? `${emp.Leaves} ημ.` : '0 ημ.',
+                rawLeaves: emp.Leaves || 0,
                 salary: `€${emp.Salary || 0}`,
-                score: emp.Score !== null ? `⭐${emp.Score}` : '⭐-'       // <--- Από τη βάση
+                complaintCount: complaintCounts[emp.EmpID] || 0
             };
         });
 
-        // Ενημέρωση dashboard με αριθμό προσωπικού
         if (document.getElementById('dash-staff-val')) document.getElementById('dash-staff-val').textContent = staffData.length;
         if (document.getElementById('dash-staff-sub')) document.getElementById('dash-staff-sub').textContent = `${staffData.length} ενεργοί υπάλληλοι`;
 
-        renderStaff('all'); // Εμφάνιση όλων αρχικά
+        _roleDeptMap = {};
+        staffData.forEach(s => {
+            if (!_roleDeptMap[s.dbRole]) _roleDeptMap[s.dbRole] = s.dept;
+        });
+        _deptToRoles = {};
+        Object.entries(_roleDeptMap).forEach(([role, dept]) => {
+            if (!_deptToRoles[dept]) _deptToRoles[dept] = [];
+            _deptToRoles[dept].push(role);
+        });
+        renderStaffTabs('all');
+        populateLeaveDropdown();
 
     } catch (err) {
         console.error("Σφάλμα φόρτωσης προσωπικού:", err.message);
@@ -815,51 +877,143 @@ async function fetchStaff() {
     }
 }
 
-// 3. Render του HTML
-function renderStaff(filter){
-    const tbody = document.getElementById('staff-body');
-    if (!tbody) return;
+// 3. Render των tabs (δυναμικά από τα δεδομένα)
+function renderStaffTabs(activeFilter) {
+    const container = document.getElementById('staff-tab-row');
+    if (!container) return;
+    let html = `<div class="tab ${activeFilter === 'all' ? 'active' : ''}" onclick="stTab('all',this)">Όλοι</div>`;
+    Object.keys(_deptToRoles).sort().forEach(dept => {
+        const safe = dept.replace(/'/g, "\\'");
+        html += `<div class="tab ${activeFilter === dept ? 'active' : ''}" onclick="stTab('${safe}',this)">${dept}</div>`;
+    });
+    container.innerHTML = html;
+    renderStaff(activeFilter);
+}
 
-    // Φιλτράρισμα με βάση τον αγγλικό ρόλο (dbRole)
+// 4. Render του HTML με κάρτες
+function renderStaff(filter){
+    const container = document.getElementById('staff-body');
+    if (!container) return;
+
+    const sorted = [...staffData].sort((a, b) =>
+        _complaintSortOrder === 'desc' ? b.complaintCount - a.complaintCount : a.complaintCount - b.complaintCount
+    );
+
     const filteredData = filter === 'all' 
-        ? staffData 
-        : staffData.filter(s => {
-            if (filter === 'reception') return s.dbRole === 'receptionist';
-            if (filter === 'clean') return s.dbRole === 'maid';
-            if (filter === 'restaurant') return s.dbRole === 'minibar' || s.dbRole === 'restaurant';
-            return false;
-        });
+        ? sorted
+        : sorted.filter(s => s.dept === filter);
 
     if (filteredData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">Δεν βρέθηκαν υπάλληλοι σε αυτό το τμήμα.</td></tr>';
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);grid-column:1/-1;">Δεν βρέθηκαν υπάλληλοι σε αυτό το τμήμα.</div>';
         return;
     }
 
-    tbody.innerHTML = filteredData.map(s => 
-        `<tr>
-            <td>${s.n}</td>
-            <td><span class="pill p-b">${s.dept}</span></td>
-            <td>Από ${s.since}</td>
-            <td>${s.leaves}</td>
-            <td>${s.salary}</td>
-            <td>${s.score}</td>
-            <td>
-                <button class="btn btn-sm" onclick="triggerAction('Προβολή καρτέλας: ${s.n}', 'info')">
+    container.innerHTML = filteredData.map(s => {
+        const initials = ((s.firstName?.[0] || '') + (s.lastName?.[0] || '')).trim() || '?';
+        const complaintColor = s.complaintCount > 0 ? 'color:#791F1F' : 'color:var(--color-text-secondary)';
+        return `
+            <div class="staff-card">
+                <div class="sc-avatar">${initials}</div>
+                <div class="sc-body">
+                    <div class="sc-name">${s.n}</div>
+                    <div class="sc-dept"><span class="pill p-b">${s.dept}</span></div>
+                    <div class="sc-meta">Από ${s.since} · ${s.leaves} άδεια · ${s.salary}</div>
+                    <div class="sc-complaints" style="${complaintColor}"><i class="ti ti-message-report" aria-hidden="true"></i> Παράπονα: ${s.complaintCount}</div>
+                </div>
+                <button class="btn btn-sm sc-btn" onclick="openEmpModal(${s.id})" title="Προβολή">
                     <i class="ti ti-eye" aria-hidden="true"></i>
                 </button>
-            </td>
-        </tr>`
-    ).join('');
+            </div>`;
+    }).join('');
 }
 
 // Λειτουργία των Tabs
 window.stTab = function(f, el){
     document.querySelectorAll('#v-staff .tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
+    _activeStaffFilter = f;
     currentComplaintFilter = f;
     renderStaff(f);
     renderComplaints(f);
 }
+
+window.toggleComplaintSort = function() {
+    _complaintSortOrder = _complaintSortOrder === 'desc' ? 'asc' : 'desc';
+    const btn = document.getElementById('sort-complaints-btn');
+    if (btn) {
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = _complaintSortOrder === 'desc' ? 'ti ti-arrow-down' : 'ti ti-arrow-up';
+        btn.innerHTML = (_complaintSortOrder === 'desc' ? '<i class="ti ti-arrow-down" aria-hidden="true"></i> Περισσότερα παράπονα' : '<i class="ti ti-arrow-up" aria-hidden="true"></i> Λιγότερα παράπονα');
+    }
+    renderStaff(_activeStaffFilter);
+};
+
+/* ==============================================================
+   ΔΙΑΧΕΙΡΙΣΗ ΑΔΕΙΩΝ
+   ============================================================== */
+
+function populateLeaveDropdown() {
+    const sel = document.getElementById('leave-emp');
+    if (!sel) return;
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">— Επιλέξτε —</option>';
+    staffData.forEach(s => {
+        sel.innerHTML += `<option value="${s.id}">${s.n} (${s.dept})</option>`;
+    });
+    if (currentVal && sel.querySelector(`option[value="${currentVal}"]`)) sel.value = currentVal;
+}
+
+window.addLeaveDays = async function() {
+    const sel = document.getElementById('leave-emp');
+    const daysInput = document.getElementById('leave-days');
+    if (!sel || !daysInput) return;
+    const empId = parseInt(sel.value);
+    if (!empId) { showToast('Επιλέξτε υπάλληλο.', 'warning'); return; }
+    const days = parseInt(daysInput.value);
+    if (!days || days < 1) { showToast('Εισάγετε έγκυρο αριθμό ημερών.', 'warning'); return; }
+
+    const emp = staffData.find(s => s.id === empId);
+    if (!emp) return;
+    const current = emp.rawLeaves;
+    const newVal = current + days;
+
+    if (!await window.showConfirm(`Προσθήκη ${days} ημερών άδειας στον/στην ${emp.n}; (${current} → ${newVal} ημ.)`)) return;
+
+    try {
+        const { error } = await supabase.from('EMPLOYEE').update({ Leaves: newVal }).eq('EmpID', empId);
+        if (error) throw error;
+        showToast(`Προστέθηκαν ${days} ημέρες άδειας στον/στην ${emp.n}.`, 'success');
+        fetchStaff();
+    } catch (err) {
+        showToast('Αποτυχία ενημέρωσης.', 'error');
+    }
+};
+
+window.removeLeaveDays = async function() {
+    const sel = document.getElementById('leave-emp');
+    const daysInput = document.getElementById('leave-days');
+    if (!sel || !daysInput) return;
+    const empId = parseInt(sel.value);
+    if (!empId) { showToast('Επιλέξτε υπάλληλο.', 'warning'); return; }
+    const days = parseInt(daysInput.value);
+    if (!days || days < 1) { showToast('Εισάγετε έγκυρο αριθμό ημερών.', 'warning'); return; }
+
+    const emp = staffData.find(s => s.id === empId);
+    if (!emp) return;
+    const current = emp.rawLeaves;
+    const newVal = Math.max(0, current - days);
+
+    if (!await window.showConfirm(`Αφαίρεση ${days} ημερών άδειας από τον/την ${emp.n}; (${current} → ${newVal} ημ.)`)) return;
+
+    try {
+        const { error } = await supabase.from('EMPLOYEE').update({ Leaves: newVal }).eq('EmpID', empId);
+        if (error) throw error;
+        showToast(`Αφαιρέθηκαν ${days} ημέρες άδειας από τον/την ${emp.n}.`, 'success');
+        fetchStaff();
+    } catch (err) {
+        showToast('Αποτυχία ενημέρωσης.', 'error');
+    }
+};
 
 /* ==============================================================
    ΠΑΡΑΠΟΝΑ ΠΕΛΑΤΩΝ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
@@ -907,10 +1061,8 @@ function renderComplaints(filter) {
     const filteredData = filter === 'all'
         ? complaintsData
         : complaintsData.filter(c => {
-            if (filter === 'reception') return c.empRole === 'receptionist';
-            if (filter === 'clean') return c.empRole === 'maid';
-            if (filter === 'restaurant') return c.empRole === 'minibar' || c.empRole === 'restaurant';
-            return false;
+            const roles = _deptToRoles[filter] || [];
+            return roles.includes(c.empRole);
         });
 
     if (filteredData.length === 0) {
@@ -1055,6 +1207,30 @@ async function archiveComplaint(btn, id) {
 // Κάνουμε τις συναρτήσεις διαθέσιμες στο HTML (απαραίτητο για ES Modules)
 window.resolveComplaint = resolveComplaint;
 window.archiveComplaint = archiveComplaint;
+
+/* ==============================================================
+   MODAL ΠΡΟΒΟΛΗΣ ΥΠΑΛΛΗΛΟΥ
+   ============================================================== */
+
+window.openEmpModal = function(id) {
+    const emp = staffData.find(s => s.id === id);
+    if (!emp) return;
+    document.getElementById('emp-modal-title').textContent = emp.n;
+    document.getElementById('emp-modal-body').innerHTML = `
+        <div style="margin-bottom:12px"><span class="pill p-b">${emp.dept}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><span style="color:#6B7280">Ρόλος</span><span>${emp.dbRole}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><span style="color:#6B7280">Απασχόληση</span><span>Από ${emp.since}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><span style="color:#6B7280">Άδειες</span><span>${emp.leaves}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><span style="color:#6B7280">Μισθός</span><span>${emp.salary}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px"><span style="color:#6B7280">Παράπονα</span><span style="${emp.complaintCount > 0 ? 'color:#791F1F;font-weight:600' : ''}">${emp.complaintCount}</span></div>
+    `;
+    document.getElementById('emp-modal').style.display = 'flex';
+};
+
+window.closeEmpModal = function(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('emp-modal').style.display = 'none';
+};
 
 /* ==============================================================
    ΕΣΤΙΑΤΟΡΙΟ & ΑΠΟΘΗΚΕΣ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
@@ -1346,31 +1522,54 @@ async function fetchVehicles() {
             notifContainer.innerHTML = notifHtml;
         }
 
-        // Ειδοποιήσεις ανεφοδιασμού από το minibar
+        // Ειδοποιήσεις από τη βάση (ανεφοδιασμός, βλάβες οχημάτων κλπ.)
         try {
-            const { data: restockNotifs } = await supabase
+            const { data: dbNotifs } = await supabase
                 .from('NOTIFICATION')
-                .select(`
-                    NotificationID, Type, Message, CreatedAt,
-                    INVENTORY_ITEM (Name)
-                `)
-                .eq('TargetRole', 'both')
+                .select('NotificationID, Type, Message, CreatedAt')
+                .in('TargetRole', ['both', 'admin'])
                 .eq('IsRead', false)
                 .order('CreatedAt', { ascending: false });
 
-            if (restockNotifs && restockNotifs.length > 0) {
-                let restockHtml = restockNotifs.map(n => {
-                    const itemName = n.INVENTORY_ITEM?.Name || 'άγνωστο';
+            if (dbNotifs && dbNotifs.length > 0) {
+                let extraHtml = dbNotifs.map(n => {
+                    const isFault = n.Type === 'vehicle_fault';
+                    const icon = isFault ? 'ti ti-alert-octagon' : 'ti ti-package';
+                    const cls = isFault ? 'ns-e' : 'ns-w';
                     return `
-                    <div class="ns ns-w" id="restock-notif-${n.NotificationID}" onclick="dismissRestockNotif(${n.NotificationID}, this)">
-                        <i class="ti ti-package" aria-hidden="true"></i>
+                    <div class="ns ${cls}" id="restock-notif-${n.NotificationID}" onclick="dismissRestockNotif(${n.NotificationID}, this)">
+                        <i class="${icon}" aria-hidden="true"></i>
                         <div style="flex:1">${n.Message}</div>
                     </div>`;
                 }).join('');
 
                 if (notifContainer) {
-                    notifContainer.insertAdjacentHTML('beforeend', restockHtml);
-                    notifCount += restockNotifs.length;
+                    notifContainer.insertAdjacentHTML('beforeend', extraHtml);
+                    notifCount += dbNotifs.length;
+                }
+            }
+        } catch (_) {}
+
+        // Ειδοποιήσεις δυναμικής τιμολόγησης (πληρότητα <60%)
+        try {
+            const { data: pricingNotifs } = await supabase
+                .from('NOTIFICATION')
+                .select('NotificationID, Message, CreatedAt')
+                .eq('TargetRole', 'admin')
+                .eq('Type', 'pricing')
+                .eq('IsRead', false)
+                .order('CreatedAt', { ascending: false });
+
+            if (pricingNotifs && pricingNotifs.length > 0) {
+                let pricingHtml = pricingNotifs.map(n => `
+                    <div class="ns ns-e" id="pricing-notif-${n.NotificationID}" onclick="dismissPricingNotif(${n.NotificationID}, this)">
+                        <i class="ti ti-discount-2" aria-hidden="true"></i>
+                        <div style="flex:1">${n.Message}</div>
+                    </div>`).join('');
+
+                if (notifContainer) {
+                    notifContainer.insertAdjacentHTML('beforeend', pricingHtml);
+                    notifCount += pricingNotifs.length;
                 }
             }
         } catch (_) {}
@@ -1449,6 +1648,39 @@ window.dismissRestockNotif = async function(notifId, el) {
             const remaining = container ? container.children.length : 0;
             updateNotifBadge(remaining);
         }, 300);
+    }
+};
+
+window.dismissPricingNotif = async function(notifId, el) {
+    try {
+        await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', notifId);
+    } catch (_) {}
+    const target = el || document.getElementById(`pricing-notif-${notifId}`);
+    if (target) {
+        const msgEl = target.querySelector('div');
+        const msg = msgEl ? msgEl.textContent.trim() : 'Ειδοποίηση τιμολόγησης';
+        saveNotifHistory('pricing', notifId, msg, 'ns-e');
+        target.style.opacity = '0';
+        setTimeout(() => {
+            target.remove();
+            const container = document.getElementById('admin-notifications');
+            const remaining = container ? container.children.length : 0;
+            updateNotifBadge(remaining);
+        }, 300);
+    }
+};
+
+window.undoPricingNotif = async function(notifId) {
+    try {
+        await supabase.from('NOTIFICATION').update({ IsRead: false }).eq('NotificationID', notifId);
+        removeNotifHistory('pricing', notifId);
+        showToast('Η ειδοποίηση τιμολόγησης επαναφέρθηκε.', 'info');
+        loadNotifHistory();
+        fetchVehicles();
+        const dashItem = document.querySelector('.sb-item[data-v="dash"]');
+        if (dashItem) dashItem.click();
+    } catch (err) {
+        showToast('Αποτυχία επαναφοράς.', 'error');
     }
 };
 
@@ -1551,14 +1783,34 @@ window.loadNotifHistory = async function() {
 
         if (readNotifs && readNotifs.length > 0) {
             readNotifs.forEach(n => {
-                _notifHistoryData.push({
-                    type: 'Ανεφοδιασμός',
-                    icon: 'ti ti-package',
-                    cls: 'ns-w',
-                    message: n.Message,
-                    dismissedAt: n.CreatedAt ? new Date(n.CreatedAt).getTime() : null,
-                    undo: `undoRestockNotif(${n.NotificationID})`
-                });
+                if (n.Type === 'pricing') {
+                    _notifHistoryData.push({
+                        type: 'Δυναμική Τιμολόγηση',
+                        icon: 'ti ti-discount-2',
+                        cls: 'ns-e',
+                        message: n.Message,
+                        dismissedAt: n.CreatedAt ? new Date(n.CreatedAt).getTime() : null,
+                        undo: `undoPricingNotif(${n.NotificationID})`
+                    });
+                } else if (n.Type === 'vehicle_fault') {
+                    _notifHistoryData.push({
+                        type: 'Βλάβη οχήματος',
+                        icon: 'ti ti-alert-octagon',
+                        cls: 'ns-e',
+                        message: n.Message,
+                        dismissedAt: n.CreatedAt ? new Date(n.CreatedAt).getTime() : null,
+                        undo: `undoRestockNotif(${n.NotificationID})`
+                    });
+                } else {
+                    _notifHistoryData.push({
+                        type: 'Ανεφοδιασμός',
+                        icon: 'ti ti-package',
+                        cls: 'ns-w',
+                        message: n.Message,
+                        dismissedAt: n.CreatedAt ? new Date(n.CreatedAt).getTime() : null,
+                        undo: `undoRestockNotif(${n.NotificationID})`
+                    });
+                }
             });
         }
     } catch (_) {}
@@ -1666,6 +1918,79 @@ window.openTripModal = async function(vehicleId, plateNumber) {
 window.closeTripModal = function(e) {
     if (e && e.target !== e.currentTarget) return;
     document.getElementById('trip-modal').style.display = 'none';
+};
+
+/* ==============================================================
+   ΔΡΟΜΟΛΟΓΙΑ — CRUD (ΔΙΑΧΕΙΡΙΣΗ ΑΠΟ ADMIN)
+   ============================================================== */
+async function fetchTrips() {
+    const tbody = document.getElementById('trips-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση δρομολογίων...</td></tr>';
+
+    try {
+        const [tripRes, vehRes, empRes, custRes] = await Promise.all([
+            supabase.from('TRIP').select('*').order('Date', { ascending: false }),
+            supabase.from('VEHICLE').select('*'),
+            supabase.from('EMPLOYEE').select('*'),
+            supabase.from('CUSTOMER').select('*')
+        ]);
+
+        if (tripRes.error) throw tripRes.error;
+
+        const data = tripRes.data || [];
+        const vehMap = Object.fromEntries((vehRes.data || []).map(v => [v.VehicleID, v]));
+        const empMap = Object.fromEntries((empRes.data || []).map(e => [e.EmpID, e]));
+        const custMap = Object.fromEntries((custRes.data || []).map(c => [c.CustomerID, c]));
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν δρομολόγια.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(t => {
+            const veh = vehMap[t.VehicleID] || {};
+            const vehicleName = `${veh.Type || ''} ${veh.LicensePlate || veh.PlateNumber || ''}`.trim() || '—';
+            const driver = empMap[t.DriverID] || {};
+            const driverName = `${driver.FirstName || ''} ${driver.LastName || ''}`.trim() || '—';
+            const customer = custMap[t.CustomerID] || {};
+            const customerName = `${customer.FirstName || ''} ${customer.LastName || ''}`.trim() || '—';
+            const dateStr = new Date(t.Date).toLocaleDateString('el-GR');
+            const cost = t.Cost != null ? `€${t.Cost}` : '—';
+            const statusLabel = t.Status === 'completed' ? '<span class="pill p-g">Ολοκληρώθηκε</span>' : '<span class="pill p-a">Εκκρεμεί</span>';
+            return `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td><strong>${t.Destination}</strong></td>
+                    <td>${vehicleName}</td>
+                    <td>${driverName}</td>
+                    <td>${customerName}</td>
+                    <td>${cost}</td>
+                    <td>${statusLabel}</td>
+                    <td><button class="btn btn-sm" onclick="deleteTrip(${t.TripID})" title="Διαγραφή"><i class="ti ti-trash"></i></button></td>
+                </tr>`;
+        }).join('');
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης δρομολογίων:", err.message);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem;">Σφάλμα φόρτωσης</td></tr>';
+    }
+}
+
+
+
+window.deleteTrip = async function(tripId) {
+    if (!await window.showConfirm('Διαγραφή δρομολογίου;')) return;
+    try {
+        const { error } = await supabase
+            .from('TRIP')
+            .delete()
+            .eq('TripID', tripId);
+        if (error) throw error;
+        showToast('Το δρομολόγιο διαγράφηκε.', 'info');
+        fetchTrips();
+    } catch (err) {
+        showToast('Σφάλμα διαγραφής: ' + err.message, 'error');
+    }
 };
 
 /* ==============================================================
@@ -2354,7 +2679,7 @@ async function fetchRevenue() {
             const dateStr = dateObj.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit' });
             
             if (!groupedData[dateStr]) {
-                groupedData[dateStr] = { 'Διαμονή': 0, 'Εστιατόριο': 0, 'Λοιπά': 0 };
+                groupedData[dateStr] = { 'Διαμονή': 0, 'Minibar': 0, 'Λοιπά': 0 };
             }
             
             const cat = receipt.Category || 'Λοιπά';
@@ -2367,7 +2692,7 @@ async function fetchRevenue() {
         buildRevChart(
             labels, 
             labels.map(date => groupedData[date]['Διαμονή']), 
-            labels.map(date => groupedData[date]['Εστιατόριο']), 
+            labels.map(date => groupedData[date]['Minibar']), 
             labels.map(date => groupedData[date]['Λοιπά'])
         );
 
@@ -2394,7 +2719,7 @@ async function fetchRevenue() {
 }
 
 // 3. Σχεδιασμός του γραφήματος
-function buildRevChart(labels, diamoni, estiatorio, loipa) {
+function buildRevChart(labels, diamoni, minibar, loipa) {
     const ctx = document.getElementById('rev-chart');
     if (!ctx) return;
     if (revChart) revChart.destroy();
@@ -2405,7 +2730,7 @@ function buildRevChart(labels, diamoni, estiatorio, loipa) {
             labels: labels,
             datasets: [
                 {label: 'Διαμονή', data: diamoni, backgroundColor: '#1D9E75'},
-                {label: 'Εστιατόριο', data: estiatorio, backgroundColor: '#378ADD'},
+                {label: 'Minibar', data: minibar, backgroundColor: '#378ADD'},
                 {label: 'Λοιπά', data: loipa, backgroundColor: '#F97316'}
             ]
         },
@@ -2513,8 +2838,107 @@ window.logout = function() {
     window.location.href = "/pages/login.html";
 }
 
+let allReservations = [];
+
+async function fetchReservations() {
+    try {
+        const { data, error } = await supabase
+            .from('RESERVATION')
+            .select(`
+                ReservationID, CheckInDate, CheckOutDate, TotalCost, Status, RoomType,
+                CUSTOMER ( FirstName, LastName ),
+                RESERVATION_ROOM ( RoomNumber )
+            `)
+            .order('CheckInDate', { ascending: false });
+
+        if (error) throw error;
+
+        allReservations = data.map(res => ({
+            ...res,
+            customerName: `${res.CUSTOMER?.FirstName || ''} ${res.CUSTOMER?.LastName || ''}`.trim() || 'Άγνωστος',
+            roomNumbers: (res.RESERVATION_ROOM || []).map(rr => rr.RoomNumber).join(', ') || '—',
+        }));
+
+        renderReservations();
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης κρατήσεων:", err.message);
+        showToast("Αποτυχία φόρτωσης κρατήσεων.", "error");
+    }
+}
+
+function renderReservations() {
+    const searchTerm = normalizeString(document.getElementById('res-search')?.value || '');
+    const statusFilter = document.getElementById('res-status-filter')?.value || 'all';
+    const tbody = document.getElementById('reservations-body');
+    const countEl = document.getElementById('res-count');
+    if (!tbody || !countEl) return;
+
+    const filteredReservations = allReservations.filter(res => {
+        const matchesSearch = searchTerm === '' ||
+            normalizeString(res.customerName).includes(searchTerm) ||
+            normalizeString(res.ReservationID.toString()).includes(searchTerm) ||
+            normalizeString(res.roomNumbers).includes(searchTerm);
+
+        const matchesStatus = statusFilter === 'all' || res.Status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    tbody.innerHTML = '';
+    if (filteredReservations.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν βρέθηκαν κρατήσεις.</td></tr>';
+        countEl.textContent = '0 κρατήσεις';
+        return;
+    }
+
+    tbody.innerHTML = filteredReservations.map(res => {
+        const checkIn = new Date(res.CheckInDate).toLocaleDateString('el-GR');
+        const checkOut = new Date(res.CheckOutDate).toLocaleDateString('el-GR');
+        let statusClass = 'p-a';
+        if (res.Status === 'Confirmed') statusClass = 'p-b';
+        if (res.Status === 'CheckedIn') statusClass = 'p-g';
+        if (res.Status === 'CheckedOut') statusClass = 'p-g';
+        if (res.Status === 'Cancelled') statusClass = 'p-r';
+
+        const totalCost = parseFloat(res.TotalCost).toFixed(2);
+
+        return `
+            <tr>
+                <td>${res.ReservationID}</td>
+                <td>${res.customerName}</td>
+                <td>${checkIn}</td>
+                <td>${checkOut}</td>
+                <td>${res.RoomType || '—'}</td>
+                <td>${res.roomNumbers}</td>
+                <td>€${totalCost}</td>
+                <td><span class="pill ${statusClass}">${res.Status}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-r" onclick="deleteReservation(${res.ReservationID})"><i class="ti ti-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    countEl.textContent = `${filteredReservations.length} κρατήσεις`;
+}
+
+window.deleteReservation = async function(reservationId) {
+    if (!await window.showConfirm('Διαγραφή κράτησης; Αυτή η ενέργεια δεν αναιρείται.')) return;
+    try {
+        const { error } = await supabase
+            .from('RESERVATION')
+            .delete()
+            .eq('ReservationID', reservationId);
+        if (error) throw error;
+        showToast('Η κράτηση διαγράφηκε επιτυχώς.', 'info');
+        fetchReservations();
+    } catch (err) {
+        showToast('Σφάλμα διαγραφής κράτησης: ' + err.message, 'error');
+    }
+}
+
 /* ==============================================================
-   ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
+   ΔΙΑΧΕΙΡΙΣΗ ΔΩΜΑΤΙΩΝ (ROOMS MANAGEMENT)
    ============================================================== */
 async function fetchUsers() {
     try {
@@ -2708,7 +3132,7 @@ window.openUserModal = async function(empId) {
     const existing = document.querySelector('.inv-overlay');
     if (existing) existing.remove();
 
-    const roleOptions = ['admin', 'manager', 'receptionist', 'maid', 'minibar', 'restaurant'];
+    const roleOptions = ['admin', 'manager', 'receptionist', 'maid', 'minibar'];
     const roleHtml = roleOptions.map(r =>
         `<option value="${r}"${user?.Role === r ? ' selected' : ''}>${r}</option>`
     ).join('');
@@ -2847,6 +3271,8 @@ appReady.then(ok => {
     el.addEventListener('click', () => {
       if (el.dataset.v === 'revenue') setTimeout(buildRevChart, 50);
       if (el.dataset.v === 'notif-history') setTimeout(loadNotifHistory, 50);
+      if (el.dataset.v === 'trips') { fetchTrips(); }
+      if (el.dataset.v === 'reservations') { fetchReservations(); }
     });
   });
   const logoutBtn = document.getElementById('logout-btn');
