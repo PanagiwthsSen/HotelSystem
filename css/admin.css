@@ -353,6 +353,32 @@ input[type=range]::-moz-range-thumb:hover{box-shadow:0 2px 8px rgba(168,137,42,0
   #inventory-table td:nth-child(4) { display: none; }
 }
 
+/* COMPLAINT & EMPLOYEE MODALS */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10000; animation: fadeIn 0.2s ease-out;
+}
+.modal-content {
+  background: #fff; border-radius: 14px; width: 420px; max-width: 90vw;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.2); overflow: hidden;
+  animation: scaleIn 0.2s ease-out;
+}
+.modal-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 20px 24px 0; font-size: 16px; font-weight: 600; color: #111827;
+}
+.modal-title { flex: 1; }
+.modal-close {
+  cursor: pointer; font-size: 22px; color: #9CA3AF; line-height: 1; padding: 0 4px;
+}
+.modal-close:hover { color: #111827; }
+.modal-body { padding: 16px 24px 12px; }
+.modal-footer {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 12px 24px 20px; border-top: 1px solid #F3F4F6;
+}
+
 /* PASSWORD MODAL */
 .pw-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.45);
@@ -419,6 +445,18 @@ input[type=range]::-moz-range-thumb:hover{box-shadow:0 2px 8px rgba(168,137,42,0
   box-shadow: 0 16px 48px rgba(0,0,0,0.2); overflow: hidden;
   animation: scaleIn 0.2s ease-out;
 }
+
+/* STAFF CARDS */
+.staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.staff-card { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); transition: box-shadow .12s; }
+.staff-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.sc-avatar { width: 40px; height: 40px; border-radius: 50%; background: #0A1628; color: #EEE4CC; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; flex-shrink: 0; }
+.sc-body { flex: 1; min-width: 0; }
+.sc-name { font-weight: 600; font-size: 13px; }
+.sc-dept { margin: 2px 0; }
+.sc-meta { font-size: 11px; color: var(--color-text-secondary); }
+.sc-complaints { font-size: 11px; margin-top: 3px; display: flex; align-items: center; gap: 4px; }
+.sc-btn { flex-shrink: 0; }
 
 /* LOADING SCREEN */
 .app-loader {
