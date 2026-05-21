@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>External Manager — Grand Kavala</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <link rel="stylesheet" href="../css/manager.css">
     <style>.app{display:none}</style>
@@ -32,7 +33,9 @@
     
     <div class="sb-group">Στόλος & Μεταφορές</div>
     <div class="sb-item" data-v="schedule"><i class="ti ti-route"></i>Πρόγραμμα Οδηγών</div>
+    <div class="sb-item" data-v="new-trip"><i class="ti ti-plus"></i>Νέα Μεταφορά</div>
     <div class="sb-item" data-v="fleet"><i class="ti ti-car"></i>Οχήματα & Συντήρηση</div>
+    <div class="sb-item" data-v="trip-logs"><i class="ti ti-archive"></i>Αρχείο Μεταφορών</div>
     
     <div class="sb-group">Οικονομικά</div>
     <div class="sb-item" data-v="payroll"><i class="ti ti-cash"></i>Κόστη & Μισθοδοσία</div>
@@ -65,6 +68,10 @@
       <div class="sc"><div class="sc-lbl">Ελλείψεις Υλικών</div><div class="sc-val" id="material-shortages" style="color:#D85A30"></div><div class="sc-sub" id="material-order"></div></div>
       <div class="sc"><div class="sc-lbl">Μεταφορές Σήμερα</div><div class="sc-val" id="trips-today" style="color:#0EA5E9"></div><div class="sc-sub" id="trips-details"></div></div>
     </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-bell"></i>Ειδοποιήσεις</div></div>
+      <div id="manager-notifications"></div>
+    </div>
   </div>
 
   <div class="view" id="v-inventory">
@@ -94,6 +101,63 @@
           <th style="padding:8px">Όχημα</th><th style="padding:8px">Χιλιόμετρα</th><th style="padding:8px">Τελευταίο Service</th><th style="padding:8px">Επόμενο Πρόγραμμα Συντήρησης</th>
         </tr>
       </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-new-trip">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-plus"></i>Νέα Μεταφορά</div></div>
+      <div class="fg">
+        <div class="fg-row">
+          <div class="fg">
+            <label>Οδηγός *</label>
+            <select id="trip-driver" required></select>
+          </div>
+          <div class="fg">
+            <label>Όχημα *</label>
+            <select id="trip-vehicle" required></select>
+          </div>
+        </div>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Προορισμός *</label>
+            <input type="text" id="trip-destination" placeholder="π.χ. Αεροδρόμιο" required>
+          </div>
+          <div class="fg">
+            <label>Ημερομηνία *</label>
+            <input type="datetime-local" id="trip-date" required>
+          </div>
+        </div>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Κόστος (€) *</label>
+            <input type="number" id="trip-cost" step="0.01" min="0" placeholder="0.00" required>
+          </div>
+          <div class="fg">
+            <label>Πελάτης (προαιρετικά)</label>
+            <select id="trip-customer"><option value="">— Κανένας —</option></select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-dark" onclick="window.submitTrip()"><i class="ti ti-check"></i> Καταχώρηση Μεταφοράς</button>
+          <button class="btn" onclick="window.resetTripForm()">Ακύρωση</button>
+        </div>
+        <div id="trip-toast" class="toast" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="v-trip-logs">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-archive"></i>Αρχείο Μεταφορών</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--color-text-secondary)" id="trip-log-count"></span><button class="btn btn-sm" style="color:var(--color-danger,#E53E3E)" onclick="window.deleteAllTrips()"><i class="ti ti-trash"></i> Διαγραφή Όλων</button></div></div>
+      <div style="overflow-x:auto">
+        <table style="width:100%; border-collapse:collapse; font-size:12px" id="trip-log-table">
+          <tr style="border-bottom:1px solid var(--color-border-tertiary); text-align:left; color:var(--color-text-secondary)">
+            <th style="padding:8px">#</th><th style="padding:8px">Οδηγός</th><th style="padding:8px">Όχημα</th><th style="padding:8px">Προορισμός</th><th style="padding:8px">Ημ/νία</th><th style="padding:8px">Κόστος</th><th style="padding:8px">Πελάτης</th><th style="padding:8px">Κατάσταση</th><th style="padding:8px">Ενέργειες</th>
+          </tr>
+          <tbody id="trip-log-body"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 

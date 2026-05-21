@@ -3,6 +3,8 @@
     if (!userData) { window.location.href = "/pages/login.html"; return; }
 })();
 
+const hiddenTripIds = new Set();
+
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -94,10 +96,28 @@ async function loadDriverData() {
             .select(tripSelect)
             .eq('DriverID', currentUser.id)
             .gte('Date', dayStart.toISOString())
-            .lt('Date', dayEnd.toISOString())
-            .order('Date', { ascending: true });
+            .order('Date', { ascending: false });
+
+        // Also include any pending trips from the past that weren't caught by the date filter
+        const { data: pastPendingTrips } = await window.supabase
+            .from('TRIP')
+            .select(tripSelect)
+            .eq('DriverID', currentUser.id)
+            .eq('Status', 'pending')
+            .lt('Date', dayStart.toISOString())
+            .order('Date', { ascending: false });
+
+        const allTrips = (trips || []).concat(pastPendingTrips || []);
+        // Deduplicate by TripID
+        const seen = new Set();
+        todayTrips = allTrips.filter(t => {
+            if (seen.has(t.TripID)) return false;
+            seen.add(t.TripID);
+            return true;
+        });
+        // Sort most recent first
+        todayTrips.sort((a, b) => new Date(b.Date) - new Date(a.Date));
         if (tripErr) throw tripErr;
-        todayTrips = trips || [];
 
         if (todayTrips.length > 0 && todayTrips[0].VehicleID) {
             const { data: veh } = await window.supabase
@@ -136,10 +156,11 @@ function updateLiveTime() {
 setInterval(updateLiveTime, 60000);
 
 function updateOverview() {
+    const visible = todayTrips.filter(t => !hiddenTripIds.has(t.TripID));
     const completedCount = window._tripHasStatus
-        ? todayTrips.filter(t => t.Status === 'completed').length
+        ? visible.filter(t => t.Status === 'completed').length
         : localCompleted.size;
-    const tripCount = todayTrips.length;
+    const tripCount = visible.length;
     const pendingCount = tripCount - completedCount;
 
     const elTripCount = document.getElementById('stat-trip-count');
@@ -147,7 +168,7 @@ function updateOverview() {
     const elTripSub = document.getElementById('stat-trip-sub');
     if (elTripSub) elTripSub.textContent = `${pendingCount} Εκκρεμούν`;
 
-    const pendingTrips = todayTrips.filter(t => t.Status !== 'completed');
+    const pendingTrips = visible.filter(t => t.Status !== 'completed');
     const elNextPickup = document.getElementById('stat-next-pickup');
     const elNextSub = document.getElementById('stat-next-sub');
     if (pendingTrips.length > 0) {
@@ -171,7 +192,7 @@ function updateOverview() {
             elVehStatus.textContent = statusLabels[myVehicle.Status] || myVehicle.Status;
             elVehStatus.style.color = myVehicle.Status === 'available' ? '#1D9E75' : myVehicle.Status === 'in_use' ? '#378ADD' : '#DC2626';
         }
-        if (elVehSub) elVehSub.textContent = `${myVehicle.Type || 'Όχημα'} (${myVehicle.LicensePlate || myVehicle.PlateNumber || '—'})`;
+        if (elVehSub) elVehSub.textContent = `${myVehicle.Type || 'Όχημα'} (${myVehicle.PlateNumber || '—'})`;
     } else {
         if (elVehStatus) { elVehStatus.textContent = '—'; elVehStatus.style.color = ''; }
         if (elVehSub) elVehSub.textContent = 'Δεν έχει οριστεί';
@@ -225,29 +246,31 @@ function updateOverview() {
 function renderTrips() {
     const container = document.getElementById('trip-list');
     if (!container) return;
+    const visible = todayTrips.filter(t => !hiddenTripIds.has(t.TripID));
 
-    if (todayTrips.length === 0) {
+    if (visible.length === 0) {
         container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">Δεν υπάρχουν προγραμματισμένες διαδρομές για σήμερα.</div>';
         const badge = document.getElementById('badge-trips');
         if (badge) badge.style.display = 'none';
+        renderHiddenBanner(container);
         return;
     }
 
     const isPersisted = window._tripHasStatus;
     const pendingCount = isPersisted
-        ? todayTrips.filter(t => t.Status !== 'completed').length
-        : todayTrips.length - localCompleted.size;
+        ? visible.filter(t => t.Status !== 'completed').length
+        : visible.length - localCompleted.size;
     const badge = document.getElementById('badge-trips');
     if (badge) { badge.textContent = pendingCount; badge.style.display = ''; }
 
     let lastCompletedIndex = -1;
-    for (let i = 0; i < todayTrips.length; i++) {
-        const done = isPersisted ? todayTrips[i].Status === 'completed' : localCompleted.has(i);
+    for (let i = 0; i < visible.length; i++) {
+        const done = isPersisted ? visible[i].Status === 'completed' : localCompleted.has(i);
         if (done) lastCompletedIndex = i;
         else break;
     }
 
-    container.innerHTML = todayTrips.map((trip, i) => {
+    container.innerHTML = visible.map((trip, i) => {
         const isDone = isPersisted ? trip.Status === 'completed' : localCompleted.has(i);
         const cust = trip.CUSTOMER || {};
         const customerName = `${cust.FirstName || ''} ${cust.LastName || ''}`.trim() || 'Επισκέπτης';
@@ -304,10 +327,26 @@ function renderTrips() {
                     ${!isDone
                         ? `<button class="btn-complete" onclick="completeTrip(${trip.TripID})"><i class="ti ti-check"></i> Ολοκλήρωση</button>`
                         : `<span class="trip-check"><i class="ti ti-check"></i></span>`}
+                    <button class="btn-del" onclick="hideTrip(${trip.TripID})" title="Απόκρυψη"><i class="ti ti-eye-off"></i></button>
                 </div>
             </div>
         </div>`;
     }).join('');
+
+    renderHiddenBanner(container);
+}
+
+function renderHiddenBanner(container) {
+    if (hiddenTripIds.size === 0) return;
+    const restore = document.createElement('div');
+    restore.style.cssText = 'text-align:center;padding:10px;font-size:12px;color:var(--color-text-secondary);border-top:1px solid var(--color-border-tertiary);margin-top:6px;cursor:pointer';
+    restore.innerHTML = `${hiddenTripIds.size} κρυφές — <a style="color:#378ADD;text-decoration:underline;cursor:pointer">Εμφάνιση</a>`;
+    restore.querySelector('a').onclick = function() {
+        hiddenTripIds.clear();
+        renderTrips();
+        updateOverview();
+    };
+    container.appendChild(restore);
 }
 
 window.completeTrip = async function(tripId) {
@@ -334,6 +373,16 @@ window.completeTrip = async function(tripId) {
     showToast('Η διαδρομή ολοκληρώθηκε! Ενημερώθηκε η Reception.', 'success');
 };
 
+window.hideTrip = function(tripId) {
+    hiddenTripIds.add(tripId);
+    renderTrips();
+};
+
+window.hideAllTrips = function() {
+    todayTrips.forEach(t => hiddenTripIds.add(t.TripID));
+    renderTrips();
+};
+
 function renderFleet() {
     const container = document.getElementById('fleet-list');
     if (!container) return;
@@ -354,7 +403,7 @@ function renderFleet() {
         const bg = statusBg[v.Status] || '#F3F4F6';
         return `
         <div class="sc" style="border:1px solid ${color};background:${bg};${isMine ? '' : 'opacity:0.6'}">
-            <div class="sc-lbl">${v.LicensePlate || v.PlateNumber || '—'} ${isMine ? '(Εσείς)' : ''}</div>
+            <div class="sc-lbl">${v.PlateNumber || '—'} ${isMine ? '(Εσείς)' : ''}</div>
             <div class="sc-val" style="font-size:16px">${v.Type || 'Όχημα'}</div>
             <div class="sc-sub">Κατάσταση: ${label}</div>
         </div>`;
@@ -364,8 +413,8 @@ function renderFleet() {
 function populateFaultVehicleSelect() {
     const select = document.getElementById('fault-vehicle');
     if (!select || allVehicles.length === 0) return;
-    select.innerHTML = allVehicles.map(v =>
-        `<option value="${v.VehicleID}">${v.Type || 'Όχημα'} (${v.LicensePlate || v.PlateNumber || '—'})</option>`
+    select.innerHTML = '<option value="">— Επιλέξτε Όχημα —</option>' + allVehicles.map(v =>
+        `<option value="${v.VehicleID}">${v.Type || 'Όχημα'} (${v.PlateNumber || '—'})</option>`
     ).join('');
 }
 
@@ -417,28 +466,37 @@ window.submitFault = async function() {
     }
 
     const vehicleId = vehicleSelect ? parseInt(vehicleSelect.value) : null;
+    const vehicleText = vehicleSelect && vehicleSelect.selectedIndex > 0
+        ? vehicleSelect.options[vehicleSelect.selectedIndex].text
+        : null;
     const isUrgent = urgency && urgency.includes('ΝΑΙ');
 
     try {
-        let vehicleLabel = '';
+        const now = new Date();
+        const timeStr = now.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const driverName = currentUser?.name || '—';
+
+        let vehicleInfo = vehicleText ? ` | Όχημα: ${vehicleText}` : '';
+        // Also fetch from DB to get PlateNumber if available
         if (vehicleId) {
             const { data: veh } = await window.supabase
                 .from('VEHICLE')
-                .select('Type, LicensePlate, PlateNumber')
+                .select('Type, PlateNumber')
                 .eq('VehicleID', vehicleId)
                 .maybeSingle();
             if (veh) {
-                vehicleLabel = ` (${veh.Type || 'Όχημα'} ${veh.LicensePlate || veh.PlateNumber || ''})`.trim();
+                vehicleInfo = ` | Όχημα: ${veh.Type || '—'} (${veh.PlateNumber || '—'})`;
             }
         }
 
         const { error } = await window.supabase
             .from('NOTIFICATION')
             .insert([{
-                TargetRole: 'admin',
+                TargetRole: 'both',
                 Type: 'vehicle_fault',
-                Message: `Βλάβη οχήματος${isUrgent ? ' [ΕΠΕΙΓΟΝ]' : ''}: ${desc.trim()}${vehicleLabel}`,
-                IsRead: false
+                Message: `${isUrgent ? ' [ΕΠΕΙΓΟΝ]' : ''}Βλάβη από ${driverName}${vehicleInfo} | Ώρα: ${timeStr} | Περιγραφή: ${desc.trim()}`,
+                IsRead: false,
+                CreatedAt: now.toISOString()
             }]);
         if (error) throw error;
 
