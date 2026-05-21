@@ -115,6 +115,7 @@ function setRoomSelect(roomNum) {
 }
 
 let consumptionCount = 0;
+const checkedToday = new Set();
 
 /* ==============================================================
    SUPABASE — CACHED DATA
@@ -168,7 +169,9 @@ async function loadDashboard() {
             .eq('Status', 'CheckedIn')
             .eq('CheckOutDate', today);
         (urgentRes || []).forEach(res => {
-            const room = res.RESERVATION_ROOM?.[0]?.RoomNumber || '—';
+            const roomData = res.RESERVATION_ROOM;
+            const roomArr = Array.isArray(roomData) ? roomData : (roomData ? [roomData] : []);
+            const room = roomArr.map(r => r.RoomNumber).filter(Boolean).join(', ') || '—';
             const guest = [
                 res.CUSTOMER?.FirstName || '',
                 res.CUSTOMER?.LastName || ''
@@ -197,8 +200,21 @@ async function loadDashboard() {
         .eq('Status', 'CheckedIn')
         .order('CheckOutDate', { ascending: true });
 
-    (checkedIn || []).forEach(res => {
-        const room = res.RESERVATION_ROOM?.[0]?.RoomNumber || '—';
+    let list = (checkedIn || []).filter(r => !checkedToday.has(r.ReservationID));
+
+    document.getElementById('stat-rooms').textContent = list.length;
+
+    if (list.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="4" style="text-align:center;color:var(--color-text-secondary);padding:24px 0;">Δεν υπάρχουν ενεργές κρατήσεις προς έλεγχο</td>`;
+        priorityBody.appendChild(tr);
+        return;
+    }
+
+    list.forEach(res => {
+        const roomData = res.RESERVATION_ROOM;
+        const roomArr = Array.isArray(roomData) ? roomData : (roomData ? [roomData] : []);
+        const room = roomArr.map(r => r.RoomNumber).filter(Boolean).join(', ') || '—';
         const guest = [
             res.CUSTOMER?.FirstName || '',
             res.CUSTOMER?.LastName || ''
@@ -511,6 +527,7 @@ async function submitConsumption() {
 
     if (successCount > 0) {
         showToast(`Επιτυχία! Το ${room} ενημερώθηκε (${successCount} προϊόντα).`, 'success');
+        checkedToday.add(resId);
         setRoomSelect('');
         await loadItemMap();
         await loadConsumptionItems();
@@ -577,4 +594,16 @@ document.addEventListener('DOMContentLoaded', async function initPage() {
     } catch (err) {
         showToast('Σφάλμα φόρτωσης δεδομένων: ' + (err.message || err), 'error');
     }
+
+    setInterval(async () => {
+        try {
+            await Promise.all([
+                loadDashboard(),
+                loadStock(),
+                loadRecentLogs()
+            ]);
+        } catch (err) {
+            console.warn('Auto-refresh error:', err);
+        }
+    }, 30000);
 });
