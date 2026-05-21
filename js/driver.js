@@ -24,6 +24,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
+function logout() {
+    localStorage.removeItem('hotel_user');
+    alert("Αποσυνδεθήκατε επιτυχώς!");
+    window.location.href = "/pages/login.html";
+}
+
 function navTo(viewId) {
     const targetItem = document.querySelector(`.sb-item[data-v="${viewId}"]`);
     if(targetItem) targetItem.click();
