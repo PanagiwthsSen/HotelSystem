@@ -2866,34 +2866,6 @@ async function fetchReservations() {
     }
 }
 
-let allReservations = [];
-
-async function fetchReservations() {
-    try {
-        const { data, error } = await supabase
-            .from('RESERVATION')
-            .select(`
-                ReservationID, CheckInDate, CheckOutDate, TotalCost, Status, RoomType,
-                CUSTOMER ( FirstName, LastName ),
-                RESERVATION_ROOM ( RoomNumber )
-            `)
-            .order('CheckInDate', { ascending: false });
-
-        if (error) throw error;
-
-        allReservations = data.map(res => ({
-            ...res,
-            customerName: `${res.CUSTOMER?.FirstName || ''} ${res.CUSTOMER?.LastName || ''}`.trim() || 'Άγνωστος',
-            roomNumbers: (res.RESERVATION_ROOM || []).map(rr => rr.RoomNumber).join(', ') || '—',
-        }));
-
-        renderReservations();
-    } catch (err) {
-        console.error("Σφάλμα φόρτωσης κρατήσεων:", err.message);
-        showToast("Αποτυχία φόρτωσης κρατήσεων.", "error");
-    }
-}
-
 function renderReservations() {
     const searchTerm = normalizeString(document.getElementById('res-search')?.value || '');
     const statusFilter = document.getElementById('res-status-filter')?.value || 'all';
@@ -2922,12 +2894,12 @@ function renderReservations() {
     tbody.innerHTML = filteredReservations.map(res => {
         const checkIn = new Date(res.CheckInDate).toLocaleDateString('el-GR');
         const checkOut = new Date(res.CheckOutDate).toLocaleDateString('el-GR');
-        let statusClass = 'p-a'; // pending
-        if (res.Status === 'Confirmed') statusClass = 'p-b'; // blue for confirmed
-        if (res.Status === 'CheckedIn') statusClass = 'p-g'; // green for checked-in
-        if (res.Status === 'CheckedOut') statusClass = 'p-g'; // green for checked-out
-        if (res.Status === 'Cancelled') statusClass = 'p-r'; // red for cancelled
-        
+        let statusClass = 'p-a';
+        if (res.Status === 'Confirmed') statusClass = 'p-b';
+        if (res.Status === 'CheckedIn') statusClass = 'p-g';
+        if (res.Status === 'CheckedOut') statusClass = 'p-g';
+        if (res.Status === 'Cancelled') statusClass = 'p-r';
+
         const totalCost = parseFloat(res.TotalCost).toFixed(2);
 
         return `
@@ -2959,7 +2931,7 @@ window.deleteReservation = async function(reservationId) {
             .eq('ReservationID', reservationId);
         if (error) throw error;
         showToast('Η κράτηση διαγράφηκε επιτυχώς.', 'info');
-        fetchReservations(); // Re-fetch to update list
+        fetchReservations();
     } catch (err) {
         showToast('Σφάλμα διαγραφής κράτησης: ' + err.message, 'error');
     }
