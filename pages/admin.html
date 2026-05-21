@@ -45,6 +45,7 @@
     <div class="sb-item" data-v="restaurant"><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i>Minibar</div>
     <div class="sb-item" data-v="vehicles"><i class="ti ti-bus" aria-hidden="true"></i>Οχήματα</div>
     <div class="sb-item" data-v="trips"><i class="ti ti-route" aria-hidden="true"></i>Δρομολόγια</div>
+    <div class="sb-item" data-v="reservations"><i class="ti ti-calendar-event" aria-hidden="true"></i>Κρατήσεις</div>
     <div class="sb-item" data-v="gardens"><i class="ti ti-plant" aria-hidden="true"></i>Κήποι</div>
     
     <div class="sb-group">Οικονομικά</div>
@@ -319,22 +320,46 @@
 
   <div class="view" id="v-trips">
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-route" aria-hidden="true"></i> Νέο Δρομολόγιο</div></div>
-      <div class="form-grid">
-        <div class="fg"><label>Όχημα *</label><select id="trip-vehicle"></select></div>
-        <div class="fg"><label>Οδηγός *</label><select id="trip-driver"></select></div>
-        <div class="fg"><label>Πελάτης</label><select id="trip-customer"><option value="">— Κανένας —</option></select></div>
-        <div class="fg"><label>Ημερομηνία & Ώρα *</label><input type="datetime-local" id="trip-date"></div>
-        <div class="fg"><label>Προορισμός *</label><input type="text" id="trip-destination" placeholder="π.χ. Αεροδρόμιο"></div>
-        <div class="fg"><label>Κόστος (€) *</label><input type="number" id="trip-cost" placeholder="0.00"></div>
-      </div>
-      <button class="btn btn-dark" onclick="createTrip()"><i class="ti ti-plus"></i> Καταχώρηση Δρομολογίου</button>
-    </div>
-    <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-list" aria-hidden="true"></i> Όλα τα Δρομολόγια</div></div>
       <table>
         <thead><tr><th>Ημερομηνία</th><th>Προορισμός</th><th>Όχημα</th><th>Οδηγός</th><th>Πελάτης</th><th>Κόστος</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
         <tbody id="trips-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-reservations">
+    <div class="card">
+      <div class="card-hd">
+        <div class="card-hd-l"><i class="ti ti-calendar-event" aria-hidden="true"></i>Όλες οι Κρατήσεις</div>
+        <div style="display:flex;gap:8px;">
+          <select id="res-status-filter" class="search-input" style="max-width:160px;" onchange="renderReservations()">
+            <option value="all">Όλες οι καταστάσεις</option>
+            <option value="Confirmed">Επιβεβαιωμένες</option>
+            <option value="CheckedIn">Check-in</option>
+            <option value="CheckedOut">Check-out</option>
+            <option value="Cancelled">Ακυρωμένες</option>
+          </select>
+          <input type="text" id="res-search" class="search-input" placeholder="Αναζήτηση πελάτη, δωματίου ή ID" oninput="renderReservations()">
+          <button class="btn btn-sm" onclick="fetchReservations()"><i class="ti ti-refresh"></i> Ανανέωση</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;" id="res-count"></div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:5%">ID</th>
+            <th style="width:18%">Πελάτης</th>
+            <th style="width:12%">Check-in</th>
+            <th style="width:12%">Check-out</th>
+            <th style="width:10%">Τύπος Δωματίου</th>
+            <th style="width:8%">Δωμ.</th>
+            <th style="width:10%">Σύνολο</th>
+            <th style="width:13%">Κατάσταση</th>
+            <th style="width:12%">Ενέργεια</th>
+          </tr>
+        </thead>
+        <tbody id="reservations-body"></tbody>
       </table>
     </div>
   </div>

@@ -39,8 +39,13 @@
   <div class="sb-foot">
     <div class="av">
       <div class="av-circle" style="color:#0EA5E9">ΓΑ</div>
+<<<<<<< HEAD
       <div><div class="av-name">Γιώργος Α.</div><div class="av-shift">Διαχειριστής Εξωτ.</div></div>
       <i class="ti ti-logout" style="cursor:pointer;" onclick="logout()" title="Αποσύνδεση"></i>
+=======
+      <div><div class="av-name" id="user-name"></div><div class="av-shift" id="user-role"></div></div>
+      <i class="ti ti-logout" id="logout-btn" style="cursor:pointer;"></i>
+>>>>>>> a83f243ecb5c9c60c640ee2e4f5a4f569cb1e918
     </div>
   </div>
 </aside>
@@ -50,7 +55,7 @@
     <div class="tb-l">
       <div>
         <div class="tb-title" id="tb-title">Επισκόπηση Εξωτερικών Χώρων & Στόλου</div>
-        <div class="tb-meta">Τρίτη 19 Μαΐου 2026 · Ενεργά Οχήματα: 3</div>
+        <div class="tb-meta" id="tb-meta"></div>
       </div>
     </div>
   </div>
@@ -59,28 +64,19 @@
 
   <div class="view active" id="v-overview">
     <div class="g4">
-      <div class="sc"><div class="sc-lbl">Διαθεσιμότητα Οδηγών</div><div class="sc-val" style="color:#1D9E75">2/3</div><div class="sc-sub">1 σε μεταφορά</div></div>
-      <div class="sc"><div class="sc-lbl">Κατάσταση Στόλου</div><div class="sc-val">ΟΚ</div><div class="sc-sub">0 οχήματα σε Service</div></div>
-      <div class="sc"><div class="sc-lbl">Ελλείψεις Υλικών</div><div class="sc-val" style="color:#D85A30">3 Είδη</div><div class="sc-sub">Απαιτείται Παραγγελία</div></div>
-      <div class="sc"><div class="sc-lbl">Μεταφορές Σήμερα</div><div class="sc-val" style="color:#0EA5E9">5</div><div class="sc-sub">Πελάτες & Προϊόντα</div></div>
+      <div class="sc"><div class="sc-lbl">Διαθεσιμότητα Οδηγών</div><div class="sc-val" id="driver-availability" style="color:#1D9E75"></div><div class="sc-sub" id="driver-status"></div></div>
+      <div class="sc"><div class="sc-lbl">Κατάσταση Στόλου</div><div class="sc-val" id="fleet-status"></div><div class="sc-sub" id="fleet-maintenance"></div></div>
+      <div class="sc"><div class="sc-lbl">Ελλείψεις Υλικών</div><div class="sc-val" id="material-shortages" style="color:#D85A30"></div><div class="sc-sub" id="material-order"></div></div>
+      <div class="sc"><div class="sc-lbl">Μεταφορές Σήμερα</div><div class="sc-val" id="trips-today" style="color:#0EA5E9"></div><div class="sc-sub" id="trips-details"></div></div>
     </div>
   </div>
 
   <div class="view" id="v-inventory">
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-box"></i>Διαχείριση Υλικού & Ελλείψεις</div></div>
-      <table style="width:100%; border-collapse:collapse; font-size:12px">
+      <table style="width:100%; border-collapse:collapse; font-size:12px" id="inventory-table">
         <tr style="border-bottom:1px solid var(--color-border-tertiary); text-align:left; color:var(--color-text-secondary)">
           <th style="padding:8px">Είδος / Υλικό</th><th style="padding:8px">Τμήμα</th><th style="padding:8px">Απόθεμα</th><th style="padding:8px">Κατάσταση</th>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Λίπασμα</td><td style="padding:8px">Κήπος</td><td style="padding:8px">2 Kg</td><td style="padding:8px"><span class="pill p-r">Λείπει (Παραγγελία)</span></td>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Καύσιμα (Δεξαμενή)</td><td style="padding:8px">Στόλος</td><td style="padding:8px">800 Lt</td><td style="padding:8px"><span class="pill p-g">Επαρκές</span></td>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Ανταλλακτικά Μπεκ</td><td style="padding:8px">Κήπος</td><td style="padding:8px">0 Τεμ.</td><td style="padding:8px"><span class="pill p-r">Λείπει (Παραγγελία)</span></td>
         </tr>
       </table>
     </div>
@@ -89,24 +85,7 @@
   <div class="view" id="v-schedule">
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-route"></i>Πρόγραμμα & Διαθεσιμότητα Οδηγών</div></div>
-      <div class="room-list">
-        <div class="room-card">
-          <div class="room-info">
-            <div style="font-weight:600; font-size:14px">Οδηγός: Κώστας Σ.</div>
-            <div class="room-type">Όχημα: Mercedes V-Class (KVA-9922)</div>
-            <div class="room-guest" style="color:#0EA5E9; font-weight:bold;">Τρέχουσα Αποστολή: Μεταφορά Πελατών (Αεροδρόμιο -> Ξενοδοχείο)</div>
-          </div>
-          <span class="pill p-a">Απασχολημένος (έως 11:30)</span>
-        </div>
-        
-        <div class="room-card">
-          <div class="room-info">
-            <div style="font-weight:600; font-size:14px">Οδηγός: Δημήτρης Λ.</div>
-            <div class="room-type">Όχημα: Minivan (KVA-5566)</div>
-            <div class="room-guest">Επόμενη Αποστολή: 14:00 - Μεταφορά Προϊόντων/Τροφίμων από προμηθευτή.</div>
-          </div>
-          <span class="pill p-g">Διαθέσιμος</span>
-        </div>
+      <div class="room-list" id="driver-schedule-list">
       </div>
     </div>
   </div>
@@ -114,18 +93,9 @@
   <div class="view" id="v-fleet">
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-tool"></i>Συντήρηση Οχημάτων & Πρόγραμμα</div></div>
-      <table style="width:100%; border-collapse:collapse; font-size:12px">
+      <table style="width:100%; border-collapse:collapse; font-size:12px" id="fleet-maintenance-table">
         <tr style="border-bottom:1px solid var(--color-border-tertiary); text-align:left; color:var(--color-text-secondary)">
           <th style="padding:8px">Όχημα</th><th style="padding:8px">Χιλιόμετρα</th><th style="padding:8px">Τελευταίο Service</th><th style="padding:8px">Επόμενο Πρόγραμμα Συντήρησης</th>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">KVA-9922 (V-Class)</td><td style="padding:8px">125,000</td><td style="padding:8px">10/01/2026</td><td style="padding:8px; color:#1D9E75">Προγραμματισμένο σε 5,000 km</td>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">KVA-1144 (S-Class)</td><td style="padding:8px">89,500</td><td style="padding:8px">05/03/2026</td><td style="padding:8px; color:#1D9E75">OK</td>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">KVA-5566 (Minivan)</td><td style="padding:8px">198,000</td><td style="padding:8px">12/11/2025</td><td style="padding:8px; color:#D85A30; font-weight:bold">Απαιτείται Αλλαγή Λαδιών & Φρένων</td>
         </tr>
       </table>
     </div>
@@ -135,30 +105,20 @@
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-cash"></i>Οικονομικά Στόλου & Μισθοδοσία Οδηγών</div></div>
       <div class="g2">
-        <div class="sc" style="border:1px solid var(--color-border-tertiary)">
-          <div class="sc-lbl">Κόστος Λειτουργίας Στόλου (Τρέχων Μήνας)</div>
-          <div style="font-size:12px; margin-top:10px">
-            <div style="display:flex; justify-content:space-between; padding:4px 0"><span>KVA-9922 (Καύσιμα + Φθορές)</span><strong>450€</strong></div>
-            <div style="display:flex; justify-content:space-between; padding:4px 0"><span>KVA-1144 (Καύσιμα)</span><strong>280€</strong></div>
-            <div style="display:flex; justify-content:space-between; padding:4px 0"><span>KVA-5566 (Καύσιμα + Service)</span><strong>620€</strong></div>
-            <div style="display:flex; justify-content:space-between; padding:8px 0; border-top:1px solid #ccc; margin-top:5px"><span>Μέσο Κόστος Μεταφοράς/Διαδρομή:</span><strong>18.50€</strong></div>
+          <div class="sc" style="border:1px solid var(--color-border-tertiary)">
+            <div class="sc-lbl">Κόστος Λειτουργίας Στόλου (Τρέχων Μήνας)</div>
+            <div style="font-size:12px; margin-top:10px" id="fleet-costs-list">
+            </div>
           </div>
-        </div>
-        
-        <div class="sc" style="border:1px solid var(--color-border-tertiary)">
-          <div class="sc-lbl">Πληρωμές Οδηγών (Payroll)</div>
-          <table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:10px">
-            <tr style="border-bottom:1px solid var(--color-border-tertiary); text-align:left; color:var(--color-text-secondary)">
-              <th style="padding:4px">Οδηγός</th><th style="padding:4px">Ώρες/Διαδρομές</th><th style="padding:4px">Πληρωτέο Ποσό</th>
-            </tr>
-            <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-              <td style="padding:6px; font-weight:500">Κώστας Σ.</td><td style="padding:6px">160h + 12 Μεταφορές</td><td style="padding:6px; font-weight:bold; color:#1D9E75">1,250€</td>
-            </tr>
-            <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-              <td style="padding:6px; font-weight:500">Δημήτρης Λ.</td><td style="padding:6px">140h + 5 Μεταφορές</td><td style="padding:6px; font-weight:bold; color:#1D9E75">1,100€</td>
-            </tr>
-          </table>
-        </div>
+          
+          <div class="sc" style="border:1px solid var(--color-border-tertiary)">
+            <div class="sc-lbl">Πληρωμές Οδηγών (Payroll)</div>
+            <table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:10px" id="driver-payroll-table">
+              <tr style="border-bottom:1px solid var(--color-border-tertiary); text-align:left; color:var(--color-text-secondary)">
+                <th style="padding:4px">Οδηγός</th><th style="padding:4px">Ώρες/Διαδρομές</th><th style="padding:4px">Πληρωτέο Ποσό</th>
+              </tr>
+            </table>
+          </div>
       </div>
     </div>
   </div>
