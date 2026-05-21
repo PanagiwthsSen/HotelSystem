@@ -42,6 +42,7 @@ async function navTo(id) {
         fetchAvailableRooms();
     }
     if (id === 'bookings') fetchAllReservations();
+    if (id === 'minibar') fetchMinibarView();
 }
 
 document.querySelectorAll('.sb-item').forEach(el => {
@@ -246,6 +247,80 @@ async function fetchMinibarForDepartures(reservationIds) {
     } catch (err) {
         console.error('Σφάλμα minibar:', err.message);
         return {};
+    }
+}
+
+async function fetchMinibarView() {
+    const tbody = document.querySelector('#v-minibar tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--color-text-secondary)">Φόρτωση...</td></tr>';
+
+    try {
+        const { data: records, error } = await window.supabase
+            .from('MINIBAR_CONSUMPTION')
+            .select('ConsumptionID, Quantity, Charge, ReservationID, INVENTORY_ITEM ( Name )')
+            .order('ConsumptionID', { ascending: false });
+
+        if (error) throw error;
+
+        tbody.innerHTML = '';
+
+        if (!records || records.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--color-text-secondary)">Δεν υπάρχουν χρεώσεις mini-bar.</td></tr>';
+            return;
+        }
+
+        const resIds = [...new Set(records.map(r => r.ReservationID))];
+
+        const [{ data: resRooms }, { data: reservations }] = await Promise.all([
+            window.supabase.from('RESERVATION_ROOM').select('ReservationID, RoomNumber').in('ReservationID', resIds),
+            window.supabase.from('RESERVATION').select('ReservationID, CustomerID, Status').in('ReservationID', resIds)
+        ]);
+
+        const custIds = [...new Set((reservations || []).map(r => r.CustomerID))];
+        const { data: customers } = await window.supabase
+            .from('CUSTOMER')
+            .select('CustomerID, FirstName, LastName')
+            .in('CustomerID', custIds);
+
+        const roomByRes = {};
+        (resRooms || []).forEach(rr => { roomByRes[rr.ReservationID] = rr.RoomNumber; });
+
+        const custByRes = {};
+        (reservations || []).forEach(r => { custByRes[r.ReservationID] = r.CustomerID; });
+
+        const statusByRes = {};
+        (reservations || []).forEach(r => { statusByRes[r.ReservationID] = r.Status; });
+
+        const nameByCust = {};
+        (customers || []).forEach(c => {
+            nameByCust[c.CustomerID] = [c.FirstName || '', c.LastName || ''].filter(Boolean).join(' ').trim() || 'Άγνωστος';
+        });
+
+        records.forEach(rec => {
+            const roomNumber = roomByRes[rec.ReservationID] || '-';
+            const custId = custByRes[rec.ReservationID];
+            const customerName = nameByCust[custId] || 'Άγνωστος';
+            const itemName = rec.INVENTORY_ITEM?.Name || 'Είδος';
+            const charge = parseFloat(rec.Charge) || 0;
+            const qty = rec.Quantity || 0;
+            const isCharged = statusByRes[rec.ReservationID] === 'CheckedOut';
+            const statusPill = isCharged ? 'p-g' : 'p-b';
+            const statusText = isCharged ? 'Χρεώθηκε' : 'Αναμονή';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${roomNumber}</td>
+                <td>${customerName}</td>
+                <td>${itemName} x${qty}</td>
+                <td>€${charge.toFixed(2)}</td>
+                <td><span class="pill ${statusPill}">${statusText}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('Σφάλμα φόρτωσης mini-bar:', err.message);
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--color-text-secondary)">Σφάλμα φόρτωσης δεδομένων.</td></tr>';
     }
 }
 
@@ -553,14 +628,33 @@ let roomPrices = {};
 async function fetchRoomPrices() {
     try {
         const { data, error } = await window.supabase
-            .from('ROOM')
-            .select('RoomType, BasePrice');
+            .from('ROOM').select('RoomType, BasePrice');
         if (error) throw error;
-        const map = {};
+        roomPrices = {};
         (data || []).forEach(r => {
-            if (!map[r.RoomType]) map[r.RoomType] = r.BasePrice;
+            if (!roomPrices[r.RoomType]) roomPrices[r.RoomType] = r.BasePrice;
         });
-        roomPrices = map;
+
+        // Special pricing — non-blocking
+        try {
+            const { data: spData } = await window.supabase
+                .from('SPECIAL_PRICING').select('*');
+            specialPricing = {};
+            (spData || []).forEach(r => {
+                if (!specialPricing[r.RoomType]) specialPricing[r.RoomType] = [];
+                specialPricing[r.RoomType].push(r);
+            });
+        } catch (_) { specialPricing = null; }
+
+        // Low occupancy check — non-blocking
+        try {
+            const { count: occCount } = await window.supabase
+                .from('ROOM').select('*', { count: 'exact', head: true }).eq('Status', 'occ');
+            const { count: totalCount } = await window.supabase
+                .from('ROOM').select('*', { count: 'exact', head: true });
+            lowMultiplier = (totalCount > 0 && (occCount / totalCount) * 100 < 60) ? 0.85 : 1.0;
+        } catch (_) { lowMultiplier = 1.0; }
+
         populateRoomTypeDropdown();
     } catch (err) {
         console.error('Σφάλμα φόρτωσης τιμών:', err.message);
@@ -604,23 +698,31 @@ function updatePrice() {
     if(!rtypeEl) return;
     const typeText = rtypeEl.value;
     if (!typeText || !roomPrices[typeText]) return;
-    const price = roomPrices[typeText];
+    const basePrice = roomPrices[typeText];
+    const checkIn = document.getElementById('nb-in')?.value;
+    const checkOut = document.getElementById('nb-out')?.value;
     const nights = calcNights();
-    
-    // Account for multiple rooms based on guest count
+
     const guestsEl = document.getElementById('nb-guests');
     const guests = parseInt(guestsEl?.value) || 1;
     const capacity = ROOM_CAPACITY[typeText] || 2;
     const roomsNeeded = Math.ceil(guests / capacity);
-    
-    const totalPerRoom = price * nights;
+
+    const { total: totalPerRoom, groups: groupLabels } = calcDynamicPricePerRoom(basePrice, typeText, checkIn, checkOut);
     const grandTotal = totalPerRoom * roomsNeeded;
-    
+    let breakdown = '';
+    if (groupLabels.length > 0) {
+        breakdown = `${typeText}: ` + groupLabels.map(g => `${g.label} €${g.pricePerNight}×${g.count}`).join(', ');
+    } else {
+        breakdown = `${typeText}: €${basePrice} × ${nights}`;
+    }
+    if (roomsNeeded > 1) breakdown += ` × ${roomsNeeded} δωμ.`;
+
     document.getElementById('sp-room').textContent = roomsNeeded > 1 ? `${roomsNeeded} × ${typeText}` : typeText;
     document.getElementById('sp-nights').textContent = nights;
-    document.getElementById('sp-sub').textContent = `€${price} × ${nights}${roomsNeeded > 1 ? ` × ${roomsNeeded} δωμ.` : ''}`;
+    document.getElementById('sp-sub').textContent = breakdown;
     document.getElementById('sp-total').textContent = `€${grandTotal}`;
-    
+
     updatePrepay(grandTotal);
 }
 
@@ -639,6 +741,118 @@ function updatePrepay(totalVal) {
    ============================================================== */
 
 const ROOM_CAPACITY = { 'Μονόκλινο': 1, 'Δίκλινο': 2, 'Φαρδύκλινο': 2, 'Σουίτα': 4 };
+
+/* ==============================================================
+   DYNAMIC PRICING (same logic as landing page app.js)
+   ============================================================== */
+function calculateEaster(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+}
+
+const SEASONS = {
+    summer: {
+        label: 'Καλοκαίρι',
+        defaultMultiplier: 1.6,
+        isActive: (d) => { const m = d.getMonth() + 1; return m >= 6 && m <= 8; }
+    },
+    xmas: {
+        label: 'Χριστούγεννα',
+        defaultMultiplier: 1.4,
+        isActive: (d) => {
+            const m = d.getMonth() + 1, day = d.getDate();
+            return (m === 12 && day >= 15) || (m === 1 && day <= 7);
+        }
+    },
+    easter: {
+        label: 'Πάσχα',
+        defaultMultiplier: 1.3,
+        isActive: (d) => {
+            const easter = calculateEaster(d.getFullYear());
+            const start = new Date(easter); start.setDate(start.getDate() - 7);
+            const end = new Date(easter); end.setDate(end.getDate() + 7);
+            end.setHours(23, 59, 59, 999);
+            return d >= start && d <= end;
+        }
+    }
+};
+
+function getSeasonForDate(date) {
+    for (const [key, season] of Object.entries(SEASONS)) {
+        if (season.isActive(date)) return key;
+    }
+    return null;
+}
+
+function getMultiplier(date) {
+    const key = getSeasonForDate(date);
+    return key ? SEASONS[key].defaultMultiplier : 1.0;
+}
+
+function getSeasonLabel(date) {
+    const key = getSeasonForDate(date);
+    return key ? SEASONS[key].label : 'Κανονική';
+}
+
+let specialPricing = null;
+let lowMultiplier = 1.0;
+
+function calcDynamicPricePerRoom(basePrice, roomType, checkIn, checkOut) {
+    if (!checkIn || !checkOut) return { total: basePrice, groups: {} };
+    const start = new Date(checkIn + 'T12:00:00');
+    const end = new Date(checkOut + 'T12:00:00');
+    const roomRules = specialPricing ? specialPricing[roomType] : null;
+    const groups = {};
+    let total = 0;
+
+    for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+        let price = basePrice;
+        let label = getSeasonLabel(d);
+
+        if (roomRules) {
+            const found = roomRules.find(r => {
+                const f = new Date(r.FromDate + 'T00:00:00');
+                const t = new Date(r.ToDate + 'T23:59:59');
+                return d >= f && d <= t;
+            });
+            if (found) {
+                price = found.Price;
+                label = 'Ειδική Τιμή';
+            }
+        }
+
+        if (label !== 'Ειδική Τιμή') {
+            price = Math.round(basePrice * getMultiplier(d));
+        }
+
+        if (lowMultiplier < 1) {
+            price = Math.round(price * lowMultiplier);
+            label = label + ' (Χ. Πληρ. -15%)';
+        }
+
+        if (!groups[label]) {
+            groups[label] = { label, pricePerNight: price, count: 0, subtotal: 0 };
+        }
+        groups[label].count++;
+        groups[label].subtotal += price;
+        total += price;
+    }
+
+    return { total, groups: Object.values(groups) };
+}
 
 function calculateRoomRequirements(totalGuests, roomType, availableCount) {
     const capacity = ROOM_CAPACITY[roomType] || 2;
@@ -1676,14 +1890,16 @@ window.openRsBookingModal = function (roomNum, roomType, basePrice) {
     const calc = calculateRoomRequirements(totalGuests, roomType, totalAvailable);
 
     const roomsNeeded = calc ? calc.roomsNeeded : 1;
-    const total = basePrice * nights * roomsNeeded;
+    const { total: dynamicPerRoom } = calcDynamicPricePerRoom(basePrice, roomType, rsState.checkIn, rsState.checkOut);
+    const total = dynamicPerRoom * roomsNeeded;
 
     rsState.roomsNeeded = roomsNeeded;
+    rsState.roomPrice = basePrice;
 
     document.getElementById('rs-modal-room').textContent = '— Δωμάτιο ' + roomNum + (roomsNeeded > 1 ? ` (+${roomsNeeded - 1} ακόμα)` : '');
     document.getElementById('rs-modal-room-type').textContent = roomType;
     document.getElementById('rs-modal-nights').textContent = nights;
-    document.getElementById('rs-modal-rate').textContent = '€' + basePrice;
+    document.getElementById('rs-modal-rate').textContent = '€' + basePrice + ' (δυναμική τιμολόγηση)';
     document.getElementById('rs-modal-rooms').textContent = roomsNeeded;
     document.getElementById('rs-modal-total').textContent = '€' + total;
 
@@ -1769,7 +1985,8 @@ window.confirmRsBooking = async function () {
         if (custErr) throw custErr;
 
         const nights = Math.max(1, Math.round((new Date(rsState.checkOut) - new Date(rsState.checkIn)) / 86400000));
-        const totalCost = rsState.roomPrice * nights * roomsNeeded;
+        const { total: dynamicPerRoom } = calcDynamicPricePerRoom(rsState.roomPrice, rsState.roomType, rsState.checkIn, rsState.checkOut);
+        const totalCost = dynamicPerRoom * roomsNeeded;
 
         // Atomic booking for first room
         const { data: result, error: rpcError } = await window.supabase
