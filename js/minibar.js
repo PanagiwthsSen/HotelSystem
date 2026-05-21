@@ -118,6 +118,7 @@ function setRoomSelect(roomNum) {
 let consumptionCount = 0;
 const checkedToday = new Set();
 let todayChargesTotal = 0;
+let historyData = [];
 
 /* ==============================================================
    SUPABASE — CACHED DATA
@@ -321,36 +322,63 @@ async function loadHistory() {
         .order('ConsumptionID', { ascending: false })
         .limit(50);
 
+    historyData = [];
+    const tbody = document.getElementById('history-list');
+    tbody.innerHTML = '';
+
     if (!records || records.length === 0) return;
 
     const resIds = [...new Set(records.map(r => r.ReservationID))];
 
-    const [{ data: resRooms }, { data: reservations }] = await Promise.all([
+    const [{ data: resRooms }] = await Promise.all([
         supabase.from('RESERVATION_ROOM').select('ReservationID, RoomNumber').in('ReservationID', resIds),
-        supabase.from('RESERVATION').select('ReservationID, CustomerID').in('ReservationID', resIds),
     ]);
 
     const roomByRes = {};
     (resRooms || []).forEach(rr => { roomByRes[rr.ReservationID] = rr.RoomNumber; });
 
+    records.forEach(rec => {
+        const room = String(roomByRes[rec.ReservationID] || '—');
+        const itemName = rec.INVENTORY_ITEM?.Name || '—';
+        historyData.push({
+            id: rec.ConsumptionID,
+            room: room,
+            product: itemName,
+            qty: rec.Quantity,
+            charge: rec.Charge || 0
+        });
+    });
+
+    consumptionCount = records.length;
+    renderHistory(historyData);
+}
+
+function renderHistory(data) {
     const tbody = document.getElementById('history-list');
     tbody.innerHTML = '';
-
-    records.forEach(rec => {
-        const room = roomByRes[rec.ReservationID] || '—';
-        const itemName = rec.INVENTORY_ITEM?.Name || '—';
+    data.forEach(rec => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${rec.ConsumptionID}</td>
-            <td>${room}</td>
-            <td>${rec.Quantity}× ${itemName}</td>
-            <td>€${(rec.Charge || 0).toFixed(2)}</td>
+            <td>${rec.id}</td>
+            <td>${rec.room}</td>
+            <td>${rec.qty}× ${rec.product}</td>
+            <td>€${rec.charge.toFixed(2)}</td>
             <td><span class="pill p-g">Στάλθηκε</span></td>
         `;
         tbody.appendChild(tr);
     });
+}
 
-    consumptionCount = records.length;
+window.filterHistory = function() {
+    const el = document.getElementById('history-search');
+    if (!el) return;
+    const q = el.value.trim().toLowerCase();
+    if (!q) {
+        renderHistory(historyData);
+        return;
+    }
+    const filtered = historyData.filter(r => String(r.room).toLowerCase().includes(q));
+    renderHistory(filtered);
 }
 
 /* ==============================================================
