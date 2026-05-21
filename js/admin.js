@@ -69,7 +69,14 @@ function getStatusLabel(state, checkoutDate) {
 }
 
 /* ==============================================================
-   TOAST NOTIFICATION SYSTEM (ΖΩΝΤΑΝΕΣ ΕΙΔΟΠΟΙΗΣΕΙΣ)
+   SHARED UTILITIES
+   ============================================================== */
+function normalizeString(str) {
+    return str.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+}
+
+/* ==============================================================
+   TOAST NOTIFICATION SYSTEM
    ============================================================== */
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
@@ -106,7 +113,7 @@ window.triggerAction = function(msg, type) {
 const viewTitles = {
     dash: 'Πίνακας Ελέγχου', revenue: 'Έσοδα & Αναφορές', pricing: 'Δυναμική Τιμολόγηση',
     rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Minibar & Αποθήκες',
-    vehicles: 'Οχήματα & Μεταφορές', trips: 'Δρομολόγια Οχημάτων', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
+    vehicles: 'Οχήματα & Μεταφορές',     trips: 'Δρομολόγια Οχημάτων', reservations: 'Κρατήσεις', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
     payroll: 'Μισθοδοσία', users: 'Χρήστες & Ρόλοι', backup: 'Backup & Ασφάλεια',
     'notif-history': 'Ιστορικό Ειδοποιήσεων'
 };
@@ -1969,118 +1976,7 @@ async function fetchTrips() {
     }
 }
 
-async function checkTripStatusColumn() {
-    const { error } = await supabase.from('TRIP').select('Status').limit(0).maybeSingle();
-    window._tripHasStatus = !error;
-}
 
-async function populateTripFormDropdowns() {
-    await checkTripStatusColumn();
-    try {
-        const [vehRes, empRes, custRes] = await Promise.all([
-            supabase.from('VEHICLE').select('*').order('VehicleID'),
-            supabase.from('EMPLOYEE').select('*').eq('Role', 'driver').eq('isActive', true).order('FirstName'),
-            supabase.from('CUSTOMER').select('*').order('FirstName')
-        ]);
-
-        const vehSelect = document.getElementById('trip-vehicle');
-        if (vehSelect && vehRes.data) {
-            vehSelect.innerHTML = '<option value="">— Επιλέξτε Όχημα —</option>' +
-                vehRes.data.map(v =>
-                    `<option value="${v.VehicleID}">${v.Type || 'Όχημα'} (${v.LicensePlate || v.PlateNumber || '—'})${v.Status === 'maintenance' ? ' [Συντήρηση]' : ''}</option>`
-                ).join('');
-        }
-
-        const drvSelect = document.getElementById('trip-driver');
-        if (drvSelect && empRes.data) {
-            if (empRes.data.length === 0) {
-                drvSelect.innerHTML = '<option value="">— Δεν υπάρχουν ενεργοί οδηγοί —</option>';
-            } else {
-                drvSelect.innerHTML = '<option value="">— Επιλέξτε Οδηγό —</option>' +
-                    empRes.data.map(e =>
-                        `<option value="${e.EmpID}">${e.FirstName || ''} ${e.LastName || ''}</option>`
-                    ).join('');
-            }
-        }
-
-        const custSelect = document.getElementById('trip-customer');
-        if (custSelect && custRes.data) {
-            custSelect.innerHTML = '<option value="">— Κανένας —</option>' +
-                custRes.data.map(c =>
-                    `<option value="${c.CustomerID}">${c.FirstName || ''} ${c.LastName || ''}${c.IsGroup ? ' (Group)' : ''}</option>`
-                ).join('');
-        }
-
-        const now = new Date();
-        now.setMinutes(0, 0, 0);
-        now.setHours(now.getHours() + 1);
-        const pad = (n) => String(n).padStart(2, '0');
-        const dateInput = document.getElementById('trip-date');
-        if (dateInput) dateInput.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    } catch (err) {
-        console.error("Σφάλμα φόρτωσης dropdown:", err.message);
-    }
-}
-
-window.createTrip = async function() {
-    const vehicleId = parseInt(document.getElementById('trip-vehicle')?.value);
-    const driverId = parseInt(document.getElementById('trip-driver')?.value);
-    const customerId = parseInt(document.getElementById('trip-customer')?.value) || null;
-        const rawDate = document.getElementById('trip-date')?.value;
-        let date = '';
-        if (rawDate) {
-            const offset = -new Date().getTimezoneOffset();
-            const oh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
-            const om = String(Math.abs(offset) % 60).padStart(2, '0');
-            const tz = `${offset >= 0 ? '+' : '-'}${oh}:${om}`;
-            date = `${rawDate}:00${tz}`;
-        }
-    const destination = document.getElementById('trip-destination')?.value?.trim();
-    const cost = parseFloat(document.getElementById('trip-cost')?.value);
-
-    if (!vehicleId) { showToast('Επιλέξτε όχημα.', 'error'); return; }
-    if (!driverId) { showToast('Επιλέξτε οδηγό.', 'error'); return; }
-    if (!date) { showToast('Επιλέξτε ημερομηνία.', 'error'); return; }
-    if (!destination) { showToast('Συμπληρώστε προορισμό.', 'error'); return; }
-    if (!cost || cost <= 0) { showToast('Συμπληρώστε έγκυρο κόστος.', 'error'); return; }
-
-    try {
-        const { data: maxTrip } = await supabase
-            .from('TRIP')
-            .select('TripID')
-            .order('TripID', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-        const nextId = (maxTrip?.TripID || 0) + 1;
-
-        const insertFields = {
-            TripID: nextId,
-            VehicleID: vehicleId,
-            DriverID: driverId,
-            CustomerID: customerId,
-            Date: date,
-            Cost: cost,
-            Destination: destination
-        };
-
-        if (window._tripHasStatus) {
-            insertFields.Status = 'pending';
-        }
-
-        const { error } = await supabase
-            .from('TRIP')
-            .insert([insertFields]);
-
-        if (error) throw error;
-
-        showToast('Το δρομολόγιο καταχωρήθηκε επιτυχώς!', 'success');
-        document.getElementById('trip-destination').value = '';
-        document.getElementById('trip-cost').value = '';
-        fetchTrips();
-    } catch (err) {
-        showToast('Σφάλμα καταχώρησης: ' + err.message, 'error');
-    }
-};
 
 window.deleteTrip = async function(tripId) {
     if (!await window.showConfirm('Διαγραφή δρομολογίου;')) return;
@@ -2942,8 +2838,135 @@ window.logout = function() {
     window.location.href = "/pages/login.html";
 }
 
+let allReservations = [];
+
+async function fetchReservations() {
+    try {
+        const { data, error } = await supabase
+            .from('RESERVATION')
+            .select(`
+                ReservationID, CheckInDate, CheckOutDate, TotalCost, Status, RoomType,
+                CUSTOMER ( FirstName, LastName ),
+                RESERVATION_ROOM ( RoomNumber )
+            `)
+            .order('CheckInDate', { ascending: false });
+
+        if (error) throw error;
+
+        allReservations = data.map(res => ({
+            ...res,
+            customerName: `${res.CUSTOMER?.FirstName || ''} ${res.CUSTOMER?.LastName || ''}`.trim() || 'Άγνωστος',
+            roomNumbers: (res.RESERVATION_ROOM || []).map(rr => rr.RoomNumber).join(', ') || '—',
+        }));
+
+        renderReservations();
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης κρατήσεων:", err.message);
+        showToast("Αποτυχία φόρτωσης κρατήσεων.", "error");
+    }
+}
+
+let allReservations = [];
+
+async function fetchReservations() {
+    try {
+        const { data, error } = await supabase
+            .from('RESERVATION')
+            .select(`
+                ReservationID, CheckInDate, CheckOutDate, TotalCost, Status, RoomType,
+                CUSTOMER ( FirstName, LastName ),
+                RESERVATION_ROOM ( RoomNumber )
+            `)
+            .order('CheckInDate', { ascending: false });
+
+        if (error) throw error;
+
+        allReservations = data.map(res => ({
+            ...res,
+            customerName: `${res.CUSTOMER?.FirstName || ''} ${res.CUSTOMER?.LastName || ''}`.trim() || 'Άγνωστος',
+            roomNumbers: (res.RESERVATION_ROOM || []).map(rr => rr.RoomNumber).join(', ') || '—',
+        }));
+
+        renderReservations();
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης κρατήσεων:", err.message);
+        showToast("Αποτυχία φόρτωσης κρατήσεων.", "error");
+    }
+}
+
+function renderReservations() {
+    const searchTerm = normalizeString(document.getElementById('res-search')?.value || '');
+    const statusFilter = document.getElementById('res-status-filter')?.value || 'all';
+    const tbody = document.getElementById('reservations-body');
+    const countEl = document.getElementById('res-count');
+    if (!tbody || !countEl) return;
+
+    const filteredReservations = allReservations.filter(res => {
+        const matchesSearch = searchTerm === '' ||
+            normalizeString(res.customerName).includes(searchTerm) ||
+            normalizeString(res.ReservationID.toString()).includes(searchTerm) ||
+            normalizeString(res.roomNumbers).includes(searchTerm);
+
+        const matchesStatus = statusFilter === 'all' || res.Status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    tbody.innerHTML = '';
+    if (filteredReservations.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν βρέθηκαν κρατήσεις.</td></tr>';
+        countEl.textContent = '0 κρατήσεις';
+        return;
+    }
+
+    tbody.innerHTML = filteredReservations.map(res => {
+        const checkIn = new Date(res.CheckInDate).toLocaleDateString('el-GR');
+        const checkOut = new Date(res.CheckOutDate).toLocaleDateString('el-GR');
+        let statusClass = 'p-a'; // pending
+        if (res.Status === 'Confirmed') statusClass = 'p-b'; // blue for confirmed
+        if (res.Status === 'CheckedIn') statusClass = 'p-g'; // green for checked-in
+        if (res.Status === 'CheckedOut') statusClass = 'p-g'; // green for checked-out
+        if (res.Status === 'Cancelled') statusClass = 'p-r'; // red for cancelled
+        
+        const totalCost = parseFloat(res.TotalCost).toFixed(2);
+
+        return `
+            <tr>
+                <td>${res.ReservationID}</td>
+                <td>${res.customerName}</td>
+                <td>${checkIn}</td>
+                <td>${checkOut}</td>
+                <td>${res.RoomType || '—'}</td>
+                <td>${res.roomNumbers}</td>
+                <td>€${totalCost}</td>
+                <td><span class="pill ${statusClass}">${res.Status}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-r" onclick="deleteReservation(${res.ReservationID})"><i class="ti ti-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    countEl.textContent = `${filteredReservations.length} κρατήσεις`;
+}
+
+window.deleteReservation = async function(reservationId) {
+    if (!await window.showConfirm('Διαγραφή κράτησης; Αυτή η ενέργεια δεν αναιρείται.')) return;
+    try {
+        const { error } = await supabase
+            .from('RESERVATION')
+            .delete()
+            .eq('ReservationID', reservationId);
+        if (error) throw error;
+        showToast('Η κράτηση διαγράφηκε επιτυχώς.', 'info');
+        fetchReservations(); // Re-fetch to update list
+    } catch (err) {
+        showToast('Σφάλμα διαγραφής κράτησης: ' + err.message, 'error');
+    }
+}
+
 /* ==============================================================
-   ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
+   ΔΙΑΧΕΙΡΙΣΗ ΔΩΜΑΤΙΩΝ (ROOMS MANAGEMENT)
    ============================================================== */
 async function fetchUsers() {
     try {
@@ -3276,7 +3299,8 @@ appReady.then(ok => {
     el.addEventListener('click', () => {
       if (el.dataset.v === 'revenue') setTimeout(buildRevChart, 50);
       if (el.dataset.v === 'notif-history') setTimeout(loadNotifHistory, 50);
-      if (el.dataset.v === 'trips') { fetchTrips(); populateTripFormDropdowns(); }
+      if (el.dataset.v === 'trips') { fetchTrips(); }
+      if (el.dataset.v === 'reservations') { fetchReservations(); }
     });
   });
   const logoutBtn = document.getElementById('logout-btn');
