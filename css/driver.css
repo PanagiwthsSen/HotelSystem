@@ -85,3 +85,47 @@ body{font-family:'DM Sans',sans-serif;background:var(--color-background-tertiary
 .app-loader {position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: #fff;}
 .loader-spin i {font-size: 30px; animation: spin 1s linear infinite; display: inline-block;}
 @keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* ── Toast container (live toasts) ── */
+#toast-container{position:fixed;top:16px;right:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:360px;pointer-events:none}
+.live-toast{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;font-size:12px;background:#fff;border:1px solid;box-shadow:0 4px 16px rgba(0,0,0,.08);pointer-events:auto;animation:slideIn .25s ease-out}
+.live-toast.success{border-color:#C0DD97;background:#EAF3DE;color:#27500A}
+.live-toast.error{border-color:#F7C1C1;background:#FCEBEB;color:#791F1F}
+.live-toast.info{border-color:#BFDBFE;background:#E6F1FB;color:#0C447C}
+.live-toast.warning{border-color:#FDE68A;background:#FFF8E6;color:#7A6118}
+.live-toast.fade-out{opacity:0;transform:translateX(30px);transition:all .3s}
+@keyframes slideIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+
+/* ── Modal overlay ── */
+.modal-overlay{position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);animation:fadeIn .15s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* ── Trip rows (schedule view) ── */
+.trip-row{display:flex;align-items:stretch;gap:0;margin-bottom:10px;background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);border:1px solid #eef0f2;overflow:hidden;transition:all .2s}
+.trip-row:hover{box-shadow:0 4px 12px rgba(0,0,0,.08);border-color:#d0d4d8}
+.trip-row.trip-done{opacity:.55}
+.trip-row.trip-done:hover{opacity:.75}
+.trip-sidebar{width:5px;flex-shrink:0}
+.trip-sidebar-next{background:#F59E0B}
+.trip-sidebar-done{background:#1D9E75}
+.trip-sidebar-pending{background:#D1D5DB}
+.trip-body{flex:1;display:flex;align-items:center;padding:14px 16px;gap:16px;min-width:0}
+.trip-time{min-width:60px;text-align:center;flex-shrink:0}
+.trip-time-val{font-size:20px;font-weight:700;line-height:1.2;letter-spacing:-.3px}
+.trip-time-date{font-size:10px;color:#9CA3AF;margin-top:2px;font-weight:500}
+.trip-info{flex:1;min-width:0}
+.trip-dest{font-weight:600;font-size:14px;color:#111827}
+.trip-meta{font-size:12px;color:#6B7280;margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.trip-meta-dot{width:3px;height:3px;border-radius:50%;background:#D1D5DB;display:inline-block}
+.trip-status{flex-shrink:0;margin-right:4px}
+.trip-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.2px}
+.trip-pill-next{background:#FEF3C7;color:#92400E}
+.trip-pill-pending{background:#F3F4F6;color:#6B7280}
+.trip-pill-done{background:#D1FAE5;color:#065F46}
+.trip-pill i{font-size:13px}
+.trip-action{flex-shrink:0;display:flex;align-items:center}
+.btn-complete{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:8px;border:none;background:#0A1628;color:#EEE4CC;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn-complete:hover{background:#1E2D4A;transform:translateY(-1px);box-shadow:0 4px 12px rgba(10,22,40,.25)}
+.btn-complete:active{transform:translateY(0)}
+.btn-complete i{font-size:15px}
+.trip-check{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#D1FAE5;color:#065F46;font-size:20px;flex-shrink:0}
