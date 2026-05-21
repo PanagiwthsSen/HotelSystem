@@ -229,7 +229,7 @@
 
   <div class="view" id="v-staff">
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-users" aria-hidden="true"></i>Ιστορικό & Αξιολόγηση Προσωπικού</div><button class="btn btn-sm" id="sort-complaints-btn" onclick="toggleComplaintSort()"><i class="ti ti-arrow-down" aria-hidden="true"></i> Περισσότερα παράπονα</button></div>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-users" aria-hidden="true"></i>Ιστορικό & Αξιολόγηση Προσωπικού</div><div style="display:flex;gap:8px;align-items:center"><input type="text" id="staff-search" class="search-input" placeholder="Αναζήτηση υπαλλήλου..." oninput="filterStaff()"><button class="btn btn-sm" id="sort-complaints-btn" onclick="toggleComplaintSort()"><i class="ti ti-arrow-down" aria-hidden="true"></i> Περισσότερα παράπονα</button></div></div>
       <div id="staff-tab-row" class="tab-row"></div>
       <div id="staff-body" class="staff-grid"></div>
     </div>
@@ -287,6 +287,7 @@
     <div class="card">
       <div class="card-hd">
         <div class="card-hd-l"><i class="ti ti-users-lock" aria-hidden="true"></i>Διαχείριση Πρόσβασης & Ρόλων</div>
+        <input type="text" id="users-search" class="search-input" placeholder="Αναζήτηση χρήστη..." oninput="renderUsers()">
         <button class="btn btn-dark btn-sm" onclick="openUserModal()">+ Προσθήκη</button>
         <button class="btn btn-sm btn-dark" onclick="exportToExcel('users-table', 'GrandKavala_Admin_Users')"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Εξαγωγή (Excel)</button>
       </div>
@@ -368,7 +369,7 @@
 
   <div class="view" id="v-payroll">
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-cash-banknote" aria-hidden="true"></i> Τρέχουσα Μισθοδοσία</div></div>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-cash-banknote" aria-hidden="true"></i> Τρέχουσα Μισθοδοσία</div><input type="text" id="payroll-search" class="search-input" placeholder="Αναζήτηση υπαλλήλου..." oninput="renderPayroll()"></div>
       <table id="payroll-table">
         <thead><tr><th>Υπάλληλος</th><th>Ρόλος / Τμήμα</th><th>Μηνιαίος Μισθός</th><th>IBAN Λογαριασμού</th><th>Τελ. Πληρωμή</th><th>Ενέργεια</th></tr></thead>
         <tbody id="payroll-body"></tbody>

@@ -354,7 +354,7 @@ async function fetchDashboardBookings() {
                     RESERVATION_ROOM (RoomNumber)
                 `)
                 .eq('CheckOutDate', today)
-                .neq('Status', 'Cancelled')
+                .not('Status', 'in', '("Cancelled","CheckedIn","CheckedOut")')
         ]);
 
         if (arrivalsRes.error) throw arrivalsRes.error;
@@ -809,6 +809,7 @@ let _roleDeptMap = {};
 let _deptToRoles = {};
 let _activeStaffFilter = 'all';
 let _complaintSortOrder = 'desc';
+let _staffSearchTerm = '';
 
 // 1. Fetch δεδομένων από τη βάση
 async function fetchStaff() {
@@ -899,9 +900,12 @@ function renderStaff(filter){
         _complaintSortOrder === 'desc' ? b.complaintCount - a.complaintCount : a.complaintCount - b.complaintCount
     );
 
-    const filteredData = filter === 'all' 
-        ? sorted
-        : sorted.filter(s => s.dept === filter);
+    const filteredData = (filter === 'all' ? sorted : sorted.filter(s => s.dept === filter))
+        .filter(s => {
+            if (!_staffSearchTerm) return true;
+            const searchable = normalizeString(s.n + ' ' + s.dept + ' ' + s.salary + ' ' + s.leaves);
+            return searchable.includes(_staffSearchTerm);
+        });
 
     if (filteredData.length === 0) {
         container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);grid-column:1/-1;">Δεν βρέθηκαν υπάλληλοι σε αυτό το τμήμα.</div>';
@@ -936,6 +940,11 @@ window.stTab = function(f, el){
     renderStaff(f);
     renderComplaints(f);
 }
+
+window.filterStaff = function() {
+    _staffSearchTerm = normalizeString(document.getElementById('staff-search')?.value || '');
+    renderStaff(_activeStaffFilter);
+};
 
 window.toggleComplaintSort = function() {
     _complaintSortOrder = _complaintSortOrder === 'desc' ? 'asc' : 'desc';
@@ -2392,6 +2401,8 @@ window.deleteRental = async function(shopId, name) {
 /* ==============================================================
    ΜΙΣΘΟΔΟΣΙΑ (ΔΕΔΟΜΕΝΑ ΑΠΟ SUPABASE)
    ============================================================== */
+let allPayroll = [];
+
 async function fetchPayroll() {
     try {
         const tbody = document.getElementById('payroll-body');
@@ -2407,31 +2418,54 @@ async function fetchPayroll() {
 
         if (error) throw error;
 
-        tbody.innerHTML = data.map(emp => {
-            const lastDate = emp.LastPaymentDate ? new Date(emp.LastPaymentDate).toLocaleDateString('el-GR') : 'Ποτέ';
-            const ibanFormatted = emp.IBAN ? `<code>${emp.IBAN.substring(0, 4)}...${emp.IBAN.slice(-4)}</code>` : '<span class="pill p-r">Λείπει IBAN</span>';
-            const empName = `${emp.FirstName || ''} ${emp.LastName || ''}`.trim();
-            
-            return `
-                <tr>
-                    <td><strong>${empName}</strong></td>
-                    <td><span class="pill p-b">${emp.Role}</span></td>
-                    <td><span class="editable-cell" data-val="${emp.Salary}" onclick="editPayrollField(this,${emp.EmpID},'Salary')">€${emp.Salary}</span></td>
-                    <td><span class="editable-cell" data-val="${emp.IBAN || ''}" onclick="editPayrollField(this,${emp.EmpID},'IBAN')">${ibanFormatted}</span></td>
-                    <td>${lastDate}</td>
-                    <td>
-                        <button class="btn btn-dark btn-sm" onclick="payEmployee(this, ${emp.EmpID}, '${empName}', '${emp.IBAN || ''}')">
-                            Πληρωμή
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+        allPayroll = data || [];
+
+        renderPayroll();
 
     } catch (err) {
         console.error("Σφάλμα μισθοδοσίας:", err.message);
         showToast("Αποτυχία φόρτωσης μισθοδοσίας.", "error");
     }
+}
+
+function renderPayroll() {
+    const tbody = document.getElementById('payroll-body');
+    if (!tbody) return;
+
+    const searchTerm = normalizeString(document.getElementById('payroll-search')?.value || '');
+
+    const filtered = searchTerm === ''
+        ? allPayroll
+        : allPayroll.filter(emp => {
+            const empName = `${emp.FirstName || ''} ${emp.LastName || ''}`.trim();
+            return normalizeString(empName + ' ' + (emp.Role || '') + ' ' + (emp.IBAN || '')).includes(searchTerm);
+        });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν βρέθηκαν υπάλληλοι.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(emp => {
+        const lastDate = emp.LastPaymentDate ? new Date(emp.LastPaymentDate).toLocaleDateString('el-GR') : 'Ποτέ';
+        const ibanFormatted = emp.IBAN ? `<code>${emp.IBAN.substring(0, 4)}...${emp.IBAN.slice(-4)}</code>` : '<span class="pill p-r">Λείπει IBAN</span>';
+        const empName = `${emp.FirstName || ''} ${emp.LastName || ''}`.trim();
+        
+        return `
+            <tr>
+                <td><strong>${empName}</strong></td>
+                <td><span class="pill p-b">${emp.Role}</span></td>
+                <td><span class="editable-cell" data-val="${emp.Salary}" onclick="editPayrollField(this,${emp.EmpID},'Salary')">€${emp.Salary}</span></td>
+                <td><span class="editable-cell" data-val="${emp.IBAN || ''}" onclick="editPayrollField(this,${emp.EmpID},'IBAN')">${ibanFormatted}</span></td>
+                <td>${lastDate}</td>
+                <td>
+                    <button class="btn btn-dark btn-sm" onclick="payEmployee(this, ${emp.EmpID}, '${empName}', '${emp.IBAN || ''}')">
+                        Πληρωμή
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 // Επεξεργασία Μισθού / IBAN με inline input
@@ -2940,6 +2974,8 @@ window.deleteReservation = async function(reservationId) {
 /* ==============================================================
    ΔΙΑΧΕΙΡΙΣΗ ΔΩΜΑΤΙΩΝ (ROOMS MANAGEMENT)
    ============================================================== */
+let allUsers = [];
+
 async function fetchUsers() {
     try {
         const tbody = document.getElementById('users-body');
@@ -2954,44 +2990,67 @@ async function fetchUsers() {
 
         if (error) throw error;
 
-        tbody.innerHTML = data.map(u => {
-            const statusHtml = u.isActive 
-                ? '<span class="pill p-g">Ενεργός</span>' 
-                : '<span class="pill p-r">Απενεργοποιημένος</span>';
-            
-            const btnText = u.isActive ? 'Απενεργοποίηση' : 'Ενεργοποίηση';
-            const btnClass = u.isActive ? 'btn-sm' : 'btn-dark btn-sm';
-            const uName = `${u.FirstName || ''} ${u.LastName || ''}`.trim();
-            const safeName = uName.replace(/'/g, "\\'");
+        allUsers = data || [];
 
-            return `
-                <tr>
-                    <td><strong>${uName}</strong></td>
-                    <td><code>${u.Username || '-'}</code></td>
-                    <td><span class="pill p-b">${u.Role}</span></td>
-                    <td>${statusHtml}</td>
-                    <td style="white-space:nowrap">
-                        <button class="btn ${btnClass}" onclick="toggleUserStatus(${u.EmpID}, ${u.isActive}, '${safeName}')">
-                            ${btnText}
-                        </button>
-                        <button class="btn btn-sm" onclick="changePassword(${u.EmpID}, '${u.Username || safeName}')" title="Αλλαγή κωδικού">
-                            <i class="ti ti-key"></i>
-                        </button>
-                        <button class="btn btn-sm" onclick="openUserModal(${u.EmpID})" title="Επεξεργασία">
-                            <i class="ti ti-pencil"></i>
-                        </button>
-                        <button class="btn btn-sm" onclick="deleteUser(${u.EmpID}, '${safeName}')" title="Διαγραφή">
-                            <i class="ti ti-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+        renderUsers();
 
     } catch (err) {
         console.error("Σφάλμα χρηστών:", err.message);
         showToast("Αποτυχία φόρτωσης λίστας χρηστών.", "error");
     }
+}
+
+function renderUsers() {
+    const tbody = document.getElementById('users-body');
+    if (!tbody) return;
+
+    const searchTerm = normalizeString(document.getElementById('users-search')?.value || '');
+
+    const filtered = searchTerm === ''
+        ? allUsers
+        : allUsers.filter(u => {
+            const uName = `${u.FirstName || ''} ${u.LastName || ''}`.trim();
+            return normalizeString(uName + ' ' + (u.Username || '') + ' ' + (u.Role || '')).includes(searchTerm);
+        });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν βρέθηκαν χρήστες.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(u => {
+        const statusHtml = u.isActive 
+            ? '<span class="pill p-g">Ενεργός</span>' 
+            : '<span class="pill p-r">Απενεργοποιημένος</span>';
+        
+        const btnText = u.isActive ? 'Απενεργοποίηση' : 'Ενεργοποίηση';
+        const btnClass = u.isActive ? 'btn-sm' : 'btn-dark btn-sm';
+        const uName = `${u.FirstName || ''} ${u.LastName || ''}`.trim();
+        const safeName = uName.replace(/'/g, "\\'");
+
+        return `
+            <tr>
+                <td><strong>${uName}</strong></td>
+                <td><code>${u.Username || '-'}</code></td>
+                <td><span class="pill p-b">${u.Role}</span></td>
+                <td>${statusHtml}</td>
+                <td style="white-space:nowrap">
+                    <button class="btn ${btnClass}" onclick="toggleUserStatus(${u.EmpID}, ${u.isActive}, '${safeName}')">
+                        ${btnText}
+                    </button>
+                    <button class="btn btn-sm" onclick="changePassword(${u.EmpID}, '${u.Username || safeName}')" title="Αλλαγή κωδικού">
+                        <i class="ti ti-key"></i>
+                    </button>
+                    <button class="btn btn-sm" onclick="openUserModal(${u.EmpID})" title="Επεξεργασία">
+                        <i class="ti ti-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm" onclick="deleteUser(${u.EmpID}, '${safeName}')" title="Διαγραφή">
+                        <i class="ti ti-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 // Λειτουργία: Ενεργοποίηση / Απενεργοποίηση Χρήστη
