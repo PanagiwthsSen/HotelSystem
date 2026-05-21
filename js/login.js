@@ -72,6 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (r === 'minibar') window.location.href = "/pages/minibar.html";
         else if (r === 'driver') window.location.href = "/pages/driver.html";
         else if (r === 'gardener') window.location.href = "/pages/gardener.html";
+        else if (r === 'external_manager') window.location.href = "/pages/external_manager.html";
+        else if (r === 'internal_manager') window.location.href = "/pages/internal_manager.html";
         else {
             localStorage.removeItem('hotel_user');
             alert("Άγνωστος ρόλος: " + role + " — η συνεδρία διαγράφηκε, δοκιμάστε ξανά.");
