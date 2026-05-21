@@ -33,11 +33,14 @@ const viewTitles = {
     minibar: 'Χρεώσεις Mini-bar', policies: 'Πολιτική Ξενοδοχείου'
 };
 
-function navTo(id) {
+async function navTo(id) {
     document.querySelectorAll('.sb-item').forEach(i => i.classList.toggle('active', i.dataset.v === id));
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'v-' + id));
     document.getElementById('tb-title').textContent = viewTitles[id] || id;
-    if (id === 'new-booking') fetchAvailableRooms();
+    if (id === 'new-booking') {
+        await fetchRoomPrices();
+        fetchAvailableRooms();
+    }
     if (id === 'bookings') fetchAllReservations();
 }
 
@@ -541,6 +544,54 @@ function toggleCardSection(form) {
     if (!show) clearCardErrors(form);
 }
 
+/* ==============================================================
+   LIVE PRICE MANAGEMENT (fetched from DB)
+   ============================================================== */
+
+let roomPrices = {};
+
+async function fetchRoomPrices() {
+    try {
+        const { data, error } = await window.supabase
+            .from('ROOM')
+            .select('RoomType, BasePrice');
+        if (error) throw error;
+        const map = {};
+        (data || []).forEach(r => {
+            if (!map[r.RoomType]) map[r.RoomType] = r.BasePrice;
+        });
+        roomPrices = map;
+        populateRoomTypeDropdown();
+    } catch (err) {
+        console.error('Σφάλμα φόρτωσης τιμών:', err.message);
+    }
+}
+
+function populateRoomTypeDropdown() {
+    const sel = document.getElementById('nb-rtype');
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '';
+    const entries = Object.entries(roomPrices);
+    if (entries.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '— Φόρτωση τιμών —';
+        sel.appendChild(opt);
+        return;
+    }
+    entries.forEach(([type, price]) => {
+        const opt = document.createElement('option');
+        opt.value = type;
+        opt.textContent = `${type} (€${price})`;
+        sel.appendChild(opt);
+    });
+    if (prev && roomPrices[prev]) {
+        sel.value = prev;
+    }
+    updatePrice();
+}
+
 function calcNights() {
     const i = document.getElementById('nb-in')?.value;
     const o = document.getElementById('nb-out')?.value;
@@ -551,9 +602,10 @@ function calcNights() {
 function updatePrice() {
     const rtypeEl = document.getElementById('nb-rtype');
     if(!rtypeEl) return;
-    const price = parseInt(rtypeEl.value || 140);
+    const typeText = rtypeEl.value;
+    if (!typeText || !roomPrices[typeText]) return;
+    const price = roomPrices[typeText];
     const nights = calcNights();
-    const typeText = rtypeEl.options[rtypeEl.selectedIndex].text;
     
     // Account for multiple rooms based on guest count
     const guestsEl = document.getElementById('nb-guests');
@@ -626,8 +678,8 @@ function updateRoomSummary() {
     if (!guestsEl || !rtypeEl || !summaryEl) return;
 
     const totalGuests = parseInt(guestsEl.value) || 1;
-    const typeMap = { 85: 'Μονόκλινο', 140: 'Δίκλινο', 175: 'Φαρδύκλινο', 380: 'Σουίτα' };
-    const roomType = typeMap[parseInt(rtypeEl.value)];
+    const roomType = rtypeEl.value;
+    if (!roomType) return;
 
     // Count available rooms displayed
     const availableCount = document.querySelectorAll('#avail-rooms .room-opt').length;
@@ -689,8 +741,7 @@ async function submitBooking() {
         return;
     }
 
-    const rtypeMap = { 85: 'Μονόκλινο', 140: 'Δίκλινο', 175: 'Φαρδύκλινο', 380: 'Σουίτα' };
-    const roomType = rtypeMap[parseInt(document.getElementById('nb-rtype').value)];
+    const roomType = document.getElementById('nb-rtype').value;
     const available = document.querySelectorAll('#avail-rooms .room-opt');
     const availableCount = available.length;
 
@@ -813,8 +864,7 @@ async function fetchAvailableRooms() {
         return;
     }
 
-    const typeMap = { 85: 'Μονόκλινο', 140: 'Δίκλινο', 175: 'Φαρδύκλινο', 380: 'Σουίτα' };
-    const roomType = typeMap[parseInt(rtypeEl.value)];
+    const roomType = rtypeEl.value;
 
     try {
         const { data: overlapping, error: olErr } = await window.supabase
@@ -2476,6 +2526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     fetchRoomsAndRender();
     fetchTodayReservations();
     fetchAllReservations();
+    await fetchRoomPrices();
 
     // Auto-refresh departures every 20 seconds (for mini-bar updates)
     setInterval(refreshDeparturesData, 20000);
@@ -2522,4 +2573,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             this.value = this.value.replace(/\D/g, '').slice(0, 4);
         });
     });
+
+    // Refresh prices from DB every 60 seconds (picks up admin changes)
+    setInterval(fetchRoomPrices, 60000);
 });

@@ -105,8 +105,13 @@ window.triggerAction = function(msg, type) {
    ============================================================== */
 const viewTitles = {
     dash: 'Πίνακας Ελέγχου', revenue: 'Έσοδα & Αναφορές', pricing: 'Δυναμική Τιμολόγηση',
+<<<<<<< HEAD
     rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Minibar & Αποθήκες',
     vehicles: 'Οχήματα & Μεταφορές', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
+=======
+    rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Εστιατόριο & Αποθήκες',
+    vehicles: 'Οχήματα & Μεταφορές', trips: 'Δρομολόγια Οχημάτων', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
+>>>>>>> b31125c7ae77d5e3de0db4f24cbaf449b566141e
     payroll: 'Μισθοδοσία', users: 'Χρήστες & Ρόλοι', backup: 'Backup & Ασφάλεια',
     'notif-history': 'Ιστορικό Ειδοποιήσεων'
 };
@@ -1515,31 +1520,30 @@ async function fetchVehicles() {
             notifContainer.innerHTML = notifHtml;
         }
 
-        // Ειδοποιήσεις ανεφοδιασμού από το minibar
+        // Ειδοποιήσεις από τη βάση (ανεφοδιασμός, βλάβες οχημάτων κλπ.)
         try {
-            const { data: restockNotifs } = await supabase
+            const { data: dbNotifs } = await supabase
                 .from('NOTIFICATION')
-                .select(`
-                    NotificationID, Type, Message, CreatedAt,
-                    INVENTORY_ITEM (Name)
-                `)
-                .eq('TargetRole', 'both')
+                .select('NotificationID, Type, Message, CreatedAt')
+                .in('TargetRole', ['both', 'admin'])
                 .eq('IsRead', false)
                 .order('CreatedAt', { ascending: false });
 
-            if (restockNotifs && restockNotifs.length > 0) {
-                let restockHtml = restockNotifs.map(n => {
-                    const itemName = n.INVENTORY_ITEM?.Name || 'άγνωστο';
+            if (dbNotifs && dbNotifs.length > 0) {
+                let extraHtml = dbNotifs.map(n => {
+                    const isFault = n.Type === 'vehicle_fault';
+                    const icon = isFault ? 'ti ti-alert-octagon' : 'ti ti-package';
+                    const cls = isFault ? 'ns-e' : 'ns-w';
                     return `
-                    <div class="ns ns-w" id="restock-notif-${n.NotificationID}" onclick="dismissRestockNotif(${n.NotificationID}, this)">
-                        <i class="ti ti-package" aria-hidden="true"></i>
+                    <div class="ns ${cls}" id="restock-notif-${n.NotificationID}" onclick="dismissRestockNotif(${n.NotificationID}, this)">
+                        <i class="${icon}" aria-hidden="true"></i>
                         <div style="flex:1">${n.Message}</div>
                     </div>`;
                 }).join('');
 
                 if (notifContainer) {
-                    notifContainer.insertAdjacentHTML('beforeend', restockHtml);
-                    notifCount += restockNotifs.length;
+                    notifContainer.insertAdjacentHTML('beforeend', extraHtml);
+                    notifCount += dbNotifs.length;
                 }
             }
         } catch (_) {}
@@ -1777,6 +1781,7 @@ window.loadNotifHistory = async function() {
 
         if (readNotifs && readNotifs.length > 0) {
             readNotifs.forEach(n => {
+<<<<<<< HEAD
                 if (n.Type === 'pricing') {
                     _notifHistoryData.push({
                         type: 'Δυναμική Τιμολόγηση',
@@ -1796,6 +1801,17 @@ window.loadNotifHistory = async function() {
                         undo: `undoRestockNotif(${n.NotificationID})`
                     });
                 }
+=======
+const isFault = n.Type === 'vehicle_fault';
+                _notifHistoryData.push({
+                    type: isFault ? 'Βλάβη οχήματος' : 'Ανεφοδιασμός',
+                    icon: isFault ? 'ti ti-alert-octagon' : 'ti ti-package',
+                    cls: isFault ? 'ns-e' : 'ns-w',
+                    message: n.Message,
+                    dismissedAt: n.CreatedAt ? new Date(n.CreatedAt).getTime() : null,
+                    undo: `undoRestockNotif(${n.NotificationID})`
+                });
+>>>>>>> b31125c7ae77d5e3de0db4f24cbaf449b566141e
             });
         }
     } catch (_) {}
@@ -1903,6 +1919,190 @@ window.openTripModal = async function(vehicleId, plateNumber) {
 window.closeTripModal = function(e) {
     if (e && e.target !== e.currentTarget) return;
     document.getElementById('trip-modal').style.display = 'none';
+};
+
+/* ==============================================================
+   ΔΡΟΜΟΛΟΓΙΑ — CRUD (ΔΙΑΧΕΙΡΙΣΗ ΑΠΟ ADMIN)
+   ============================================================== */
+async function fetchTrips() {
+    const tbody = document.getElementById('trips-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:1.5rem;"></i><br>Φόρτωση δρομολογίων...</td></tr>';
+
+    try {
+        const [tripRes, vehRes, empRes, custRes] = await Promise.all([
+            supabase.from('TRIP').select('*').order('Date', { ascending: false }),
+            supabase.from('VEHICLE').select('*'),
+            supabase.from('EMPLOYEE').select('*'),
+            supabase.from('CUSTOMER').select('*')
+        ]);
+
+        if (tripRes.error) throw tripRes.error;
+
+        const data = tripRes.data || [];
+        const vehMap = Object.fromEntries((vehRes.data || []).map(v => [v.VehicleID, v]));
+        const empMap = Object.fromEntries((empRes.data || []).map(e => [e.EmpID, e]));
+        const custMap = Object.fromEntries((custRes.data || []).map(c => [c.CustomerID, c]));
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν δρομολόγια.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(t => {
+            const veh = vehMap[t.VehicleID] || {};
+            const vehicleName = `${veh.Type || ''} ${veh.LicensePlate || veh.PlateNumber || ''}`.trim() || '—';
+            const driver = empMap[t.DriverID] || {};
+            const driverName = `${driver.FirstName || ''} ${driver.LastName || ''}`.trim() || '—';
+            const customer = custMap[t.CustomerID] || {};
+            const customerName = `${customer.FirstName || ''} ${customer.LastName || ''}`.trim() || '—';
+            const dateStr = new Date(t.Date).toLocaleDateString('el-GR');
+            const cost = t.Cost != null ? `€${t.Cost}` : '—';
+            const statusLabel = t.Status === 'completed' ? '<span class="pill p-g">Ολοκληρώθηκε</span>' : '<span class="pill p-a">Εκκρεμεί</span>';
+            return `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td><strong>${t.Destination}</strong></td>
+                    <td>${vehicleName}</td>
+                    <td>${driverName}</td>
+                    <td>${customerName}</td>
+                    <td>${cost}</td>
+                    <td>${statusLabel}</td>
+                    <td><button class="btn btn-sm" onclick="deleteTrip(${t.TripID})" title="Διαγραφή"><i class="ti ti-trash"></i></button></td>
+                </tr>`;
+        }).join('');
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης δρομολογίων:", err.message);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem;">Σφάλμα φόρτωσης</td></tr>';
+    }
+}
+
+async function checkTripStatusColumn() {
+    const { error } = await supabase.from('TRIP').select('Status').limit(0).maybeSingle();
+    window._tripHasStatus = !error;
+}
+
+async function populateTripFormDropdowns() {
+    await checkTripStatusColumn();
+    try {
+        const [vehRes, empRes, custRes] = await Promise.all([
+            supabase.from('VEHICLE').select('*').order('VehicleID'),
+            supabase.from('EMPLOYEE').select('*').eq('Role', 'driver').eq('isActive', true).order('FirstName'),
+            supabase.from('CUSTOMER').select('*').order('FirstName')
+        ]);
+
+        const vehSelect = document.getElementById('trip-vehicle');
+        if (vehSelect && vehRes.data) {
+            vehSelect.innerHTML = '<option value="">— Επιλέξτε Όχημα —</option>' +
+                vehRes.data.map(v =>
+                    `<option value="${v.VehicleID}">${v.Type || 'Όχημα'} (${v.LicensePlate || v.PlateNumber || '—'})${v.Status === 'maintenance' ? ' [Συντήρηση]' : ''}</option>`
+                ).join('');
+        }
+
+        const drvSelect = document.getElementById('trip-driver');
+        if (drvSelect && empRes.data) {
+            if (empRes.data.length === 0) {
+                drvSelect.innerHTML = '<option value="">— Δεν υπάρχουν ενεργοί οδηγοί —</option>';
+            } else {
+                drvSelect.innerHTML = '<option value="">— Επιλέξτε Οδηγό —</option>' +
+                    empRes.data.map(e =>
+                        `<option value="${e.EmpID}">${e.FirstName || ''} ${e.LastName || ''}</option>`
+                    ).join('');
+            }
+        }
+
+        const custSelect = document.getElementById('trip-customer');
+        if (custSelect && custRes.data) {
+            custSelect.innerHTML = '<option value="">— Κανένας —</option>' +
+                custRes.data.map(c =>
+                    `<option value="${c.CustomerID}">${c.FirstName || ''} ${c.LastName || ''}${c.IsGroup ? ' (Group)' : ''}</option>`
+                ).join('');
+        }
+
+        const now = new Date();
+        now.setMinutes(0, 0, 0);
+        now.setHours(now.getHours() + 1);
+        const pad = (n) => String(n).padStart(2, '0');
+        const dateInput = document.getElementById('trip-date');
+        if (dateInput) dateInput.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης dropdown:", err.message);
+    }
+}
+
+window.createTrip = async function() {
+    const vehicleId = parseInt(document.getElementById('trip-vehicle')?.value);
+    const driverId = parseInt(document.getElementById('trip-driver')?.value);
+    const customerId = parseInt(document.getElementById('trip-customer')?.value) || null;
+        const rawDate = document.getElementById('trip-date')?.value;
+        let date = '';
+        if (rawDate) {
+            const offset = -new Date().getTimezoneOffset();
+            const oh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+            const om = String(Math.abs(offset) % 60).padStart(2, '0');
+            const tz = `${offset >= 0 ? '+' : '-'}${oh}:${om}`;
+            date = `${rawDate}:00${tz}`;
+        }
+    const destination = document.getElementById('trip-destination')?.value?.trim();
+    const cost = parseFloat(document.getElementById('trip-cost')?.value);
+
+    if (!vehicleId) { showToast('Επιλέξτε όχημα.', 'error'); return; }
+    if (!driverId) { showToast('Επιλέξτε οδηγό.', 'error'); return; }
+    if (!date) { showToast('Επιλέξτε ημερομηνία.', 'error'); return; }
+    if (!destination) { showToast('Συμπληρώστε προορισμό.', 'error'); return; }
+    if (!cost || cost <= 0) { showToast('Συμπληρώστε έγκυρο κόστος.', 'error'); return; }
+
+    try {
+        const { data: maxTrip } = await supabase
+            .from('TRIP')
+            .select('TripID')
+            .order('TripID', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        const nextId = (maxTrip?.TripID || 0) + 1;
+
+        const insertFields = {
+            TripID: nextId,
+            VehicleID: vehicleId,
+            DriverID: driverId,
+            CustomerID: customerId,
+            Date: date,
+            Cost: cost,
+            Destination: destination
+        };
+
+        if (window._tripHasStatus) {
+            insertFields.Status = 'pending';
+        }
+
+        const { error } = await supabase
+            .from('TRIP')
+            .insert([insertFields]);
+
+        if (error) throw error;
+
+        showToast('Το δρομολόγιο καταχωρήθηκε επιτυχώς!', 'success');
+        document.getElementById('trip-destination').value = '';
+        document.getElementById('trip-cost').value = '';
+        fetchTrips();
+    } catch (err) {
+        showToast('Σφάλμα καταχώρησης: ' + err.message, 'error');
+    }
+};
+
+window.deleteTrip = async function(tripId) {
+    if (!await window.showConfirm('Διαγραφή δρομολογίου;')) return;
+    try {
+        const { error } = await supabase
+            .from('TRIP')
+            .delete()
+            .eq('TripID', tripId);
+        if (error) throw error;
+        showToast('Το δρομολόγιο διαγράφηκε.', 'info');
+        fetchTrips();
+    } catch (err) {
+        showToast('Σφάλμα διαγραφής: ' + err.message, 'error');
+    }
 };
 
 /* ==============================================================
@@ -3084,6 +3284,7 @@ appReady.then(ok => {
     el.addEventListener('click', () => {
       if (el.dataset.v === 'revenue') setTimeout(buildRevChart, 50);
       if (el.dataset.v === 'notif-history') setTimeout(loadNotifHistory, 50);
+      if (el.dataset.v === 'trips') { fetchTrips(); populateTripFormDropdowns(); }
     });
   });
   const logoutBtn = document.getElementById('logout-btn');
