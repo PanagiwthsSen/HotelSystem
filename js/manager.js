@@ -327,11 +327,6 @@ async function fetchRestockNotifs() {
   container.innerHTML = html || '';
 }
 
-window.logout = function() {
-  localStorage.removeItem('hotel_user');
-  window.location.href = '/pages/login.html';
-};
-
 window.dismissNotif = async function(id, el) {
   try {
     await window.supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
@@ -347,7 +342,15 @@ window.dismissNotif = async function(id, el) {
    INIT
    ============================================================== */
 document.addEventListener('DOMContentLoaded', () => {
-<<<<<<< HEAD
+  const user = JSON.parse(localStorage.getItem('hotel_user'));
+  if (!user) {
+    window.location.href = '/pages/login.html';
+    return;
+  }
+
+  document.getElementById('user-name').textContent = user.name;
+  document.getElementById('user-role').textContent = user.Role === 'external_manager' ? 'Διαχειριστής Εξωτ.' : user.Role;
+
   setTimeout(() => {
     const loader = document.getElementById('app-loader');
     if (loader) loader.style.display = 'none';
@@ -359,16 +362,6 @@ document.addEventListener('DOMContentLoaded', () => {
     item.addEventListener('click', () => navTo(item.dataset.v));
   });
 
-=======
-  const user = JSON.parse(localStorage.getItem('hotel_user'));
-  if (!user) {
-    window.location.href = '/pages/login.html';
-    return;
-  }
-
-  document.getElementById('user-name').textContent = user.name;
-  document.getElementById('user-role').textContent = user.Role === 'external_manager' ? 'Διαχειριστής Εξωτ.' : user.Role;
-
   const logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn) logoutBtn.addEventListener('click', window.logout);
 
@@ -377,7 +370,6 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchDriverSchedule();
   fetchFleetMaintenance();
   fetchPayroll();
->>>>>>> a83f243ecb5c9c60c640ee2e4f5a4f569cb1e918
   fetchRestockNotifs();
   setInterval(fetchRestockNotifs, 30000);
 });
