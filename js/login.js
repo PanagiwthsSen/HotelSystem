@@ -70,6 +70,11 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (r === 'receptionist') window.location.href = "/pages/receptionist.html";
         else if (r === 'maid') window.location.href = "/pages/maid.html";
         else if (r === 'minibar') window.location.href = "/pages/minibar.html";
-        else alert("Άγνωστος ρόλος: " + role);
+        else if (r === 'driver') window.location.href = "/pages/driver.html";
+        else if (r === 'gardener') window.location.href = "/pages/gardener.html";
+        else {
+            localStorage.removeItem('hotel_user');
+            alert("Άγνωστος ρόλος: " + role + " — η συνεδρία διαγράφηκε, δοκιμάστε ξανά.");
+        }
     }
 });
