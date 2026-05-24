@@ -1,29 +1,10 @@
-/* ==============================================================
-   TOAST NOTIFICATION SYSTEM
-   ============================================================== */
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = `live-toast ${type}`;
-
-    let iconClass = 'ti-circle-check'; 
-    if (type === 'error') iconClass = 'ti-alert-circle';
-    if (type === 'info') iconClass = 'ti-info-circle';
-    if (type === 'warning') iconClass = 'ti-alert-triangle';
-
-    toast.innerHTML = `<i class="ti ${iconClass}" aria-hidden="true"></i> <span>${message}</span>`;
-    container.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.add('fade-out');
-        setTimeout(() => toast.remove(), 300);
-    }, 3500);
-}
+import { supabase } from './supabase-config.js';
+import { showToast, normalizeString, formatDate, updateLiveTime } from './utils/ui.js';
+import { isSoonCheckout, getStatusLabel, buildCheckoutMap, calcDynamicPrice, fetchSpecialPricing, fetchOccupancyPercentage } from './services/api.js';
+import { renderRoomMap } from './components/RoomMap.js';
 
 /* ==============================================================
-   NAVIGATION & LIVE TIME
+   NAVIGATION
    ============================================================== */
 const viewTitles = {
     dash: 'Επισκόπηση', rooms: 'Κατάσταση Δωματίων', 'new-booking': 'Νέα Κράτηση',
@@ -49,15 +30,6 @@ document.querySelectorAll('.sb-item').forEach(el => {
     el.addEventListener('click', () => navTo(el.dataset.v));
 });
 
-function updateLiveTime() {
-    const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-    const liveTimeEl = document.getElementById('live-time');
-    if(liveTimeEl) liveTimeEl.innerHTML = now.toLocaleDateString('el-GR', options);
-}
-setInterval(updateLiveTime, 60000);
-updateLiveTime();
-
 /* ==============================================================
    STATE & ROOMS FETCHING (SUPABASE)
    ============================================================== */
@@ -65,23 +37,6 @@ let hotelRooms = [];
 let currentOcc = 0, currentFree = 0, currentDirty = 0;
 let selectedRoom = null;
 let checkoutMap = {};
-
-function isSoonCheckout(checkOutDate) {
-  if (!checkOutDate) return false;
-  const d = new Date(checkOutDate);
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(23, 59, 59, 999);
-  return d <= tomorrow;
-}
-
-function roomStatusLabel(state, checkOutDate) {
-  if (state === 'free' || state === 'clean') return 'Έτοιμο για νέο πελάτη';
-  if (state === 'dirty') return 'Άδειο (χωρίς καθαριότητα)';
-  if (state === 'soon') return 'Προσεχώς άδειο';
-  if (state === 'occ') return 'Κατειλημμένο';
-  return 'Ελεύθερο';
-}
 
 function mapDbStatusToUI(dbStatus) {
     switch (dbStatus) {
@@ -93,33 +48,9 @@ function mapDbStatusToUI(dbStatus) {
     }
 }
 
-async function buildCheckoutMap() {
-  const map = {};
-  try {
-    const { data: rrData } = await window.supabase
-      .from('RESERVATION_ROOM')
-      .select('RoomNumber, ReservationID');
-    if (!rrData || rrData.length === 0) return map;
-    const ids = rrData.map(r => r.ReservationID);
-    const { data: resData } = await window.supabase
-      .from('RESERVATION')
-      .select('ReservationID, CheckOutDate')
-      .in('ReservationID', ids)
-      .neq('Status', 'CheckedOut');
-    if (resData) {
-      const dateMap = {};
-      resData.forEach(r => dateMap[r.ReservationID] = r.CheckOutDate);
-      rrData.forEach(rr => { if (dateMap[rr.ReservationID]) map[rr.RoomNumber] = dateMap[rr.ReservationID]; });
-    }
-  } catch (err) {
-    console.warn('buildCheckoutMap error:', err);
-  }
-  return map;
-}
-
 async function fetchRoomsAndRender() {
     try {
-        const { data: rooms, error } = await window.supabase
+        const { data: rooms, error } = await supabase
             .from('ROOM')
             .select('*')
             .order('RoomNumber', { ascending: true });
@@ -148,7 +79,7 @@ async function fetchRoomsAndRender() {
 }
 
 function calculateLiveStats() {
-    currentOcc = 0; currentFree = 0; currentDirty = 0; currentClean = 0;
+    currentOcc = 0; currentFree = 0; currentDirty = 0;
     
     hotelRooms.forEach(r => {
         if (r.state === 'occ') currentOcc++;
@@ -182,31 +113,8 @@ function calculateLiveStats() {
     }
 }
 
-// HotelSystem/js/receptionist.js (Αντικατάσταση της συνάρτησης renderMap)
 function renderMap(filter = 'all') {
-    const rmap = document.getElementById('rmap');
-    if (!rmap) return;
-    rmap.innerHTML = '';
-    
-    hotelRooms.forEach(r => {
-        if (filter !== 'all' && r.state !== filter) return;
-        const d = document.createElement('div');
-        d.className = 'rc rc-' + r.state;
-        
-        let prefix = r.type ? r.type.charAt(0).toUpperCase() + '-' : '';
-        d.textContent = prefix + r.id; 
-        
-        const sText = roomStatusLabel(r.state, r.checkOutDate);
-        d.title = `${r.type || 'Άγνωστος Τύπος'} ${r.id} | ${sText}`;
-        d.style.cursor = 'pointer';
-        
-        d.addEventListener('click', () => {
-            alert(`Πληροφορίες Δωματίου\n--------------------\nΔωμάτιο: ${prefix}${r.id}\nΤύπος: ${r.type || 'Άγνωστος'}\nΚατάσταση: ${sText}`);
-        });
-
-        rmap.appendChild(d);
-    });
-    
+    renderRoomMap('rmap', hotelRooms, { filter });
     calculateLiveStats();
 }
 
@@ -224,7 +132,7 @@ function filterRooms(f, el) {
 async function fetchMinibarForDepartures(reservationIds) {
     if (!reservationIds || reservationIds.length === 0) return {};
     try {
-        const { data, error } = await window.supabase
+        const { data, error } = await supabase
             .from('MINIBAR_CONSUMPTION')
             .select('ReservationID, Quantity, Charge, INVENTORY_ITEM ( Name )')
             .in('ReservationID', reservationIds);
@@ -256,7 +164,7 @@ async function fetchMinibarView() {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--color-text-secondary)">Φόρτωση...</td></tr>';
 
     try {
-        const { data: records, error } = await window.supabase
+        const { data: records, error } = await supabase
             .from('MINIBAR_CONSUMPTION')
             .select('ConsumptionID, Quantity, Charge, ReservationID, INVENTORY_ITEM ( Name )')
             .order('ConsumptionID', { ascending: false });
@@ -273,12 +181,12 @@ async function fetchMinibarView() {
         const resIds = [...new Set(records.map(r => r.ReservationID))];
 
         const [{ data: resRooms }, { data: reservations }] = await Promise.all([
-            window.supabase.from('RESERVATION_ROOM').select('ReservationID, RoomNumber').in('ReservationID', resIds),
-            window.supabase.from('RESERVATION').select('ReservationID, CustomerID, Status').in('ReservationID', resIds)
+            supabase.from('RESERVATION_ROOM').select('ReservationID, RoomNumber').in('ReservationID', resIds),
+            supabase.from('RESERVATION').select('ReservationID, CustomerID, Status').in('ReservationID', resIds)
         ]);
 
         const custIds = [...new Set((reservations || []).map(r => r.CustomerID))];
-        const { data: customers } = await window.supabase
+        const { data: customers } = await supabase
             .from('CUSTOMER')
             .select('CustomerID, FirstName, LastName')
             .in('CustomerID', custIds);
@@ -329,13 +237,13 @@ async function fetchTodayReservations() {
 
     try {
         // Αφίξεις Σήμερα
-        const { data: arrivals, error: arrErr } = await window.supabase
+        const { data: arrivals, error: arrErr } = await supabase
             .from('RESERVATION')
             .select(`ReservationID, Status, RoomType, CUSTOMER ( FirstName, LastName, IsGroup )`)
             .eq('CheckInDate', today);
 
         // Αναχωρήσεις Σήμερα
-        const { data: departures, error: depErr } = await window.supabase
+        const { data: departures, error: depErr } = await supabase
             .from('RESERVATION')
             .select(`ReservationID, Status, TotalCost, CUSTOMER ( FirstName, LastName, IsGroup )`)
             .eq('CheckOutDate', today);
@@ -351,7 +259,7 @@ async function fetchTodayReservations() {
         const roomMap = {};
 
         if (allIds.length > 0) {
-            const { data: rrData, error: rrErr } = await window.supabase
+            const { data: rrData, error: rrErr } = await supabase
                 .from('RESERVATION_ROOM')
                 .select('ReservationID, RoomNumber')
                 .in('ReservationID', allIds);
@@ -627,7 +535,7 @@ let roomPrices = {};
 
 async function fetchRoomPrices() {
     try {
-        const { data, error } = await window.supabase
+        const { data, error } = await supabase
             .from('ROOM').select('RoomType, BasePrice');
         if (error) throw error;
         roomPrices = {};
@@ -635,25 +543,10 @@ async function fetchRoomPrices() {
             if (!roomPrices[r.RoomType]) roomPrices[r.RoomType] = r.BasePrice;
         });
 
-        // Special pricing — non-blocking
-        try {
-            const { data: spData } = await window.supabase
-                .from('SPECIAL_PRICING').select('*');
-            specialPricing = {};
-            (spData || []).forEach(r => {
-                if (!specialPricing[r.RoomType]) specialPricing[r.RoomType] = [];
-                specialPricing[r.RoomType].push(r);
-            });
-        } catch (_) { specialPricing = null; }
+        specialPricing = await fetchSpecialPricing();
 
-        // Low occupancy check — non-blocking
-        try {
-            const { count: occCount } = await window.supabase
-                .from('ROOM').select('*', { count: 'exact', head: true }).eq('Status', 'occ');
-            const { count: totalCount } = await window.supabase
-                .from('ROOM').select('*', { count: 'exact', head: true });
-            lowMultiplier = (totalCount > 0 && (occCount / totalCount) * 100 < 60) ? 0.85 : 1.0;
-        } catch (_) { lowMultiplier = 1.0; }
+        const occPct = await fetchOccupancyPercentage();
+        lowMultiplier = occPct < 60 ? 0.85 : 1.0;
 
         populateRoomTypeDropdown();
     } catch (err) {
@@ -708,7 +601,7 @@ function updatePrice() {
     const capacity = ROOM_CAPACITY[typeText] || 2;
     const roomsNeeded = Math.ceil(guests / capacity);
 
-    const { total: totalPerRoom, groups: groupLabels } = calcDynamicPricePerRoom(basePrice, typeText, checkIn, checkOut);
+    const { total: totalPerRoom, groups: groupLabels } = calcDynamicPrice(basePrice, typeText, checkIn, checkOut, specialPricing, lowMultiplier);
     const grandTotal = totalPerRoom * roomsNeeded;
     let breakdown = '';
     if (groupLabels.length > 0) {
@@ -742,117 +635,8 @@ function updatePrepay(totalVal) {
 
 const ROOM_CAPACITY = { 'Μονόκλινο': 1, 'Δίκλινο': 2, 'Φαρδύκλινο': 2, 'Σουίτα': 4 };
 
-/* ==============================================================
-   DYNAMIC PRICING (same logic as landing page app.js)
-   ============================================================== */
-function calculateEaster(year) {
-    const a = year % 19;
-    const b = Math.floor(year / 100);
-    const c = year % 100;
-    const d = Math.floor(b / 4);
-    const e = b % 4;
-    const f = Math.floor((b + 8) / 25);
-    const g = Math.floor((b - f + 1) / 3);
-    const h = (19 * a + b - d - g + 15) % 30;
-    const i = Math.floor(c / 4);
-    const k = c % 4;
-    const l = (32 + 2 * e + 2 * i - h - k) % 7;
-    const m = Math.floor((a + 11 * h + 22 * l) / 451);
-    const month = Math.floor((h + l - 7 * m + 114) / 31);
-    const day = ((h + l - 7 * m + 114) % 31) + 1;
-    return new Date(year, month - 1, day);
-}
-
-const SEASONS = {
-    summer: {
-        label: 'Καλοκαίρι',
-        defaultMultiplier: 1.6,
-        isActive: (d) => { const m = d.getMonth() + 1; return m >= 6 && m <= 8; }
-    },
-    xmas: {
-        label: 'Χριστούγεννα',
-        defaultMultiplier: 1.4,
-        isActive: (d) => {
-            const m = d.getMonth() + 1, day = d.getDate();
-            return (m === 12 && day >= 15) || (m === 1 && day <= 7);
-        }
-    },
-    easter: {
-        label: 'Πάσχα',
-        defaultMultiplier: 1.3,
-        isActive: (d) => {
-            const easter = calculateEaster(d.getFullYear());
-            const start = new Date(easter); start.setDate(start.getDate() - 7);
-            const end = new Date(easter); end.setDate(end.getDate() + 7);
-            end.setHours(23, 59, 59, 999);
-            return d >= start && d <= end;
-        }
-    }
-};
-
-function getSeasonForDate(date) {
-    for (const [key, season] of Object.entries(SEASONS)) {
-        if (season.isActive(date)) return key;
-    }
-    return null;
-}
-
-function getMultiplier(date) {
-    const key = getSeasonForDate(date);
-    return key ? SEASONS[key].defaultMultiplier : 1.0;
-}
-
-function getSeasonLabel(date) {
-    const key = getSeasonForDate(date);
-    return key ? SEASONS[key].label : 'Κανονική';
-}
-
 let specialPricing = null;
 let lowMultiplier = 1.0;
-
-function calcDynamicPricePerRoom(basePrice, roomType, checkIn, checkOut) {
-    if (!checkIn || !checkOut) return { total: basePrice, groups: {} };
-    const start = new Date(checkIn + 'T12:00:00');
-    const end = new Date(checkOut + 'T12:00:00');
-    const roomRules = specialPricing ? specialPricing[roomType] : null;
-    const groups = {};
-    let total = 0;
-
-    for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
-        let price = basePrice;
-        let label = getSeasonLabel(d);
-
-        if (roomRules) {
-            const found = roomRules.find(r => {
-                const f = new Date(r.FromDate + 'T00:00:00');
-                const t = new Date(r.ToDate + 'T23:59:59');
-                return d >= f && d <= t;
-            });
-            if (found) {
-                price = found.Price;
-                label = 'Ειδική Τιμή';
-            }
-        }
-
-        if (label !== 'Ειδική Τιμή') {
-            price = Math.round(basePrice * getMultiplier(d));
-        }
-
-        if (lowMultiplier < 1) {
-            price = Math.round(price * lowMultiplier);
-            label = label + ' (Χ. Πληρ. -15%)';
-        }
-
-        if (!groups[label]) {
-            groups[label] = { label, pricePerNight: price, count: 0, subtotal: 0 };
-        }
-        groups[label].count++;
-        groups[label].subtotal += price;
-        total += price;
-    }
-
-    return { total, groups: Object.values(groups) };
-}
 
 function calculateRoomRequirements(totalGuests, roomType, availableCount) {
     const capacity = ROOM_CAPACITY[roomType] || 2;
@@ -997,27 +781,27 @@ async function submitBooking() {
             `Σύνολο: €${totalCost}`
         )) return;
 
-        const { data: customer, error: custError } = await window.supabase
+        const { data: customer, error: custError } = await supabase
             .from('CUSTOMER')
             .insert([{ FirstName: firstName, LastName: lastName, Phone: phone, Email: email, IsGroup: (calc.isGroup || bookingType === 'group') }])
             .select().single();
 
         if (custError) throw custError;
 
-        // Create reservation with first room
-        const { data: result, error: rpcError } = await window.supabase
+        // Create reservation with all rooms (atomic)
+        const { data: result, error: rpcError } = await supabase
             .rpc('book_room_atomic', {
                 p_customer_id: customer.CustomerID,
                 p_check_in: checkIn,
                 p_check_out: checkOut,
                 p_total_cost: totalCost,
                 p_status: 'Confirmed',
-                p_room_number: roomNumbers[0]
+                p_room_numbers: roomNumbers
             });
 
         if (rpcError) {
             if (rpcError.message && rpcError.message.includes('ROOM_ALREADY_BOOKED')) {
-                showToast('Η κράτηση απέτυχε: Το δωμάτιο μόλις κρατήθηκε από άλλον χρήστη.', 'error');
+                showToast('Η κράτηση απέτυχε: Κάποιο δωμάτιο μόλις κρατήθηκε από άλλον χρήστη.', 'error');
             } else {
                 throw rpcError;
             }
@@ -1027,21 +811,13 @@ async function submitBooking() {
         const resId = result?.ReservationID;
         if (!resId) throw new Error('Αποτυχία δημιουργίας κράτησης');
 
-        // Add additional rooms (skipping first which was already assigned)
-        for (let i = 1; i < roomNumbers.length; i++) {
-            const { error: rrErr } = await window.supabase
-                .from('RESERVATION_ROOM')
-                .insert([{ ReservationID: resId, RoomNumber: roomNumbers[i] }]);
-            if (rrErr) console.warn('Σφάλμα ανάθεσης δωματίου ' + roomNumbers[i] + ':', rrErr.message);
-        }
-
         // Update reservation metadata
         const updates = { RoomType: roomType, PaymentMethod: paymentMethod, BookingType: bookingType, NumberOfGuests: totalGuests, Deposit: 0 };
-        await window.supabase.from('RESERVATION').update(updates).eq('ReservationID', resId);
+        await supabase.from('RESERVATION').update(updates).eq('ReservationID', resId);
 
         // Create history entry
         const user = JSON.parse(localStorage.getItem('hotel_user') || '{}');
-        await window.supabase.from('RESERVATION_HISTORY').insert([{
+        await supabase.from('RESERVATION_HISTORY').insert([{
             ReservationID: resId,
             Action: 'created',
             ChangedBy: user.name || 'Σύστημα',
@@ -1081,7 +857,7 @@ async function fetchAvailableRooms() {
     const roomType = rtypeEl.value;
 
     try {
-        const { data: overlapping, error: olErr } = await window.supabase
+        const { data: overlapping, error: olErr } = await supabase
             .from('RESERVATION')
             .select('ReservationID')
             .lt('CheckInDate', checkOut)
@@ -1093,7 +869,7 @@ async function fetchAvailableRooms() {
         let busyRoomNumbers = [];
         if (overlapping && overlapping.length > 0) {
             const ids = overlapping.map(r => r.ReservationID);
-            const { data: busyRooms, error: brErr } = await window.supabase
+            const { data: busyRooms, error: brErr } = await supabase
                 .from('RESERVATION_ROOM')
                 .select('RoomNumber')
                 .in('ReservationID', ids);
@@ -1101,29 +877,31 @@ async function fetchAvailableRooms() {
             busyRoomNumbers = (busyRooms || []).map(r => r.RoomNumber);
         }
 
-        const { data: allRooms, error: allErr } = await window.supabase
+        const { data: allRooms, error: allErr } = await supabase
             .from('ROOM')
             .select('*')
             .eq('RoomType', roomType);
 
         if (allErr) throw allErr;
 
+        const isCheckInToday = new Date(checkIn) <= new Date(new Date().toDateString());
+        const allowedStatuses = isCheckInToday ? ['free', 'clean'] : ['free', 'clean', 'dirty', 'soon'];
         const available = (allRooms || []).filter(r =>
             !busyRoomNumbers.includes(r.RoomNumber) &&
-            ['free', 'clean', 'dirty', 'occ'].includes(r.Status)
+            allowedStatuses.includes(r.Status)
         );
 
         // Query checkout dates for 'occ' rooms
         let checkoutMap = {};
         const occNums = available.filter(r => r.Status === 'occ').map(r => r.RoomNumber);
         if (occNums.length > 0) {
-            const { data: rrData } = await window.supabase
+            const { data: rrData } = await supabase
                 .from('RESERVATION_ROOM')
                 .select('RoomNumber, ReservationID')
                 .in('RoomNumber', occNums);
             if (rrData && rrData.length > 0) {
                 const ids = rrData.map(r => r.ReservationID);
-                const { data: resData } = await window.supabase
+                const { data: resData } = await supabase
                     .from('RESERVATION')
                     .select('ReservationID, CheckOutDate')
                     .in('ReservationID', ids)
@@ -1328,13 +1106,13 @@ async function confirmCheckin() {
     try {
         if (!await window.showConfirm('Επιβεβαίωση check-in;')) return;
 
-        await window.supabase.from('RESERVATION').update({ Status: 'CheckedIn' }).eq('ReservationID', activeCheckinResId);
+        await supabase.from('RESERVATION').update({ Status: 'CheckedIn' }).eq('ReservationID', activeCheckinResId);
 
         if (activeCheckinRoom) {
-            await window.supabase.from('ROOM').update({ Status: 'occ' }).eq('RoomNumber', selectedRoom);
+            await supabase.from('ROOM').update({ Status: 'occ' }).eq('RoomNumber', selectedRoom);
         } else {
-            await window.supabase.from('RESERVATION_ROOM').insert([{ ReservationID: activeCheckinResId, RoomNumber: selectedRoom }]);
-            await window.supabase.from('ROOM').update({ Status: 'occ' }).eq('RoomNumber', selectedRoom);
+            await supabase.from('RESERVATION_ROOM').insert([{ ReservationID: activeCheckinResId, RoomNumber: selectedRoom }]);
+            await supabase.from('ROOM').update({ Status: 'occ' }).eq('RoomNumber', selectedRoom);
         }
 
         showToast(`Το Check-in ολοκληρώθηκε! Εκχωρήθηκε το δωμάτιο ${selectedRoom}.`, 'success');
@@ -1351,7 +1129,7 @@ async function confirmCheckin() {
 async function doCheckout(btn, name, reservationId, roomNumber) {
     try {
         // 1. Fetch full reservation with customer data
-        const { data: res, error: resErr } = await window.supabase
+        const { data: res, error: resErr } = await supabase
             .from('RESERVATION')
             .select('*, CUSTOMER ( FirstName, LastName, Phone, Email )')
             .eq('ReservationID', reservationId)
@@ -1361,7 +1139,7 @@ async function doCheckout(btn, name, reservationId, roomNumber) {
         if (!res) throw new Error('Η κράτηση δεν βρέθηκε');
 
         // 2. Fetch minibar consumption for this reservation
-        const { data: mbData, error: mbErr } = await window.supabase
+        const { data: mbData, error: mbErr } = await supabase
             .from('MINIBAR_CONSUMPTION')
             .select('*, INVENTORY_ITEM ( Name )')
             .eq('ReservationID', reservationId);
@@ -1395,11 +1173,11 @@ async function doCheckout(btn, name, reservationId, roomNumber) {
         if (!confirmed) return;
 
         // 6. Update reservation to CheckedOut
-        await window.supabase.from('RESERVATION').update({ Status: 'CheckedOut' }).eq('ReservationID', reservationId);
+        await supabase.from('RESERVATION').update({ Status: 'CheckedOut' }).eq('ReservationID', reservationId);
 
         // 7. Mark room as dirty
         if (roomNumber && roomNumber !== '-') {
-            await window.supabase.from('ROOM').update({ Status: 'dirty' }).eq('RoomNumber', roomNumber);
+            await supabase.from('ROOM').update({ Status: 'dirty' }).eq('RoomNumber', roomNumber);
         }
 
         // 8. Generate and download receipt PDF (fire-and-forget with error toast)
@@ -1727,7 +1505,7 @@ window.searchAvailableRooms = async function () {
 
     try {
         // Query 1: overlapping active reservation IDs (overlap formula)
-        const { data: overlapping, error: olErr } = await window.supabase
+        const { data: overlapping, error: olErr } = await supabase
             .from('RESERVATION')
             .select('ReservationID')
             .lt('CheckInDate', checkOut)
@@ -1740,7 +1518,7 @@ window.searchAvailableRooms = async function () {
         let busyRoomNumbers = [];
         if (overlapping && overlapping.length > 0) {
             const ids = overlapping.map(r => r.ReservationID);
-            const { data: busyRooms, error: brErr } = await window.supabase
+            const { data: busyRooms, error: brErr } = await supabase
                 .from('RESERVATION_ROOM')
                 .select('RoomNumber')
                 .in('ReservationID', ids);
@@ -1750,28 +1528,30 @@ window.searchAvailableRooms = async function () {
         }
 
         // Query 2: all rooms NOT busy and with bookable status
-        const { data: allRooms, error: allErr } = await window.supabase
+        const { data: allRooms, error: allErr } = await supabase
             .from('ROOM')
             .select('*');
 
         if (allErr) throw allErr;
 
+        const isCheckInToday2 = new Date(checkIn) <= new Date(new Date().toDateString());
+        const allowedStatuses2 = isCheckInToday2 ? ['free', 'clean'] : ['free', 'clean', 'dirty', 'soon'];
         const available = (allRooms || []).filter(r =>
             !busyRoomNumbers.includes(r.RoomNumber) &&
-            ['free', 'clean', 'dirty', 'occ'].includes(r.Status)
+            allowedStatuses2.includes(r.Status)
         );
 
         // Query checkout dates for 'occ' rooms
         let checkoutMap = {};
         const occNums = available.filter(r => r.Status === 'occ').map(r => r.RoomNumber);
         if (occNums.length > 0) {
-            const { data: rrData } = await window.supabase
+            const { data: rrData } = await supabase
                 .from('RESERVATION_ROOM')
                 .select('RoomNumber, ReservationID')
                 .in('RoomNumber', occNums);
             if (rrData && rrData.length > 0) {
                 const ids = rrData.map(r => r.ReservationID);
-                const { data: resData } = await window.supabase
+                const { data: resData } = await supabase
                     .from('RESERVATION')
                     .select('ReservationID, CheckOutDate')
                     .in('ReservationID', ids)
@@ -1856,16 +1636,19 @@ function renderSearchResults(rooms) {
     });
 
     count.textContent = sorted.length + ' διαθέσιμα';
+    const nights = Math.max(1, Math.round((new Date(rsState.checkOut) - new Date(rsState.checkIn)) / 86400000));
     tbody.innerHTML = sorted.map(r => {
         const st = r.Status;
         const isOcc = st === 'occ';
         const soon = isOcc && isSoonCheckout(rsState.checkoutMap[r.RoomNumber]);
         const label = st === 'free' || st === 'clean' ? 'Έτοιμο για νέο πελάτη' : st === 'dirty' ? 'Άδειο (χωρίς καθαριότητα)' : soon ? 'Προσεχώς άδειο' : 'Κατειλημμένο';
         const cls = st === 'free' || st === 'clean' ? 'p-g' : st === 'dirty' ? 'p-a' : soon ? 'p-a' : 'p-r';
+        const { total: dynTotal } = calcDynamicPrice(r.BasePrice, r.RoomType, rsState.checkIn, rsState.checkOut, specialPricing, lowMultiplier);
+        const dynPerNight = Math.round(dynTotal / nights);
         return `<tr>
             <td><strong>${r.RoomNumber}</strong></td>
             <td>${r.RoomType}</td>
-            <td>€${r.BasePrice}</td>
+            <td>€${dynPerNight}</td>
             <td><span class="pill ${cls}">${label}</span></td>
             <td>
                 <button class="btn btn-sm btn-dark" onclick="openRsBookingModal('${r.RoomNumber}', '${r.RoomType}', ${r.BasePrice})">
@@ -1890,8 +1673,9 @@ window.openRsBookingModal = function (roomNum, roomType, basePrice) {
     const calc = calculateRoomRequirements(totalGuests, roomType, totalAvailable);
 
     const roomsNeeded = calc ? calc.roomsNeeded : 1;
-    const { total: dynamicPerRoom } = calcDynamicPricePerRoom(basePrice, roomType, rsState.checkIn, rsState.checkOut);
+    const { total: dynamicPerRoom } = calcDynamicPrice(basePrice, roomType, rsState.checkIn, rsState.checkOut, specialPricing, lowMultiplier);
     const total = dynamicPerRoom * roomsNeeded;
+    const avgPerNight = nights > 0 ? Math.round(dynamicPerRoom / nights) : basePrice;
 
     rsState.roomsNeeded = roomsNeeded;
     rsState.roomPrice = basePrice;
@@ -1899,7 +1683,7 @@ window.openRsBookingModal = function (roomNum, roomType, basePrice) {
     document.getElementById('rs-modal-room').textContent = '— Δωμάτιο ' + roomNum + (roomsNeeded > 1 ? ` (+${roomsNeeded - 1} ακόμα)` : '');
     document.getElementById('rs-modal-room-type').textContent = roomType;
     document.getElementById('rs-modal-nights').textContent = nights;
-    document.getElementById('rs-modal-rate').textContent = '€' + basePrice + ' (δυναμική τιμολόγηση)';
+    document.getElementById('rs-modal-rate').textContent = '€' + (avgPerNight !== basePrice ? avgPerNight : basePrice) + ' (δυναμική τιμολόγηση)';
     document.getElementById('rs-modal-rooms').textContent = roomsNeeded;
     document.getElementById('rs-modal-total').textContent = '€' + total;
 
@@ -1970,7 +1754,7 @@ window.confirmRsBooking = async function () {
     if (!await window.showConfirm(`Επιβεβαίωση κράτησης για ${totalGuests} άτομα — ${roomNumbers.join(', ')};`)) return;
 
     try {
-        const { data: customer, error: custErr } = await window.supabase
+        const { data: customer, error: custErr } = await supabase
             .from('CUSTOMER')
             .insert([{
                 FirstName: firstName,
@@ -1985,23 +1769,23 @@ window.confirmRsBooking = async function () {
         if (custErr) throw custErr;
 
         const nights = Math.max(1, Math.round((new Date(rsState.checkOut) - new Date(rsState.checkIn)) / 86400000));
-        const { total: dynamicPerRoom } = calcDynamicPricePerRoom(rsState.roomPrice, rsState.roomType, rsState.checkIn, rsState.checkOut);
+        const { total: dynamicPerRoom } = calcDynamicPrice(rsState.roomPrice, rsState.roomType, rsState.checkIn, rsState.checkOut, specialPricing, lowMultiplier);
         const totalCost = dynamicPerRoom * roomsNeeded;
 
-        // Atomic booking for first room
-        const { data: result, error: rpcError } = await window.supabase
+        // Atomic booking for all rooms
+        const { data: result, error: rpcError } = await supabase
             .rpc('book_room_atomic', {
                 p_customer_id: customer.CustomerID,
                 p_check_in: rsState.checkIn,
                 p_check_out: rsState.checkOut,
                 p_total_cost: totalCost,
                 p_status: 'Confirmed',
-                p_room_number: roomNumbers[0]
+                p_room_numbers: roomNumbers
             });
 
         if (rpcError) {
             if (rpcError.message && rpcError.message.includes('ROOM_ALREADY_BOOKED')) {
-                showToast('Η κράτηση απέτυχε: Το δωμάτιο μόλις κρατήθηκε από άλλον χρήστη.', 'error');
+                showToast('Η κράτηση απέτυχε: Κάποιο δωμάτιο μόλις κρατήθηκε από άλλον χρήστη.', 'error');
             } else {
                 throw rpcError;
             }
@@ -2011,18 +1795,13 @@ window.confirmRsBooking = async function () {
         const resId = result?.ReservationID;
         if (!resId) throw new Error('Αποτυχία δημιουργίας κράτησης');
 
-        // Add additional rooms
-        for (let i = 1; i < roomNumbers.length; i++) {
-            await window.supabase.from('RESERVATION_ROOM').insert([{ ReservationID: resId, RoomNumber: roomNumbers[i] }]);
-        }
-
         // Update reservation metadata
         const updates = { RoomType: rsState.roomType, PaymentMethod: paymentMethod, BookingType: bookingType, NumberOfGuests: totalGuests, Deposit: 0 };
-        await window.supabase.from('RESERVATION').update(updates).eq('ReservationID', resId);
+        await supabase.from('RESERVATION').update(updates).eq('ReservationID', resId);
 
         // Create history entry
         const user = JSON.parse(localStorage.getItem('hotel_user') || '{}');
-        await window.supabase.from('RESERVATION_HISTORY').insert([{
+        await supabase.from('RESERVATION_HISTORY').insert([{
             ReservationID: resId,
             Action: 'created',
             ChangedBy: user.name || 'Σύστημα',
@@ -2030,7 +1809,7 @@ window.confirmRsBooking = async function () {
         }]);
 
         const roomList = roomNumbers.join(', ');
-        showToast(`Η κράτηση ολοκληρώθηκε! ${roomNumbers.length > 1 ? roomNumbers.length + ' δωμάτια' : 'Δωμάτιο ' + rsState.selectedRoom} ${roomList} — ${totalGuests} άτομα.`, 'success');
+        showToast(`Η κράτηση ολοκληρώθηκε! ${roomNumbers.length > 1 ? roomNumbers.length + ' δωμάτια' : 'Δωμάτιο'} ${roomList} — ${totalGuests} άτομα.`, 'success');
         closeRsModal();
 
         fetchTodayReservations();
@@ -2077,7 +1856,7 @@ let allReservations = [];
 
 async function fetchAllReservations() {
     try {
-        const { data, error } = await window.supabase
+        const { data, error } = await supabase
             .from('RESERVATION')
             .select(`ReservationID, CheckInDate, CheckOutDate, TotalCost, Status, RoomType, PaymentMethod, Notes, NumberOfGuests, Deposit, BookingType, EditedAt, EditedBy, CUSTOMER ( CustomerID, FirstName, LastName, Phone, Email, IsGroup )`);
 
@@ -2086,7 +1865,7 @@ async function fetchAllReservations() {
         const ids = (data || []).map(r => r.ReservationID);
         const roomMap = {};
         if (ids.length > 0) {
-            const { data: rrData, error: rrErr } = await window.supabase
+            const { data: rrData, error: rrErr } = await supabase
                 .from('RESERVATION_ROOM')
                 .select('ReservationID, RoomNumber')
                 .in('ReservationID', ids);
@@ -2217,20 +1996,20 @@ window.openEditReservationModal = async function (reservationId) {
     document.body.appendChild(overlay);
 
     try {
-        const { data: rooms, error: roomsErr } = await window.supabase
+        const { data: rooms, error: roomsErr } = await supabase
             .from('ROOM')
             .select('*')
             .order('RoomNumber');
         if (roomsErr) throw roomsErr;
 
-        const { data: rrData } = await window.supabase
+        const { data: rrData } = await supabase
             .from('RESERVATION_ROOM')
             .select('RoomNumber')
             .eq('ReservationID', r.ReservationID)
             .maybeSingle();
         const currentRoomNumber = rrData?.RoomNumber;
 
-        const { data: historyData } = await window.supabase
+        const { data: historyData } = await supabase
             .from('RESERVATION_HISTORY')
             .select('*')
             .eq('ReservationID', r.ReservationID)
@@ -2476,7 +2255,7 @@ window.saveEditReservation = async function () {
 
         // Room availability check if dates or room changed
         if (checkIn !== orig.CheckInDate || checkOut !== orig.CheckOutDate || roomNumber !== editState.currentRoomNumber) {
-            const { data: overlapping } = await window.supabase
+            const { data: overlapping } = await supabase
                 .from('RESERVATION')
                 .select('ReservationID')
                 .lt('CheckInDate', checkOut)
@@ -2486,7 +2265,7 @@ window.saveEditReservation = async function () {
 
             if (overlapping && overlapping.length > 0) {
                 const ids = overlapping.map(r => r.ReservationID);
-                const { data: busyRooms } = await window.supabase
+                const { data: busyRooms } = await supabase
                     .from('RESERVATION_ROOM')
                     .select('RoomNumber')
                     .in('ReservationID', ids);
@@ -2516,7 +2295,7 @@ window.saveEditReservation = async function () {
         const editorId = user.id || null;
 
         // Update CUSTOMER
-        const { error: custErr } = await window.supabase
+        const { error: custErr } = await supabase
             .from('CUSTOMER')
             .update({
                 FirstName: firstName,
@@ -2548,7 +2327,7 @@ window.saveEditReservation = async function () {
             updateData.RoomType = selectedRoomData.RoomType;
         }
 
-        const { error: resErr } = await window.supabase
+        const { error: resErr } = await supabase
             .from('RESERVATION')
             .update(updateData)
             .eq('ReservationID', rid);
@@ -2556,11 +2335,11 @@ window.saveEditReservation = async function () {
 
         // Update RESERVATION_ROOM if room changed
         if (roomNumber !== editState.currentRoomNumber) {
-            await window.supabase
+            await supabase
                 .from('RESERVATION_ROOM')
                 .delete()
                 .eq('ReservationID', rid);
-            await window.supabase
+            await supabase
                 .from('RESERVATION_ROOM')
                 .insert([{ ReservationID: rid, RoomNumber: roomNumber }]);
         }
@@ -2571,7 +2350,7 @@ window.saveEditReservation = async function () {
         else if (new Date(checkOut) < new Date(orig.CheckOutDate)) action = 'early_checkout';
 
         // Insert history
-        await window.supabase
+        await supabase
             .from('RESERVATION_HISTORY')
             .insert([{
                 ReservationID: rid,
@@ -2642,7 +2421,7 @@ window.filterBookings = function () {
 window.cancelReservation = async function (reservationId) {
     if (!await window.showConfirm('Είστε σίγουροι ότι θέλετε να ακυρώσετε αυτή την κράτηση;')) return;
     try {
-        const { error } = await window.supabase
+        const { error } = await supabase
             .from('RESERVATION')
             .update({ Status: 'Cancelled' })
             .eq('ReservationID', reservationId);
@@ -2695,7 +2474,7 @@ window.viewReservation = function (reservationId) {
 async function refreshDeparturesData() {
     const today = new Date().toISOString().split('T')[0];
     try {
-        const { data: departures, error: depErr } = await window.supabase
+        const { data: departures, error: depErr } = await supabase
             .from('RESERVATION')
             .select(`ReservationID, Status, TotalCost, CUSTOMER ( FirstName, LastName, IsGroup )`)
             .eq('CheckOutDate', today);
@@ -2707,7 +2486,7 @@ async function refreshDeparturesData() {
         // Φόρτωση δωματίων
         const roomMap = {};
         if (depIds.length > 0) {
-            const { data: rrData } = await window.supabase
+            const { data: rrData } = await supabase
                 .from('RESERVATION_ROOM')
                 .select('ReservationID, RoomNumber')
                 .in('ReservationID', depIds);
@@ -2734,7 +2513,7 @@ async function refreshDeparturesData() {
    INITIALIZATION
    ============================================================== */
 document.addEventListener('DOMContentLoaded', async () => {
-    while (!window.supabase) await new Promise(r => setTimeout(r, 50));
+    while (!supabase) await new Promise(r => setTimeout(r, 50));
 
     const loader = document.getElementById('app-loader');
     if (loader) loader.style.display = 'none';
@@ -2794,3 +2573,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Refresh prices from DB every 60 seconds (picks up admin changes)
     setInterval(fetchRoomPrices, 60000);
 });
+
+setInterval(updateLiveTime, 60000);
+updateLiveTime();
+
+window.navTo = navTo;
+window.logout = logout;
+window.filterRooms = filterRooms;
+window.updatePrice = updatePrice;
+window.fetchAvailableRooms = fetchAvailableRooms;
+window.submitBooking = submitBooking;
+window.searchAvailableRooms = searchAvailableRooms;
+window.sortRooms = sortRooms;
+window.filterBookings = filterBookings;
+window.fetchAllReservations = fetchAllReservations;
+window.filterArrivals = filterArrivals;
+window.filterDepartures = filterDepartures;
+window.closeModal = closeModal;
+window.confirmCheckin = confirmCheckin;
+window.closeRsModal = closeRsModal;
+window.confirmRsBooking = confirmRsBooking;
+window.updatePrepay = updatePrepay;
+window.updateRoomSummary = updateRoomSummary;
+window.openCheckinModal = openCheckinModal;
+window.cancelReservation = cancelReservation;
+window.openEditReservationModal = openEditReservationModal;
+window.closeEditModal = closeEditModal;
+window.recalcEditPrice = recalcEditPrice;
+window.viewReservation = viewReservation;
+window.saveEditReservation = saveEditReservation;
+window.doCheckout = doCheckout;

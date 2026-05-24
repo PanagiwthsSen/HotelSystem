@@ -1,47 +1,24 @@
+import { supabase } from './supabase-config.js';
+import { showToast } from './utils/ui.js';
+
 const vT={overview:'Πίνακας Ελέγχου',fleet:'Στόλος Οχημάτων',schedule:'Πρόγραμμα Οδηγών','new-trip':'Νέα Μεταφορά','trip-logs':'Αρχείο Μεταφορών',payroll:'Κόστη & Πληρωμές Οδηγών',inventory:'Υλικά & Ελλείψεις'};
-function navTo(id){
+window.navTo = function(id){
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.toggle('active',i.dataset.v===id));
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='v-'+id));
   document.getElementById('tb-title').textContent=vT[id]||id;
-}
+};
 
 window.logout = function() {
   localStorage.removeItem('hotel_user');
   window.location.href = '/pages/login.html';
 };
 
-function showToast2(id){
-  const el=document.getElementById(id);
-  if(!el)return;
-  el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'),3200);
-}
-
-function showToast(msg, type) {
-  const container = document.getElementById('toast-container') || (() => {
-    const c = document.createElement('div');
-    c.id = 'toast-container';
-    c.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;';
-    document.body.appendChild(c);
-    return c;
-  })();
-  const toast = document.createElement('div');
-  let icon = 'ti-circle-check';
-  if (type === 'error') icon = 'ti-alert-circle';
-  if (type === 'info') icon = 'ti-info-circle';
-  if (type === 'warning') icon = 'ti-alert-triangle';
-  toast.innerHTML = `<i class="ti ${icon}"></i><span>${msg}</span>`;
-  const borderColor = type === 'error' ? '#E24B4A' : type === 'info' ? '#378ADD' : type === 'warning' ? '#F97316' : '#1D9E75';
-  toast.style.cssText = 'background:#fff;border-left:4px solid ' + borderColor + ';box-shadow:0 4px 12px rgba(0,0,0,0.15);padding:12px 20px;border-radius:6px;display:flex;align-items:center;gap:10px;font-size:13px;color:#111;font-weight:500;min-width:250px;transition:opacity 0.3s;';
-  container.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3500);
-}
+window.showToast = showToast;
 
 /* ==============================================================
    OVERVIEW
    ============================================================== */
 async function fetchOverview() {
-  const supabase = window.supabase;
   if (!supabase) return;
 
   const dayStart = new Date();
@@ -49,7 +26,6 @@ async function fetchOverview() {
   const dayEnd = new Date();
   dayEnd.setHours(24, 0, 0, 0);
 
-  // Drivers
   const { data: drivers } = await supabase
     .from('EMPLOYEE')
     .select('EmpID')
@@ -71,7 +47,6 @@ async function fetchOverview() {
   document.getElementById('driver-availability').textContent = available + '/' + totalDrivers;
   document.getElementById('driver-status').textContent = busyDrivers + ' σε μεταφορά';
 
-  // Fleet status
   const { data: vehicles } = await supabase
     .from('VEHICLE')
     .select('Status');
@@ -86,7 +61,6 @@ async function fetchOverview() {
   document.getElementById('fleet-status').textContent = free + ' διαθέσιμα';
   document.getElementById('fleet-maintenance').textContent = maintenance + ' οχήματα σε Service';
 
-  // Material shortages
   const { data: items } = await supabase
     .from('INVENTORY_ITEM')
     .select('*');
@@ -95,11 +69,9 @@ async function fetchOverview() {
   document.getElementById('material-shortages').textContent = shortages.length + ' Είδη';
   document.getElementById('material-order').textContent = shortages.length > 0 ? 'Απαιτείται Παραγγελία' : 'Επαρκές απόθεμα';
 
-  // Trips today
   document.getElementById('trips-today').textContent = tripsToday ? tripsToday.length : '0';
   document.getElementById('trips-details').textContent = 'Πελάτες & Προϊόντα';
 
-  // Topbar meta
   const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   const dateStr = new Date().toLocaleDateString('el-GR', opts);
   document.getElementById('tb-meta').textContent = dateStr + ' · Ενεργά Οχήματα: ' + (vehicles ? vehicles.length : 0);
@@ -109,7 +81,6 @@ async function fetchOverview() {
    INVENTORY
    ============================================================== */
 async function fetchInventory() {
-  const supabase = window.supabase;
   if (!supabase) return;
 
   const { data: items } = await supabase
@@ -140,7 +111,6 @@ async function fetchInventory() {
    DRIVER SCHEDULE
    ============================================================== */
 async function fetchDriverSchedule() {
-  const supabase = window.supabase;
   if (!supabase) return;
 
   const dayStart = new Date();
@@ -201,7 +171,6 @@ async function fetchDriverSchedule() {
    FLEET MAINTENANCE
    ============================================================== */
 async function fetchFleetMaintenance() {
-  const supabase = window.supabase;
   if (!supabase) return;
 
   const { data: vehicles } = await supabase
@@ -244,7 +213,6 @@ async function fetchFleetMaintenance() {
    PAYROLL
    ============================================================== */
 async function fetchPayroll() {
-  const supabase = window.supabase;
   if (!supabase) return;
 
   const today = new Date();
@@ -269,7 +237,6 @@ async function fetchPayroll() {
     .gte('Date', monthStart)
     .lte('Date', monthEnd);
 
-  // Fleet costs
   const totalTripCost = (trips || []).reduce((sum, t) => sum + (t.Cost || 0), 0);
   const avgCost = (trips && trips.length > 0) ? (totalTripCost / trips.length).toFixed(2) : '0.00';
 
@@ -280,7 +247,6 @@ async function fetchPayroll() {
     costsList.innerHTML = costHtml;
   }
 
-  // Driver payroll
   const tbody = document.getElementById('driver-payroll-table');
   if (!tbody) return;
 
@@ -311,7 +277,6 @@ async function fetchPayroll() {
    NEW TRIP
    ============================================================== */
 async function fetchTripFormData() {
-  const supabase = window.supabase;
   if (!supabase) return;
 
   const [driversRes, vehiclesRes, customersRes, maxTripRes] = await Promise.all([
@@ -348,7 +313,6 @@ async function fetchTripFormData() {
     });
   }
 
-  // Set default date to now (local datetime)
   const dateInput = document.getElementById('trip-date');
   if (dateInput) {
     const now = new Date();
@@ -358,7 +322,6 @@ async function fetchTripFormData() {
 }
 
 window.submitTrip = async function() {
-  const supabase = window.supabase;
   if (!supabase) return;
 
   const driverId = document.getElementById('trip-driver').value;
@@ -373,7 +336,6 @@ window.submitTrip = async function() {
     return;
   }
 
-  // Get next TripID
   const { data: maxData } = await supabase
     .from('TRIP')
     .select('TripID')
@@ -403,16 +365,13 @@ window.submitTrip = async function() {
     return;
   }
 
-  // Update vehicle status to in_use
   await supabase.from('VEHICLE').update({ Status: 'in_use' }).eq('VehicleID', parseInt(vehicleId));
 
   showToast('Η μεταφορά καταχωρήθηκε επιτυχώς!', 'info');
 
-  // Update the schedule view if visible
   fetchDriverSchedule();
   fetchOverview();
 
-  // Reset form
   window.resetTripForm();
 };
 
@@ -431,7 +390,6 @@ window.resetTripForm = function() {
    TRIP LOGS
    ============================================================== */
 async function fetchTripLogs() {
-  const supabase = window.supabase;
   if (!supabase) return;
 
   const { data: trips, error } = await supabase
@@ -488,7 +446,7 @@ async function fetchTripLogs() {
 window.deleteTrip = async function(tripId) {
   if (!await window.showConfirm('Διαγραφή αυτής της μεταφοράς;')) return;
   try {
-    const { error } = await window.supabase.from('TRIP').delete().eq('TripID', tripId);
+    const { error } = await supabase.from('TRIP').delete().eq('TripID', tripId);
     if (error) throw error;
     showToast('Η μεταφορά διαγράφηκε.', 'info');
     fetchTripLogs();
@@ -498,12 +456,12 @@ window.deleteTrip = async function(tripId) {
 };
 
 window.deleteAllTrips = async function() {
-  const { data: trips } = await window.supabase.from('TRIP').select('TripID');
+  const { data: trips } = await supabase.from('TRIP').select('TripID');
   if (!trips || trips.length === 0) { showToast('Δεν υπάρχουν μεταφορές προς διαγραφή.', 'info'); return; }
   if (!await window.showConfirm('Διαγραφή όλων των μεταφορών; Η ενέργεια είναι μη αναστρέψιμη.')) return;
   try {
     const ids = trips.map(t => t.TripID);
-    const { error } = await window.supabase.from('TRIP').delete().in('TripID', ids);
+    const { error } = await supabase.from('TRIP').delete().in('TripID', ids);
     if (error) throw error;
     showToast('Όλες οι μεταφορές διαγράφηκαν.', 'info');
     fetchTripLogs();
@@ -518,7 +476,6 @@ window.deleteAllTrips = async function() {
 async function fetchRestockNotifs() {
   const container = document.getElementById('manager-notifications');
   if (!container) return;
-  const supabase = window.supabase;
   if (!supabase) return;
 
   const user = JSON.parse(localStorage.getItem('hotel_user'));
@@ -562,7 +519,7 @@ async function fetchRestockNotifs() {
       cls = 'ns ns-w';
     }
 
-    html += '<div class="' + cls + '" onclick="dismissNotif(' + n.NotificationID + ', this)" style="cursor:pointer">'
+    html += '<div class="' + cls + '" onclick="window.dismissNotif(' + n.NotificationID + ', this)" style="cursor:pointer">'
       + '<i class="' + icon + '"></i>'
       + '<div><strong>' + label + '</strong> ' + n.Message + '</div>'
       + '<span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary)">' + time + '</span>'
@@ -574,7 +531,7 @@ async function fetchRestockNotifs() {
 
 window.dismissNotif = async function(id, el) {
   try {
-    await window.supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
+    await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 300);
     showToast('Η ειδοποίηση απορρίφθηκε.', 'info');
@@ -604,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 800);
 
   document.querySelectorAll('.sb-item').forEach(item => {
-    item.addEventListener('click', () => navTo(item.dataset.v));
+    item.addEventListener('click', () => window.navTo(item.dataset.v));
   });
 
   const logoutBtn = document.getElementById('logout-btn');

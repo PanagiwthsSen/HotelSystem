@@ -1,5 +1,6 @@
+import { supabase } from './supabase-config.js';
+
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Προσομοίωση Loader (ακριβώς όπως στο σύστημά σας)
     setTimeout(() => {
         const loader = document.getElementById("app-loader");
         const app = document.querySelector(".app");
@@ -7,31 +8,23 @@ document.addEventListener("DOMContentLoaded", () => {
         if(app) app.style.display = "flex";
     }, 800);
 
-    // 1b. Real-time ρολόι
     startClock();
 
-    // 2. Λειτουργία Μενού (Sidebar Navigation)
     const navItems = document.querySelectorAll('.sb-item');
     const views = document.querySelectorAll('.view');
     const tbTitle = document.getElementById('tb-title');
 
     navItems.forEach(item => {
         item.addEventListener('click', () => {
-            // Αφαίρεση του active class από όλα
             navItems.forEach(nav => nav.classList.remove('active'));
             views.forEach(view => view.classList.remove('active'));
-            
-            // Προσθήκη του active class στο επιλεγμένο
             item.classList.add('active');
             const targetView = item.getAttribute('data-v');
             document.getElementById(`v-${targetView}`).classList.add('active');
-            
-            // Αλλαγή Τίτλου Topbar
             tbTitle.innerText = item.innerText;
         });
     });
 
-    // 2b. Δημιουργία εργασιών από εκδηλώσεις
     const taskCard = document.querySelector('#v-schedule-zones .card');
     document.querySelectorAll('#v-events .room-card[data-tasks]').forEach(card => {
         const eventId = card.dataset.eventId;
@@ -49,14 +42,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     sortTaskRows();
 
-    // 3. Δυναμική ενημέρωση badge στο Πρόγραμμα
     updateBadgeTasks();
 
-    // 4. Αρχική ενημέρωση Ολοκλ. & Εκκρεμών Ζωνών
     updateDoneCount();
     updatePendCount();
 
-    // 5. Δυναμική ενημέρωση Εκδηλώσεων & Επισκόπησης
     const eventCards = document.querySelectorAll('#v-events .room-card');
     const ovCount = document.getElementById('ov-events-count');
     const ovSub = document.getElementById('ov-events-sub');
@@ -71,20 +61,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     updateOverview();
 
-    // 6. Αρχικός έλεγχος για ήδη ολοκληρωμένες εκδηλώσεις
     document.querySelectorAll('.room-card[data-event-id]').forEach(card => {
         checkEventComplete(card.dataset.eventId);
     });
 });
 
-// Εξωτερική κλήση από κουμπιά (π.χ. "Όλα ->")
-function navTo(viewId) {
+window.navTo = function(viewId) {
     const targetItem = document.querySelector(`.sb-item[data-v="${viewId}"]`);
     if(targetItem) targetItem.click();
-}
+};
 
-// 3. Λειτουργίες εργασιών & φορμών
-function cycleTask(badge) {
+window.cycleTask = function(badge) {
     const text = badge.innerText;
 
     if (text === 'Εκκρεμεί') {
@@ -115,11 +102,10 @@ function updateDoneCount() {
     if (doneEl) doneEl.textContent = done + '/' + total;
 }
 
-function toggleZone(element) {
+window.toggleZone = function(element) {
     const state = element.dataset.state;
 
     if (state === 'pending') {
-        // Εκκρεμεί → Σε εξέλιξη
         element.dataset.state = 'progress';
         element.style.background = '#FAEEDA';
         element.style.borderColor = '#FAC775';
@@ -130,7 +116,6 @@ function toggleZone(element) {
         element.querySelector('i').className = 'ti ti-alert-circle';
         element.querySelector('i').style.color = '#BA7517';
     } else if (state === 'progress') {
-        // Σε εξέλιξη → Ολοκληρωμένη
         element.dataset.state = 'done';
         element.style.background = '#EAF3DE';
         element.style.borderColor = '#C0DD97';
@@ -141,12 +126,10 @@ function toggleZone(element) {
         element.querySelector('i').className = 'ti ti-check';
         element.querySelector('i').style.color = '#1D9E75';
     }
-    // 'done' → locked, καμία αλλαγή
     updatePendCount();
     updateBadgeTasks();
     updateOverview();
 
-    // Έλεγχος αν κάποια εκδήλωση μπορεί τώρα να πρασινίσει λόγω ζώνης
     document.querySelectorAll('.room-card[data-event-id]').forEach(c => checkEventComplete(c.dataset.eventId));
 }
 
@@ -221,7 +204,6 @@ function checkEventComplete(eventId) {
     const card = document.querySelector(`.room-card[data-event-id="${eventId}"]`);
     if (!card) return;
 
-    // Έλεγχος ότι όλες οι απαιτούμενες ζώνες είναι ολοκληρωμένες
     const requiredZones = (card.dataset.requireZones || '').split(',').filter(Boolean);
     const zonesDone = requiredZones.every(zId => {
         const zone = document.querySelector(`.sc[data-zone-id="${zId}"]`);
@@ -233,7 +215,7 @@ function checkEventComplete(eventId) {
     updateBadgeEvents();
 }
 
-async function submitFault() {
+window.submitFault = async function() {
     const zone = document.getElementById('fault-zone');
     const type = document.getElementById('fault-type');
     const desc = document.getElementById('fault-desc');
@@ -244,7 +226,7 @@ async function submitFault() {
     const message = 'Ζώνη: ' + zone.value + '\nΕίδος: ' + type.value + '\nΠεριγραφή: ' + desc.value.trim();
     const payload = { Type: 'fault', Message: message, IsRead: false, CreatedAt: new Date().toISOString() };
     try {
-        const { error } = await window.supabase.from('NOTIFICATION').insert([
+        const { error } = await supabase.from('NOTIFICATION').insert([
             { ...payload, TargetRole: 'admin' },
             { ...payload, TargetRole: 'external_manager' }
         ]);
@@ -254,9 +236,9 @@ async function submitFault() {
     } catch (err) {
         alert('Σφάλμα κατά την αποστολή: ' + err.message);
     }
-}
+};
 
-async function submitSupply() {
+window.submitSupply = async function() {
     const item = document.getElementById('sup-item');
     const qty = document.getElementById('sup-qty');
     const reason = document.getElementById('sup-reason');
@@ -267,7 +249,7 @@ async function submitSupply() {
     const message = 'Υλικό: ' + item.value.trim() + '\nΠοσότητα: ' + qty.value.trim() + (reason.value.trim() ? '\nΑιτιολογία: ' + reason.value.trim() : '');
     const payload = { Type: 'supply_request', Message: message, IsRead: false, CreatedAt: new Date().toISOString() };
     try {
-        const { error } = await window.supabase.from('NOTIFICATION').insert([
+        const { error } = await supabase.from('NOTIFICATION').insert([
             { ...payload, TargetRole: 'admin' },
             { ...payload, TargetRole: 'external_manager' }
         ]);
@@ -279,9 +261,8 @@ async function submitSupply() {
     } catch (err) {
         alert('Σφάλμα κατά την αποστολή: ' + err.message);
     }
-}
+};
 
-// Λειτουργία εμφάνισης ειδοποιήσεων (Toast Notification)
 function showToast(id) {
     const toast = document.getElementById(id);
     if(toast) {
@@ -324,7 +305,6 @@ function sortTaskRows() {
 
     let midDate;
     if (minDate === maxDate) {
-        // Μία μόνο ημερομηνία — no-date μετά από αυτήν
         const next = new Date(new Date(minDate + 'T00:00:00').getTime() + 86400000);
         midDate = next.toISOString().split('T')[0];
     } else {
@@ -341,3 +321,8 @@ function sortTaskRows() {
 
     rows.forEach(row => card.appendChild(row));
 }
+
+window.logout = function() {
+    localStorage.removeItem('hotel_user');
+    window.location.href = "/pages/login.html";
+};

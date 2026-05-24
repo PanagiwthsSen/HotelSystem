@@ -1,24 +1,7 @@
-/* ==============================================================
-   TOAST NOTIFICATION SYSTEM
-   ============================================================== */
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-    const toast = document.createElement('div');
-    toast.className = `live-toast ${type}`;
-    let iconClass = 'ti-circle-check';
-    if (type === 'error') iconClass = 'ti-alert-circle';
-    if (type === 'info') iconClass = 'ti-info-circle';
-    if (type === 'warning') iconClass = 'ti-alert-triangle';
-    toast.innerHTML = `<i class="ti ${iconClass}" aria-hidden="true"></i> <span>${message}</span>`;
-    container.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.add('fade-out');
-        setTimeout(() => toast.remove(), 300);
-    }, 3500);
-}
-async function requestGeneralRestock() {
-    const supabase = window.supabase;
+import { supabase } from './supabase-config.js';
+import { showToast, updateLiveTime } from './utils/ui.js';
+
+window.requestGeneralRestock = async function() {
     const { data: allItems } = await supabase
         .from('INVENTORY_ITEM')
         .select('*');
@@ -51,16 +34,15 @@ async function requestGeneralRestock() {
 
     showToast(`Στάλθηκαν ${count} ειδοποιήσεις ανεφοδιασμού`, 'success');
 }
-function triggerAction(msg, type) { showToast(msg, type); }
 
 /* ==============================================================
    LOGOUT
    ============================================================== */
-function logoutMinibar() {
+window.logoutMinibar = function() {
     localStorage.removeItem('hotel_user');
     showToast("Γίνεται αποσύνδεση... Καλή ξεκούραση.", "info");
     setTimeout(() => { window.location.href = "/pages/login.html"; }, 1500);
-}
+};
 
 /* ==============================================================
    NAVIGATION & LIVE TIME
@@ -71,19 +53,14 @@ const viewTitles = {
     stock: 'Αποθεματικό Καροτσιού / Αποθήκης',
     history: 'Ιστορικό Χρεώσεων'
 };
-function navTo(id) {
+window.navTo = function(id) {
     document.querySelectorAll('.sb-item').forEach(i => i.classList.toggle('active', i.dataset.v === id));
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'v-' + id));
     document.getElementById('tb-title').textContent = viewTitles[id] || id;
-}
+};
 document.querySelectorAll('.sb-item').forEach(el => {
-    el.addEventListener('click', () => navTo(el.dataset.v));
+    el.addEventListener('click', () => window.navTo(el.dataset.v));
 });
-function updateLiveTime() {
-    const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-    document.getElementById('live-time').innerHTML = now.toLocaleDateString('el-GR', options);
-}
 setInterval(updateLiveTime, 60000);
 updateLiveTime();
 
@@ -98,7 +75,7 @@ function getItemPrice(name) {
     return 2.00;
 }
 
-function refreshTotal() {
+window.refreshTotal = function() {
     let total = 0;
     document.querySelectorAll('#consumption-items .qty').forEach(inp => {
         const qty = parseInt(inp.value) || 0;
@@ -107,36 +84,20 @@ function refreshTotal() {
     });
     document.getElementById('mb-total-price').textContent = `€${total.toFixed(2)}`;
     return total;
-}
+};
 
 function setRoomSelect(roomNum) {
     document.getElementById('mb-room').value = roomNum;
     document.querySelectorAll('#consumption-items .qty').forEach(inp => inp.value = 0);
     refreshTotal();
 }
+window.setRoomSelect = setRoomSelect;
 
-let consumptionCount = 0;
-const checkedToday = new Set();
-let todayChargesTotal = 0;
-let historyData = [];
-
-/* ==============================================================
-   SUPABASE — CACHED DATA
-   ============================================================== */
-let inventoryItems = {};
-
-async function loadItemMap() {
-    const { data } = await window.supabase.from('INVENTORY_ITEM').select('*');
-    inventoryItems = {};
-    (data || []).forEach(item => { inventoryItems[item.Name] = item; });
-    return data || [];
-}
 
 /* ==============================================================
    SUPABASE — DASHBOARD
    ============================================================== */
 async function loadDashboard() {
-    const supabase = window.supabase;
     const today = new Date().toISOString().split('T')[0];
 
     const [res1, res3, res4] = await Promise.all([
@@ -156,7 +117,6 @@ async function loadDashboard() {
 
     document.getElementById('done-count').textContent = checkedToday.size;
 
-    // Urgent notifications
     const notifContainer = document.getElementById('urgent-notifications');
     notifContainer.innerHTML = '';
 
@@ -193,7 +153,6 @@ async function loadDashboard() {
     document.getElementById('stat-urgent').textContent = pendingUrgent.length;
     document.getElementById('urgent-count').textContent = pendingUrgent.length;
 
-    // Priority list
     const priorityBody = document.getElementById('priority-list');
     priorityBody.innerHTML = '';
 
@@ -231,7 +190,7 @@ async function loadDashboard() {
             <td><strong>${room}</strong></td>
             <td><span class="pill ${isUrgent ? 'p-r' : 'p-b'}">${isUrgent ? 'Άμεσο Check-out' : 'Παραμονή'}</span></td>
             <td>${isUrgent ? 'Αναχώρηση σήμερα' : 'Καθημερινή Ρουτίνα'}</td>
-            <td><button class="btn btn-sm ${isUrgent ? 'btn-dark' : ''}" onclick="navTo('consumption'); setRoomSelect('${room}')">Έλεγχος</button></td>
+            <td><button class="btn btn-sm ${isUrgent ? 'btn-dark' : ''}" onclick="window.navTo('consumption'); window.setRoomSelect('${room}')">Έλεγχος</button></td>
         `;
         priorityBody.appendChild(tr);
     });
@@ -243,7 +202,6 @@ async function loadDashboard() {
 const roomData = {};
 
 async function loadRoomSelect() {
-    const supabase = window.supabase;
     const { data: reservations } = await supabase
         .from('RESERVATION')
         .select('ReservationID, CheckInDate, CheckOutDate, CustomerID')
@@ -284,7 +242,6 @@ async function loadRoomSelect() {
    SUPABASE — STOCK
    ============================================================== */
 async function loadStock() {
-    const supabase = window.supabase;
     const { data: items } = await supabase.from('INVENTORY_ITEM').select('*').order('Name');
 
     const tbody = document.getElementById('stock-list');
@@ -305,7 +262,7 @@ async function loadStock() {
             <td>${item.Quantity} τεμ.</td>
             <td>${item.MinThreshold}</td>
             <td><span class="pill ${pillClass}">${status}</span></td>
-            <td>${item.Quantity < item.MinThreshold ? '<button class="btn btn-sm btn-warn" onclick="requestRestock(this)">Αίτημα</button>' : '—'}</td>
+            <td>${item.Quantity < item.MinThreshold ? '<button class="btn btn-sm btn-warn" onclick="window.requestRestock(this)">Αίτημα</button>' : '—'}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -315,7 +272,6 @@ async function loadStock() {
    SUPABASE — HISTORY
    ============================================================== */
 async function loadHistory() {
-    const supabase = window.supabase;
     const { data: records } = await supabase
         .from('MINIBAR_CONSUMPTION')
         .select('ConsumptionID, Quantity, Charge, ReservationID, INVENTORY_ITEM(Name)')
@@ -385,7 +341,6 @@ window.filterHistory = function() {
    SUPABASE — RECENT LOGS (dashboard)
    ============================================================== */
 async function loadRecentLogs() {
-    const supabase = window.supabase;
     const { data: records } = await supabase
         .from('MINIBAR_CONSUMPTION')
         .select('ConsumptionID, Quantity, Charge, ReservationID, INVENTORY_ITEM(Name)')
@@ -423,7 +378,6 @@ async function loadRecentLogs() {
    LIVE ROOM RESOLUTION (ενεργός ή τελευταίος πελάτης)
    ============================================================== */
 async function resolveRoomReservation(roomNum) {
-    const supabase = window.supabase;
     const { data: rr } = await supabase
         .from('RESERVATION_ROOM')
         .select('ReservationID')
@@ -462,7 +416,7 @@ async function loadConsumptionItems() {
                 <span class="item-price">€${price.toFixed(2)}</span>
                 <input type="number" class="qty" min="0" value="0"
                     data-item-id="${item.ItemID}" data-price="${price}"
-                    oninput="refreshTotal()" onclick="this.select()"
+                    oninput="window.refreshTotal()" onclick="this.select()"
                     ${item.Quantity <= 0 ? 'disabled' : ''}>
             </div>
         `;
@@ -473,15 +427,13 @@ async function loadConsumptionItems() {
 /* ==============================================================
    SUBMIT CONSUMPTION (ΑΠΟΘΗΚΕΥΣΗ ΣΤΟ DB)
    ============================================================== */
-async function submitConsumption() {
-    const supabase = window.supabase;
+window.submitConsumption = async function() {
     const room = document.getElementById('mb-room').value.trim();
     if (!room) {
         showToast('Παρακαλώ συμπληρώστε τον αριθμό δωματίου.', 'error');
         return;
     }
 
-    // Resolve reservation — live: active CheckedIn first, else last guest
     const resolved = await resolveRoomReservation(room);
     if (!resolved) {
         showToast(`Το δωμάτιο ${room} δεν βρέθηκε σε καμία κράτηση.`, 'error');
@@ -492,7 +444,6 @@ async function submitConsumption() {
         showToast(`Το δωμάτιο ${room} δεν έχει ενεργό πελάτη. Η χρέωση γίνεται στον τελευταίο πελάτη.`, 'warning');
     }
 
-    // Collect items with quantity > 0
     const items = [];
     document.querySelectorAll('#consumption-items .qty').forEach(inp => {
         const qty = parseInt(inp.value) || 0;
@@ -508,7 +459,6 @@ async function submitConsumption() {
         return;
     }
 
-    // Insert consumption + decrement + auto-notify
     let successCount = 0;
     for (const item of items) {
         const { error: insertErr } = await supabase
@@ -533,7 +483,6 @@ async function submitConsumption() {
                 .update({ Quantity: newQty })
                 .eq('ItemID', item.itemId);
 
-            // Auto-notify when stock exhausted or below threshold
             if (newQty === 0) {
                 supabase.from('NOTIFICATION').insert({
                     TargetRole: 'both',
@@ -565,7 +514,7 @@ async function submitConsumption() {
         await loadConsumptionItems();
         refreshAll();
     }
-}
+};
 
 /* ==============================================================
    REFRESH ALL DATA
@@ -583,14 +532,14 @@ async function refreshAll() {
 /* ==============================================================
    ΑΠΟΘΗΚΗ / ΑΝΕΦΟΔΙΑΣΜΟΣ
    ============================================================== */
-async function requestRestock(btn) {
+window.requestRestock = async function(btn) {
     const tr = btn.closest('tr');
     const itemName = tr?.querySelector('td')?.textContent?.trim();
     if (itemName) {
         const item = inventoryItems[itemName];
         if (item) {
             try {
-                await window.supabase.from('NOTIFICATION').insert({
+                await supabase.from('NOTIFICATION').insert({
                     TargetRole: 'both',
                     Type: 'restock',
                     Message: `Αίτημα ανεφοδιασμού: ${itemName}`,
@@ -608,7 +557,7 @@ async function requestRestock(btn) {
     const statusCell = btn.parentElement.previousElementSibling;
     statusCell.innerHTML = '<span class="pill p-b">Σε αναμονή</span>';
     showToast("Το αίτημα ανεφοδιασμού στάλθηκε στον διαχειριστή και τον διευθυντή.", "info");
-}
+};
 
 /* ==============================================================
    INIT

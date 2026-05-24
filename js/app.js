@@ -1,66 +1,5 @@
 import { supabase } from './supabase-config.js';
-
-function calculateEaster(year) {
-    const a = year % 19;
-    const b = Math.floor(year / 100);
-    const c = year % 100;
-    const d = Math.floor(b / 4);
-    const e = b % 4;
-    const f = Math.floor((b + 8) / 25);
-    const g = Math.floor((b - f + 1) / 3);
-    const h = (19 * a + b - d - g + 15) % 30;
-    const i = Math.floor(c / 4);
-    const k = c % 4;
-    const l = (32 + 2 * e + 2 * i - h - k) % 7;
-    const m = Math.floor((a + 11 * h + 22 * l) / 451);
-    const month = Math.floor((h + l - 7 * m + 114) / 31);
-    const day = ((h + l - 7 * m + 114) % 31) + 1;
-    return new Date(year, month - 1, day);
-}
-
-const SEASONS = {
-    summer: {
-        label: 'Καλοκαίρι',
-        defaultMultiplier: 1.6,
-        isActive: (d) => { const m = d.getMonth() + 1; return m >= 6 && m <= 8; }
-    },
-    xmas: {
-        label: 'Χριστούγεννα',
-        defaultMultiplier: 1.4,
-        isActive: (d) => {
-            const m = d.getMonth() + 1, day = d.getDate();
-            return (m === 12 && day >= 15) || (m === 1 && day <= 7);
-        }
-    },
-    easter: {
-        label: 'Πάσχα',
-        defaultMultiplier: 1.3,
-        isActive: (d) => {
-            const easter = calculateEaster(d.getFullYear());
-            const start = new Date(easter); start.setDate(start.getDate() - 7);
-            const end = new Date(easter); end.setDate(end.getDate() + 7);
-            end.setHours(23, 59, 59, 999);
-            return d >= start && d <= end;
-        }
-    }
-};
-
-function getSeasonForDate(date) {
-    for (const [key, season] of Object.entries(SEASONS)) {
-        if (season.isActive(date)) return key;
-    }
-    return null;
-}
-
-function getMultiplier(date) {
-    const key = getSeasonForDate(date);
-    return key ? SEASONS[key].defaultMultiplier : 1.0;
-}
-
-function getSeasonLabel(date) {
-    const key = getSeasonForDate(date);
-    return key ? SEASONS[key].label : 'Κανονική';
-}
+import { calcDynamicPrice, fetchSpecialPricing, fetchOccupancyPercentage } from './services/api.js';
 
 const ROOM_TYPE_INFO = {
     'Μονόκλινο': {
@@ -109,50 +48,6 @@ const ROOM_TYPE_INFO = {
     }
 };
 
-function calcPriceBreakdown(basePrice, checkin, checkout, roomType, specialPricing, lowMultiplier) {
-    const start = new Date(checkin + 'T12:00:00');
-    const end = new Date(checkout + 'T12:00:00');
-    const groups = {};
-    let total = 0;
-
-    for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
-        let price = basePrice;
-        let label = getSeasonLabel(d);
-
-        if (specialPricing && roomType) {
-            const rules = specialPricing[roomType];
-            if (rules) {
-                const found = rules.find(r => {
-                    const f = new Date(r.FromDate + 'T00:00:00');
-                    const t = new Date(r.ToDate + 'T23:59:59');
-                    return d >= f && d <= t;
-                });
-                if (found) {
-                    price = found.Price;
-                    label = 'Ειδική Τιμή';
-                }
-            }
-        }
-
-        if (label !== 'Ειδική Τιμή') {
-            const mult = getMultiplier(d);
-            price = Math.round(basePrice * mult);
-        }
-        if (lowMultiplier && lowMultiplier < 1) {
-            price = Math.round(price * lowMultiplier);
-            label = `${label} (Χ. Πληρ. -15%)`;
-        }
-
-        if (!groups[label]) {
-            groups[label] = { label, pricePerNight: price, count: 0, subtotal: 0 };
-        }
-        groups[label].count++;
-        groups[label].subtotal += price;
-        total += price;
-    }
-
-    return { groups: Object.values(groups), total };
-}
 
 async function fetchAndRenderRooms() {
     const checkin = document.getElementById('s-in').value;
@@ -194,31 +89,10 @@ async function fetchAndRenderRooms() {
             .gte('CheckOutDate', checkin);
         if (resErr) throw resErr;
 
-        let specialPricing = {};
-        try {
-            const { data: spData } = await supabase.from('SPECIAL_PRICING').select('*');
-            if (spData) {
-                spData.forEach(r => {
-                    if (!specialPricing[r.RoomType]) specialPricing[r.RoomType] = [];
-                    specialPricing[r.RoomType].push(r);
-                });
-            }
-        } catch (_) { /* table may not exist */ }
+        const specialPricing = await fetchSpecialPricing();
 
-        let lowMultiplier = 1.0;
-        try {
-            const { count: occCount, error: occErr } = await supabase
-                .from('ROOM')
-                .select('*', { count: 'exact', head: true })
-                .eq('Status', 'occ');
-            const { count: totalCount, error: totalErr } = await supabase
-                .from('ROOM')
-                .select('*', { count: 'exact', head: true });
-            if (!occErr && !totalErr && totalCount > 0) {
-                const occPct = (occCount / totalCount) * 100;
-                if (occPct < 60) lowMultiplier = 0.85;
-            }
-        } catch (_) { /* non-critical */ }
+        const occPct = await fetchOccupancyPercentage();
+        const lowMultiplier = occPct < 60 ? 0.85 : 1.0;
 
         const bookedRooms = new Set();
         const typeBookedCount = {};
@@ -291,7 +165,7 @@ async function fetchAndRenderRooms() {
             }
 
             const cheapest = roomsOfType.reduce((a, b) => a.BasePrice < b.BasePrice ? a : b);
-            const breakdown = calcPriceBreakdown(cheapest.BasePrice, checkin, checkout, type, specialPricing, lowMultiplier);
+            const breakdown = calcDynamicPrice(cheapest.BasePrice, type, checkin, checkout, specialPricing, lowMultiplier);
             const totalNights = breakdown.groups.reduce((s, g) => s + g.count, 0);
 
             const finalTotal = breakdown.total * roomsRequested;

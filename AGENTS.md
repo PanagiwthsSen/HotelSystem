@@ -17,16 +17,18 @@
 | `pages/booking.html` | Guest booking (3-step wizard) |
 | `pages/admin.html` | Admin/owner dashboard (Chart.js, Tabler Icons via CDN) |
 | `pages/receptionist.html` | Reception check-in/out, room map |
-| `pages/maid.html` | Maid task list (hardcoded data) |
-| `pages/minibar.html` | Mini-bar consumption (hardcoded data) |
-| `pages/manager.html` | Fleet/gardens manager (hardcoded data) |
+| `pages/maid.html` | Maid task list (Supabase-connected) |
+| `pages/minibar.html` | Mini-bar consumption (Supabase-connected) |
+| `pages/internal_manager.html` | Internal manager (fleet/gardens, Supabase-connected) |
+| `pages/external_manager.html` | External manager (fleet/gardens, Supabase-connected) |
+| `pages/gardener.html` | Gardener tasks (hardcoded data) |
+| `pages/driver.html` | Driver schedule (Supabase-connected) |
 | `js/supabase-config.js` | **Must be first** — creates Supabase client, attaches `window.supabase`, defines `window.showConfirm()` |
 | `js/login.js` | ES module auth → saves `hotel_user` to localStorage |
+| `js/utils/ui.js` | Shared UI helpers (toast, nav, clock) |
+| `js/services/api.js` | Shared Supabase query layer |
+| `js/components/RoomMap.js` | Shared room map renderer |
 | `css/*.css` | Per-page stylesheets |
-
-## Module loading inconsistency
-- **Admin**, **login**, and **booking** pages: use `<script type="module" src="...">` for both `supabase-config.js` and their page script (admin.js, login.js are ES modules).
-- **Receptionist**, **maid**, **minibar**, **manager**: loaded as plain `<script>` (not `type="module"`). They depend on `window.supabase` (from `supabase-config.js`'s ES module) or use hardcoded mock data.
 
 ## Supabase
 - Credentials in `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`). The `.env` is in version control.
@@ -63,12 +65,28 @@
 - No real JWT or Supabase Auth sessions
 
 ## Important quirks
-- Admin page uses ES module imports → all admin functions must be explicitly assigned to `window.*` to be callable from inline HTML `onclick` handlers (e.g. `window.savePrices`, `window.logout`, `window.resolveComplaint`)
+- All pages use ES module imports → page-level functions must be explicitly assigned to `window.*` to be callable from inline HTML `onclick` handlers (e.g. `window.savePrices`, `window.logout`, `window.resolveComplaint`)
 - `supabase-config.js` also sets `window.showConfirm()` — a custom modal replacing `confirm()`. It's async and must be used with `await`.
 - All page CSS and JS paths are absolute (e.g. `/css/admin.css`) — Vite serves from project root
 - Admin revenue chart uses Chart.js from CDN (loaded in admin.html by `<script>` tag, not ES import)
 - Greek language throughout
 - `package.json`: `"type": "commonjs"` (Vite handles ESM regardless)
+
+## Architecture
+
+### Layered module structure
+| Layer | Path | Rule |
+|---|---|---|
+| **API Services** | `js/services/api.js` | All Supabase queries live here. Functions return raw data only — **never touch the DOM**. |
+| **UI Utilities** | `js/utils/ui.js` | Global helpers (toast, date formatting, normalization, navigation). Pure functions, no side effects. |
+| **Components** | `js/components/` | Shared, reusable UI blocks (e.g. `RoomMap.js`). Accept data + config, render DOM. Page-agnostic — role-specific behavior via parameters like `userRole`. |
+
+### Execution rules (DRY refactoring)
+- **One step at a time** — never refactor the whole app in one response.
+- **Preserve UI/UX** — do not change existing HTML IDs or CSS class names (`rc`, `pill`, `p-g`, `card-hd`, etc.) unless explicitly told.
+- **ES6 modules** — always use `import`/`export`. Vite bundles them.
+- **Preserve Greek** — all Greek text, alerts, and labels stay exactly as they are.
+- **Use existing auth** — `window.supabase` client is configured in `supabase-config.js`; use it for all queries.
 
 ## Database current state (2026-05-19)
 
@@ -94,9 +112,11 @@
 - **Arrivals/departures**: Only 1 reservation starting 2026-05-20. For today's data, insert with CheckInDate/CheckOutDate = '2026-05-19'
 - **Revenue chart**: No receipts exist — insert sample rows to test
 - **Room map**: All 510 rooms are `free` — no occupied/dirty states visible yet
-- **Maid page**: Uses hardcoded mock data (not connected to Supabase)
-- **Minibar page**: Uses hardcoded mock data (not connected to Supabase)
-- **Manager page**: Uses hardcoded mock data (not connected to Supabase)
+- **Maid page**: Connected to Supabase (ROOM, RESERVATION_ROOM, RESERVATION, INVENTORY_ITEM, NOTIFICATION)
+- **Minibar page**: Connected to Supabase (RESERVATION, RESERVATION_ROOM, INVENTORY_ITEM, NOTIFICATION)
+- **Manager page**: Connected to Supabase (EMPLOYEE, TRIP, VEHICLE, SHIFT, INVENTORY_ITEM, NOTIFICATION)
+- **Gardener page**: Uses hardcoded HTML data (no Supabase queries)
 
 ## Workflow
 - If implementation is requested while in plan mode, I will present a plan and ask you to confirm (by replying "yes" or "switch to build mode") before executing.
+- **Before making changes, I will always present a test plan** detailing how to verify the changes are successful, and wait for your confirmation to proceed.

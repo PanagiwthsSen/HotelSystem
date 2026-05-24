@@ -1,3 +1,6 @@
+import { supabase } from './supabase-config.js';
+import { updateLiveTime } from './utils/ui.js';
+
 /* ==============================================================
    STATE
    ============================================================== */
@@ -28,17 +31,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadAllData();
 
   const loader = document.getElementById('app-loader');
-  if (loader) loader.style.display = 'none';
   const app = document.querySelector('.app');
+  if (loader) loader.style.display = 'none';
   if (app) app.style.display = 'flex';
 
-  addLog('Έναρξη βάρδιας — ' + (hotelUser ? hotelUser.name || hotelUser.id : 'Καμαριέρα') + ' · ' + new Date().getHours().toString().padStart(2, '0') + ':00');
+  const btnAll = document.querySelector('#v-rooms .btn-sm[data-filter="all"]');
+  if (btnAll) btnAll.style.background = 'var(--color-background-secondary)';
 
-  renderOverview();
-  renderRooms(currentFilter);
-  renderStock();
-  renderLinen();
-  renderPendingMb();
   updateLiveTime();
   setInterval(updateLiveTime, 60000);
 });
@@ -46,370 +45,248 @@ document.addEventListener('DOMContentLoaded', async () => {
 /* ==============================================================
    NAVIGATION
    ============================================================== */
-function navTo(id) {
+window.navTo = function(id) {
   document.querySelectorAll('.sb-item').forEach(i => i.classList.toggle('active', i.dataset.v === id));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'v-' + id));
-  const title = document.getElementById('tb-title');
-  if (title) title.textContent = vTitles[id] || id;
+  document.getElementById('tb-title').textContent = vTitles[id] || id;
   if (id === 'rooms') renderRooms(currentFilter);
   if (id === 'minibar') renderPendingMb();
   if (id === 'stock') renderStock();
   if (id === 'linen') renderLinen();
-}
-document.querySelectorAll('.sb-item').forEach(el => el.addEventListener('click', () => navTo(el.dataset.v)));
+};
+
+document.querySelectorAll('.sb-item').forEach(el => el.addEventListener('click', () => window.navTo(el.dataset.v)));
 
 /* ==============================================================
-   USER SETUP
+   SETUP USER INFO
    ============================================================== */
 function setupUserInfo() {
-  const name = hotelUser.name || hotelUser.id || 'Καμαριέρα';
-  const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-  const circle = document.querySelector('.av-circle');
-  const nameEl = document.querySelector('.av-name');
-  if (circle) circle.textContent = initials;
-  if (nameEl) nameEl.textContent = name;
+  const avCircle = document.querySelector('.av-circle');
+  const avName = document.querySelector('.av-name');
+  const avShift = document.querySelector('.av-shift');
+  if (avCircle) avCircle.textContent = (hotelUser.name ? hotelUser.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : 'Κ');
+  if (avName) avName.textContent = hotelUser.name || 'Καμαριέρα';
+  if (avShift) avShift.textContent = 'Σήμερα';
 }
 
 /* ==============================================================
-   DATA FETCHING
+   DATA LOADING (SUPABASE)
    ============================================================== */
 async function loadAllData() {
-  await Promise.all([
-    fetchMaidRooms(),
-    fetchInventory(),
-    fetchMaidNotifications(),
-    fetchPendingMb()
-  ]);
+  try {
+    await Promise.all([
+      fetchMaidRooms(),
+      fetchInventory(),
+      fetchMaidNotifications(),
+      fetchPendingMb()
+    ]);
+  } catch (e) {
+    console.error('Σφάλμα φόρτωσης δεδομένων:', e);
+  }
+  renderOverview();
+  updateBadges();
 }
 
 async function fetchMaidRooms() {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const { data: rooms, error: roomsErr } = await window.supabase
+    const { data: rooms, error: roomsErr } = await supabase
       .from('ROOM')
-      .select('RoomNumber, RoomType, BasePrice, Status')
+      .select('RoomNumber, RoomType, Status')
       .order('RoomNumber', { ascending: true });
     if (roomsErr) throw roomsErr;
+    if (!rooms) return;
 
-    const { data: resRooms, error: rrErr } = await window.supabase
+    const { data: resRooms, error: rrErr } = await supabase
       .from('RESERVATION_ROOM')
-      .select('RoomNumber, ReservationID');
+      .select('ReservationID, RoomNumber');
     if (rrErr) throw rrErr;
 
-    let reservationMap = {};
-    let customerMap = {};
-    if (resRooms && resRooms.length > 0) {
-      const resIds = [...new Set(resRooms.map(r => r.ReservationID))];
-      const { data: reservations, error: resErr } = await window.supabase
-        .from('RESERVATION')
-        .select('ReservationID, CustomerID, CheckInDate, CheckOutDate, Status')
-        .in('ReservationID', resIds);
-      if (resErr) throw resErr;
-
-      if (reservations) {
-        reservations.forEach(r => { reservationMap[r.ReservationID] = r; });
-      }
-
-      const custIds = [...new Set(reservations.map(r => r.CustomerID))];
-      const { data: customers, error: custErr } = await window.supabase
-        .from('CUSTOMER')
-        .select('CustomerID, FirstName, LastName')
-        .in('CustomerID', custIds);
-      if (custErr) throw custErr;
-
-      if (customers) {
-        customers.forEach(c => { customerMap[c.CustomerID] = c; });
-      }
-    }
-
-    const roomByRes = {};
+    const rrMap = {};
     if (resRooms) {
-      resRooms.forEach(rr => { roomByRes[rr.RoomNumber] = rr.ReservationID; });
+      const ids = [...new Set(resRooms.map(r => r.ReservationID))];
+      if (ids.length > 0) {
+        const { data: reservations, error: resErr } = await supabase
+          .from('RESERVATION')
+          .select('ReservationID, CUSTOMER(FirstName, LastName)')
+          .in('ReservationID', ids)
+          .not('Status', 'in', '("Cancelled","CheckedOut")');
+        if (!resErr && reservations) {
+          const custMap = {};
+          reservations.forEach(r => {
+            const c = r.CUSTOMER || {};
+            custMap[r.ReservationID] = `${c.FirstName || ''} ${c.LastName || ''}`.trim() || 'Επισκέπτης';
+          });
+          resRooms.forEach(rr => {
+            if (custMap[rr.ReservationID]) {
+              if (!rrMap[rr.RoomNumber]) rrMap[rr.RoomNumber] = [];
+              rrMap[rr.RoomNumber].push(custMap[rr.ReservationID]);
+            }
+          });
+        }
+      }
     }
 
-    maidRooms = (rooms || []).map(r => {
-      const resId = roomByRes[r.RoomNumber];
-      const res = reservationMap[resId] || null;
-      const cust = res ? customerMap[res.CustomerID] : null;
-      const guestName = cust ? [cust.FirstName || '', cust.LastName || ''].filter(Boolean).join(' ') : null;
-      const checkInToday = res && res.CheckInDate === today;
-      const checkOutToday = res && res.CheckOutDate === today;
+    const { data: customers, error: custErr } = await supabase
+      .from('CUSTOMER')
+      .select('CustomerID, FirstName, LastName');
+    if (custErr) throw custErr;
 
-      let status = null;
+    maidRooms = rooms.map(r => {
+      const guests = rrMap[r.RoomNumber];
+      let status = 'pending';
       let note = '';
-      let guest = '';
       if (r.Status === 'dirty') {
         status = 'urgent';
-        note = 'Αναχώρηση — καθαρισμός';
-      } else if (r.Status === 'clean') {
+        note = 'Check-out — Απαιτείται καθαρισμός';
+      } else if (r.Status === 'clean' || r.Status === 'free') {
         status = 'done';
-      } else if (r.Status === 'occ') {
-        if (checkOutToday) {
-          status = 'urgent';
-          note = 'Αναχώρηση σήμερα — καθαρισμός';
-        }
-      } else if (r.Status === 'free') {
-        if (checkOutToday) {
-          status = 'urgent';
-          note = 'Αναχώρηση σήμερα — καθαρισμός';
-        } else if (checkInToday) {
-          status = 'priority';
-          note = 'Άφιξη σήμερα — προετοιμασία';
-          guest = 'Νέος πελάτης';
-        }
       }
-
+      if (guests && guests.length > 0) {
+        note = guests.join(', ');
+        if (r.Status === 'occ') status = 'priority';
+      }
       return {
         id: r.RoomNumber,
-        num: r.RoomNumber.toString(),
-        type: r.RoomType || 'Δωμάτιο',
-        guest: guestName || guest,
+        num: r.RoomNumber,
+        type: r.RoomType || 'Standard',
         status: status,
-        note: note,
-        dbStatus: r.Status,
-        basePrice: r.BasePrice,
-        hasReservation: !!res
+        guest: guests ? guests.join(', ') : null,
+        note: note
       };
-    }).filter(r => r.status !== null);
-  } catch (err) {
-    console.error('Σφάλμα φόρτωσης δωματίων:', err.message);
-    maidRooms = [];
+    });
+
+    urgentCount = maidRooms.filter(r => r.status === 'urgent').length;
+    totalRoomsToday = maidRooms.length;
+  } catch (e) {
+    console.error('fetchMaidRooms error:', e);
   }
 }
 
 async function fetchInventory() {
   try {
-    const { data, error } = await window.supabase
+    const { data, error } = await supabase
       .from('INVENTORY_ITEM')
-      .select('*')
-      .order('Category', { ascending: true })
-      .order('Name', { ascending: true });
+      .select('*');
     if (error) throw error;
     inventoryItems = data || [];
-  } catch (err) {
-    console.error('Σφάλμα φόρτωσης αποθέματος:', err.message);
-    inventoryItems = [];
+  } catch (e) {
+    console.error('fetchInventory error:', e);
   }
 }
 
 async function fetchMaidNotifications() {
   try {
-    const { data, error } = await window.supabase
+    const { data, error } = await supabase
       .from('NOTIFICATION')
-      .select('NotificationID, Message, Type, CreatedAt, IsRead, ItemID')
-      .eq('TargetRole', 'maid')
+      .select('*')
+      .in('TargetRole', ['maid', 'both'])
       .eq('IsRead', false)
-      .order('CreatedAt', { ascending: false })
-      .limit(20);
+      .order('CreatedAt', { ascending: false });
     if (error) throw error;
     notifications = data || [];
-  } catch (err) {
-    console.error('Σφάλμα φόρτωσης ειδοποιήσεων:', err.message);
-    notifications = [];
+  } catch (e) {
+    console.error('fetchMaidNotifications error:', e);
   }
 }
 
 async function fetchPendingMb() {
   try {
-    const { data, error } = await window.supabase
+    const now = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
       .from('MINIBAR_CONSUMPTION')
-      .select('ConsumptionID, ReservationID, Quantity, Charge, INVENTORY_ITEM (ItemID, Name)')
-      .order('ConsumptionID', { ascending: false })
-      .limit(50);
+      .select('*, RESERVATION(CheckInDate, CheckOutDate, RESERVATION_ROOM(RoomNumber))')
+      .not('ReservationID', 'is', null);
     if (error) throw error;
+    if (!data || data.length === 0) { mbCount = 0; pendingMbRecords = []; return; }
 
-    if (!data || data.length === 0) {
-      pendingMbRecords = [];
-      return;
-    }
+    const resIds = [...new Set(data.filter(d => d.ReservationID && d.ReservationID !== 0).map(d => d.ReservationID))];
+    if (resIds.length === 0) { mbCount = 0; pendingMbRecords = []; return; }
 
-    const resIds = [...new Set(data.map(r => r.ReservationID))];
-    const [{ data: resRooms }, { data: reservations }] = await Promise.all([
-      window.supabase.from('RESERVATION_ROOM').select('ReservationID, RoomNumber').in('ReservationID', resIds),
-      window.supabase.from('RESERVATION').select('ReservationID, Status').in('ReservationID', resIds)
+    const [rrRes, resRes] = await Promise.all([
+      supabase.from('RESERVATION_ROOM').select('ReservationID, RoomNumber').in('ReservationID', resIds),
+      supabase.from('RESERVATION').select('ReservationID, Status').in('ReservationID', resIds)
     ]);
 
-    const roomByRes = {};
-    (resRooms || []).forEach(rr => { roomByRes[rr.ReservationID] = rr.RoomNumber; });
+    const rrMap = {};
+    (rrRes.data || []).forEach(rr => { if (!rrMap[rr.ReservationID]) rrMap[rr.ReservationID] = []; rrMap[rr.ReservationID].push(rr.RoomNumber); });
+    const activeIds = new Set((resRes.data || []).filter(r => r.Status !== 'Cancelled' && r.Status !== 'CheckedOut').map(r => r.ReservationID));
 
-    const activeRes = new Set();
-    (reservations || []).forEach(r => {
-      if (r.Status !== 'CheckedOut' && r.Status !== 'Cancelled') activeRes.add(r.ReservationID);
-    });
-
+    pendingMbRecords = data.filter(d => activeIds.has(d.ReservationID)).map(d => ({
+      id: 'mb-' + d.ConsumptionID,
+      consumptionId: d.ConsumptionID,
+      room: (rrMap[d.ReservationID] || ['—']).join(', '),
+      itemName: d.ItemID ? 'Είδος #' + d.ItemID : 'Γενική χρέωση',
+      qty: d.Quantity,
+      charge: d.Charge
+    }));
+    mbCount = pendingMbRecords.length;
+  } catch (e) {
+    console.error('fetchPendingMb error:', e);
     mbCount = 0;
-    pendingMbRecords = (data || []).filter(r => activeRes.has(r.ReservationID)).map(r => {
-      mbCount++;
-      return {
-        id: 'mb-' + r.ConsumptionID,
-        room: roomByRes[r.ReservationID] || '-',
-        itemName: r.INVENTORY_ITEM?.Name || 'Είδος',
-        qty: r.Quantity || 0,
-        charge: parseFloat(r.Charge) || 0,
-        consumptionId: r.ConsumptionID,
-        reservationId: r.ReservationID
-      };
-    });
-  } catch (err) {
-    console.error('Σφάλμα φόρτωσης mini-bar:', err.message);
     pendingMbRecords = [];
-    mbCount = 0;
   }
 }
 
-/* ==============================================================
-   LIVE TIME
-   ============================================================== */
-function updateLiveTime() {
-  const el = document.getElementById('live-time');
-  if (!el) return;
-  const now = new Date();
-  const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-  el.textContent = now.toLocaleDateString('el-GR', opts) + ' · Βάρδια 09:00–17:00';
-}
+let pendingMbRecords = [];
 
 /* ==============================================================
-   OVERVIEW RENDER
+   OVERVIEW
    ============================================================== */
 function renderOverview() {
-  const urgent = maidRooms.filter(r => r.status === 'urgent');
-  const done = maidRooms.filter(r => r.status === 'done');
-  const inProg = maidRooms.filter(r => roomStates[r.id] === 'inprogress');
-  const all = maidRooms.filter(r => r.status !== 'done' || roomStates[r.id] === 'inprogress');
-
-  totalRoomsToday = all.length + done.length;
-  doneCount = done.length;
-  inProgressCount = inProg.length;
-  urgentCount = urgent.length;
-
-  const totalEl = document.getElementById('ov-total');
-  if (totalEl) totalEl.textContent = totalRoomsToday;
-
-  const doneEl = document.getElementById('ov-done');
-  if (doneEl) doneEl.textContent = doneCount;
-
-  const progPct = totalRoomsToday > 0 ? Math.round(doneCount / totalRoomsToday * 100) : 0;
-  const progPctEl = document.getElementById('ov-progress-pct');
-  if (progPctEl) progPctEl.textContent = progPct;
-  const progFill = document.getElementById('ov-progress-fill');
-  if (progFill) progFill.style.width = progPct + '%';
-
-  const inProgEl = document.getElementById('ov-inprogress');
-  if (inProgEl) inProgEl.textContent = inProgressCount;
-
-  const urgentEl = document.getElementById('ov-urgent');
-  if (urgentEl) urgentEl.textContent = urgentCount;
-
-  updateBadges();
-  updateFilterCounts();
-
   renderOverviewNotifications();
   renderOverviewRoomList();
   renderOverviewLinen();
 }
 
 function renderOverviewNotifications() {
-  const container = document.getElementById('ov-notifications');
-  if (!container) return;
-  const items = [];
-
-  const urgentRooms = maidRooms.filter(r => r.status === 'urgent' && r.guest);
-  urgentRooms.slice(0, 3).forEach(r => {
-    items.push({ type: 'e', icon: 'alert-triangle', msg: `<strong>${r.num}:</strong> ${r.guest} · ${r.note || 'Αναχώρηση — καθαρισμός'}` });
-  });
-
-  const priorityRooms = maidRooms.filter(r => r.status === 'priority');
-  priorityRooms.slice(0, 3).forEach(r => {
-    items.push({ type: 'w', icon: 'clock', msg: `<strong>${r.num}:</strong> Νέος πελάτης άφιξη σήμερα · Προετοιμασία` });
-  });
-
-  notifications.slice(0, 3).forEach(n => {
-    const cls = n.Type === 'alert' ? 'e' : 'w';
-    const icon = n.Type === 'alert' ? 'alert-triangle' : 'info-circle';
-    items.push({ type: cls, icon: icon, msg: n.Message });
-  });
-
-  if (items.length === 0) {
-    items.push({ type: 'ok', icon: 'circle-check', msg: 'Δεν υπάρχουν ειδοποιήσεις.' });
-  }
-
-  container.innerHTML = items.map(i =>
-    `<div class="ns ns-${i.type}"><i class="ti ti-${i.icon}" aria-hidden="true"></i><div>${i.msg}</div></div>`
-  ).join('');
-
-  const doneRooms = maidRooms.filter(r => r.status === 'done').slice(0, 2);
-  if (doneRooms.length > 0) {
-    const doneMsg = doneRooms.map(r => r.num).join(', ') + ': Καθαρίστηκαν · Κατάσταση ενημερώθηκε';
-    container.innerHTML += `<div class="ns ns-ok"><i class="ti ti-circle-check" aria-hidden="true"></i><div><strong>${doneRooms.map(r => r.num).join(', ')}:</strong> Καθαρίστηκαν · Κατάσταση ενημερώθηκε</div></div>`;
-  }
-}
-
-function renderOverviewRoomList() {
-  const container = document.getElementById('ov-room-list');
-  if (!container) return;
-  const urgent = maidRooms.filter(r => r.status === 'urgent').slice(0, 3);
-  const priority = maidRooms.filter(r => r.status === 'priority').slice(0, 2);
-  const pending = maidRooms.filter(r => r.status === 'pending').slice(0, 2);
-  const items = [...urgent, ...priority, ...pending];
-
-  if (items.length === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--color-text-secondary);font-size:12px">Όλα τα δωμάτια είναι καθαρά</div>';
+  const list = document.getElementById('ov-notif');
+  if (!list) return;
+  if (notifications.length === 0) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary)">Καμία νέα ειδοποίηση</div>';
     return;
   }
-
-  container.innerHTML = items.map(r => {
-    const pillClass = r.status === 'urgent' ? 'p-r' : r.status === 'priority' ? 'p-a' : 'p-b';
-    const pillText = r.status === 'urgent' ? 'Επείγον' : r.status === 'priority' ? 'Προτεραιότητα' : 'Εκκρεμεί';
-    const guestText = r.guest || r.note || 'Κανονικός καθαρισμός';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
-      <div><div style="font-weight:500;font-size:12px">${r.num}</div><div style="font-size:11px;color:var(--color-text-secondary)">${guestText}</div></div>
-      <span class="pill ${pillClass}">${pillText}</span>
-    </div>`;
-  }).join('');
-}
-
-function renderOverviewLinen() {
-  const container = document.getElementById('ov-linen');
-  if (!container) return;
-  const linenItems = inventoryItems.filter(i => isLinenCategory(i.Category, i.Name)).slice(0, 4);
-  if (linenItems.length === 0) {
-    container.innerHTML = '<div style="padding:8px;color:var(--color-text-secondary);font-size:12px">Δεν υπάρχουν δεδομένα ιματισμού</div>';
-    return;
-  }
-  container.innerHTML = linenItems.map(item =>
-    `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
-      <span style="color:var(--color-text-secondary)">${item.Name}</span>
-      <span style="font-weight:500">${item.Quantity} τεμ.</span>
+  list.innerHTML = notifications.slice(0, 5).map(n =>
+    `<div style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+      <i class="ti ti-bell" style="color:#378ADD;font-size:14px;margin-top:2px"></i>
+      <span style="font-size:12px;line-height:1.3">${n.Message || '—'}</span>
     </div>`
   ).join('');
 }
 
-function isLinenCategory(cat, name) {
-  if (!cat) return false;
-  const c = cat.toLowerCase();
-  const n = name.toLowerCase();
-  const keywords = ['σεντόν', 'πετσέτ', 'μπουρνούζ', 'μαξιλαροθήκ', 'κλινοσκεπάσ', 'πάπλωμ', 'κουβέρτ', 'τραπεζομάντ', 'σεντον', 'πετσετ', 'μπουρνουζ', 'μαξιλαροθηκ'];
-  return keywords.some(k => c.includes(k) || n.includes(k));
+function renderOverviewRoomList() {
+  const list = document.getElementById('ov-room-list');
+  if (!list) return;
+  const urgent = maidRooms.filter(r => r.status === 'urgent').slice(0, 5);
+  const priority = maidRooms.filter(r => r.status === 'priority').slice(0, 5);
+  const items = [...urgent, ...priority];
+  if (items.length === 0) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary)">Καμία εκκρεμότητα</div>';
+    return;
+  }
+  list.innerHTML = items.map(r =>
+    `<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+      <span style="font-weight:600;font-size:12px;min-width:50px">${r.num}</span>
+      <span style="font-size:11px;color:var(--color-text-secondary);flex:1">${r.note || r.guest || r.type}</span>
+      <span class="pill ${r.status === 'urgent' ? 'p-r' : 'p-a'}">${r.status === 'urgent' ? 'Check-out' : 'Προτεραιότητα'}</span>
+    </div>`
+  ).join('');
 }
 
-/* ==============================================================
-   BADGES
-   ============================================================== */
+function renderOverviewLinen() {
+  const el = document.getElementById('ov-linen');
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary);padding:4px 0">Παρακολούθηση ιματισμού στην καρτέλα Ιματισμός</div>';
+}
+
+const isLinenCategory = (cat, name) => ['linen', 'towel', 'robe', 'sheet', 'pillow', 'bedding', 'bath'].some(k => (cat || '').toLowerCase().includes(k) || (name || '').toLowerCase().includes(k));
+
 function updateBadges() {
-  const badgeRooms = document.getElementById('badge-rooms');
-  if (badgeRooms) badgeRooms.textContent = maidRooms.filter(r => r.status !== 'done').length;
-
-  const badgeMb = document.getElementById('badge-mb');
-  if (badgeMb) badgeMb.textContent = mbCount;
-
-  const doneEl = document.getElementById('done-count');
-  if (doneEl) doneEl.textContent = doneCount;
-
-  const pendEl = document.getElementById('pend-count');
-  if (pendEl) pendEl.textContent = maidRooms.filter(r => r.status !== 'done').length;
-
-  const mbCountEl = document.getElementById('mb-count');
-  if (mbCountEl) mbCountEl.textContent = mbCount;
+  const bRooms = document.getElementById('badge-rooms');
+  if (bRooms) bRooms.textContent = maidRooms.filter(r => r.status !== 'done').length;
+  const bNotif = document.getElementById('badge-notifications');
+  if (bNotif) bNotif.textContent = notifications.length;
+  const bMb = document.getElementById('badge-mb');
+  if (bMb) bMb.textContent = mbCount;
 }
 
 /* ==============================================================
@@ -444,8 +321,8 @@ function renderRooms(filter) {
       <div class="room-actions">
         <span class="pill ${pillClass}">${pillText}</span>
         ${!isDone ? `
-          ${!isInProgress ? `<button class="btn btn-sm btn-teal" onclick="setRoomInProgress('${r.id}')"><i class="ti ti-player-play" aria-hidden="true"></i> Έναρξη</button>` : ''}
-          <button class="btn btn-sm btn-dark" onclick="setRoomDone('${r.id}')"><i class="ti ti-check" aria-hidden="true"></i> Έτοιμο</button>
+          ${!isInProgress ? `<button class="btn btn-sm btn-teal" onclick="window.setRoomInProgress('${r.id}')"><i class="ti ti-player-play" aria-hidden="true"></i> Έναρξη</button>` : ''}
+          <button class="btn btn-sm btn-dark" onclick="window.setRoomDone('${r.id}')"><i class="ti ti-check" aria-hidden="true"></i> Έτοιμο</button>
         ` : '<span style="font-size:11px;color:var(--color-text-secondary)">Ολοκληρώθηκε</span>'}
       </div>
     </div>`;
@@ -464,20 +341,20 @@ function updateFilterCounts() {
   });
 }
 
-function filterRooms(f, el) {
+window.filterRooms = function(f, el) {
   currentFilter = f;
   document.querySelectorAll('#v-rooms .btn-sm[data-filter]').forEach(b => b.style.background = '');
   if (el) el.style.background = 'var(--color-background-secondary)';
   renderRooms(f);
-}
+};
 
-function setRoomInProgress(id) {
+window.setRoomInProgress = function(id) {
   roomStates[id] = 'inprogress';
   showToast('room-toast', 'Καθαρισμός σε εξέλιξη...');
   renderRooms(currentFilter);
-}
+};
 
-async function setRoomDone(id) {
+window.setRoomDone = async function(id) {
   const room = maidRooms.find(r => r.id === id);
   if (!room) return;
 
@@ -488,7 +365,7 @@ async function setRoomDone(id) {
   doneCount++;
 
   try {
-    const { error } = await window.supabase
+    const { error } = await supabase
       .from('ROOM')
       .update({ Status: 'clean' })
       .eq('RoomNumber', id);
@@ -496,7 +373,7 @@ async function setRoomDone(id) {
       console.error('Σφάλμα ενημέρωσης δωματίου:', error.message);
       showToast('Σφάλμα ενημέρωσης κατάστασης δωματίου.', 'error');
     } else {
-      await window.supabase.from('NOTIFICATION').insert({
+      await supabase.from('NOTIFICATION').insert({
         TargetRole: 'receptionist',
         Type: 'room_ready',
         Message: `Δωμάτιο ${room.num} (${room.type}) καθαρίστηκε και είναι έτοιμο.`,
@@ -522,7 +399,7 @@ async function setRoomDone(id) {
   addLog(room.num + ' καθαρίστηκε — κατάσταση ενημερώθηκε στην υποδοχή');
   renderRooms(currentFilter);
   renderOverview();
-}
+};
 
 /* ==============================================================
    MINI-BAR VIEW
@@ -542,12 +419,12 @@ function renderPendingMb() {
       <div class="mb-items">${r.qty}× ${r.itemName}</div>
       <div class="mb-total">€${r.charge.toFixed(2)}</div>
       <span class="pill p-r" style="margin-left:4px">Εκκρ.</span>
-      <button class="btn btn-sm btn-teal" onclick="chargeMb('${r.id}', ${r.consumptionId})">Καταχώρηση</button>
+      <button class="btn btn-sm btn-teal" onclick="window.chargeMb('${r.id}', ${r.consumptionId})">Καταχώρηση</button>
     </div>`
   ).join('');
 }
 
-async function chargeMb(rowId, consumptionId) {
+window.chargeMb = async function(rowId, consumptionId) {
   const row = document.getElementById(rowId);
   if (!row) return;
   row.querySelector('.pill').className = 'pill p-g';
@@ -563,9 +440,9 @@ async function chargeMb(rowId, consumptionId) {
 
   const record = pendingMbRecords.find(r => r.consumptionId === consumptionId);
   addLog('Mini-bar ' + (record ? record.room : '') + ' — €' + (record ? record.charge.toFixed(2) : '?') + ' χρεώθηκε στον λογαριασμό πελάτη');
-}
+};
 
-async function submitNewMb() {
+window.submitNewMb = async function() {
   const roomNum = document.getElementById('mb-room-inp').value.trim();
   const itemsText = document.getElementById('mb-items-inp').value.trim();
   const total = parseFloat(document.getElementById('mb-total-inp').value);
@@ -574,7 +451,7 @@ async function submitNewMb() {
   if (!total || total <= 0) { alert('Εισάγετε έγκυρο σύνολο χρέωσης.'); return; }
 
   try {
-    const { data: rrData, error: rrErr } = await window.supabase
+    const { data: rrData, error: rrErr } = await supabase
       .from('RESERVATION_ROOM')
       .select('ReservationID')
       .eq('RoomNumber', roomNum);
@@ -584,7 +461,7 @@ async function submitNewMb() {
     let reservationId = null;
     if (rrData && rrData.length > 0) {
       const ids = rrData.map(r => r.ReservationID);
-      const { data: resData } = await window.supabase
+      const { data: resData } = await supabase
         .from('RESERVATION')
         .select('ReservationID')
         .in('ReservationID', ids)
@@ -613,7 +490,7 @@ async function submitNewMb() {
       addLog('Προσοχή: Δεν βρέθηκε ενεργή κράτηση για το δωμάτιο ' + roomNum + ' — η χρέωση καταχωρήθηκε με ReservationID=0');
     }
 
-    const { error: insertErr } = await window.supabase
+    const { error: insertErr } = await supabase
       .from('MINIBAR_CONSUMPTION')
       .insert([insertData]);
 
@@ -628,53 +505,47 @@ async function submitNewMb() {
     renderPendingMb();
     updateBadges();
   } catch (err) {
-    console.error('Σφάλμα καταχώρησης mini-bar:', err.message);
-    alert('Σφάλμα καταχώρησης. Δοκιμάστε ξανά.');
+    alert('Σφάλμα υποβολής: ' + err.message);
   }
-}
+};
 
 /* ==============================================================
    STOCK VIEW
    ============================================================== */
 function renderStock() {
-  const tbody = document.getElementById('stock-body');
-  if (!tbody) return;
+  const list = document.getElementById('stock-list');
+  if (!list) return;
+
   if (inventoryItems.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--color-text-secondary)">Δεν υπάρχουν είδη στην αποθήκη.</td></tr>';
+    list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-secondary)">Δεν υπάρχουν καταχωρημένα υλικά.</div>';
     return;
   }
-  tbody.innerHTML = inventoryItems.map(item => {
-    let statusHtml = '';
-    let statusClass = 'p-g';
-    let statusText = 'Επαρκές';
-    if (item.Quantity === 0) { statusClass = 'p-r'; statusText = 'Εξαντλήθηκε'; }
-    else if (item.Quantity <= item.MinThreshold) { statusClass = 'p-a'; statusText = 'Οριακό Απόθεμα'; }
-    return `<tr>
-      <td><strong>${item.Name}</strong></td>
-      <td>${item.Category || '-'}</td>
-      <td>${item.Quantity}</td>
-      <td>${item.MinThreshold}</td>
-      <td><span class="pill ${statusClass}">${statusText}</span></td>
-      <td>${item.Quantity <= item.MinThreshold ? `<button class="btn btn-sm btn-warn" onclick="reportLowStock(${item.ItemID},'${item.Name}')">Αναφορά</button>` : '—'}</td>
-    </tr>`;
+
+  list.innerHTML = inventoryItems.map(item => {
+    const isLow = item.Quantity <= (item.MinThreshold || 0);
+    return `<div class="minibar-row">
+      <div class="mb-room">${item.ItemID}</div>
+      <div class="mb-items"><strong>${item.Name}</strong></div>
+      <div class="mb-total" style="font-size:12px">${item.Quantity} ${item.Unit || 'τεμ.'}</div>
+      <span class="pill ${isLow ? 'p-r' : 'p-g'}">${isLow ? 'Χαμηλό' : 'Επαρκές'}</span>
+      ${isLow ? `<button class="btn btn-sm btn-dark" onclick="window.reportLowStock(${item.ItemID}, '${item.Name}')"><i class="ti ti-bell" aria-hidden="true"></i></button>` : ''}
+    </div>`;
   }).join('');
 }
 
-async function reportLowStock(itemId, itemName) {
+window.reportLowStock = async function(itemId, itemName) {
   try {
-    await window.supabase.from('NOTIFICATION').insert({
-      TargetRole: 'manager',
-      Type: 'restock',
-      Message: `Χαμηλό απόθεμα: ${itemName} (ID: ${itemId}) — παρακαλώ παραγγελία.`,
+    await supabase.from('NOTIFICATION').insert({
+      TargetRole: 'admin',
+      Type: 'low_stock',
+      Message: `Ελλιπές απόθεμα: ${itemName} (ID: ${itemId}) — Απαιτείται παραγγελία.`,
       IsRead: false
     });
     showToast('rep-toast', 'Αναφορά για ' + itemName + ' εστάλη στον διαχειριστή.');
-    addLog('Αναφορά χαμηλού αποθέματος: ' + itemName);
   } catch (err) {
-    console.error('Σφάλμα αναφοράς:', err.message);
-    alert('Σφάλμα αποστολής αναφοράς.');
+    alert('Σφάλμα: ' + err.message);
   }
-}
+};
 
 /* ==============================================================
    LINEN VIEW
@@ -685,78 +556,67 @@ function renderLinen() {
 }
 
 function renderLinenSendList() {
-  const linenItems = inventoryItems.filter(i => isLinenCategory(i.Category, i.Name));
-  const container = document.getElementById('linen-send-list');
-  if (!container) return;
-
-  const headerHtml = `<div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--color-text-secondary)">
-    <span>Είδος</span><span style="text-align:center">Απόθεμα</span><span style="text-align:center">Ελάχ. Απόθ.</span>
-  </div>`;
-
+  const list = document.getElementById('linen-send-list');
+  if (!list) return;
+  const linenItems = inventoryItems.filter(i => isLinenCategory(i.Category, i.Name) && i.Name);
   if (linenItems.length === 0) {
-    container.innerHTML = headerHtml + '<div style="text-align:center;padding:1rem;color:var(--color-text-secondary);font-size:12px">Δεν βρέθηκαν είδη ιματισμού στη βάση.</div>';
+    list.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary);padding:1rem">Δεν βρέθηκαν είδη ιματισμού στην αποθήκη.</div>';
     return;
   }
-
-  const rowsHtml = linenItems.map(item => {
-    const belowThreshold = item.Quantity < item.MinThreshold ? 'style="color:#D85A30;font-weight:500"' : '';
-    return `<div class="linen-row">
-      <div class="linen-name"><i class="ti ti-bed" aria-hidden="true" style="font-size:14px;margin-right:5px"></i>${item.Name}</div>
-      <div class="linen-qty"><input type="number" value="${item.Quantity}" min="0" style="width:60px;padding:3px 5px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)"></div>
-      <div class="linen-min" ${belowThreshold}>${item.MinThreshold}</div>
+  list.innerHTML = linenItems.map(item => {
+    const qtyId = 'ls-qty-' + item.ItemID;
+    return `<div class="minibar-row" style="padding:8px 0">
+      <div class="mb-room" style="min-width:120px">${item.Name}</div>
+      <div class="mb-items" style="font-size:12px;color:var(--color-text-secondary)">Διαθέσιμο: ${item.Quantity}</div>
+      <input type="number" id="${qtyId}" class="fg-inp" style="width:70px" placeholder="0" min="0" value="0">
     </div>`;
   }).join('');
 
-  container.innerHTML = headerHtml + rowsHtml;
-
-  const alerts = document.getElementById('linen-alerts');
-  if (alerts) {
-    const below = linenItems.filter(i => i.Quantity < i.MinThreshold);
-    if (below.length > 0) {
-      alerts.innerHTML = below.map(i =>
-        `<div class="ns ns-w" style="margin-bottom:0;margin-top:6px"><i class="ti ti-info-circle" aria-hidden="true"></i><div>${i.Name} (${i.Quantity}) κάτω από ελάχ. απόθεμα (${i.MinThreshold})</div></div>`
-      ).join('');
-    } else {
-      alerts.innerHTML = '';
-    }
-  }
+  const allDiv = document.createElement('div');
+  allDiv.style.cssText = 'display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--color-border-tertiary)';
+  allDiv.innerHTML = `
+    <button class="btn btn-sm" onclick="document.querySelectorAll('#v-linen input[type=number]').forEach(i => i.value = i.closest('.minibar-row').querySelector('.mb-items').textContent.replace('Διαθέσιμο: ','').trim())"><i class="ti ti-select-all"></i> Όλα</button>
+    <span style="font-size:11px;color:var(--color-text-secondary)">Αυτόματη συμπλήρωση διαθέσιμων ποσοτήτων</span>`;
+  list.appendChild(allDiv);
 }
 
 function renderLinenReceiveTable() {
-  const tbody = document.getElementById('linen-receive-body');
-  if (!tbody) return;
-  const linenItems = inventoryItems.filter(i => isLinenCategory(i.Category, i.Name));
-  if (linenItems.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:1rem;color:var(--color-text-secondary)">Δεν υπάρχουν δεδομένα</td></tr>';
+  const table = document.getElementById('linen-receive-table');
+  if (!table) return;
+  const receiving = inventoryItems.filter(i => isLinenCategory(i.Category, i.Name) && i.Name);
+  if (receiving.length === 0) {
+    table.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary);padding:1rem">Καμία προηγούμενη καταχώρηση παραλαβής.</div>';
     return;
   }
-  tbody.innerHTML = linenItems.map(item => {
-    const statusClass = item.Quantity >= item.MinThreshold ? 'p-g' : 'p-a';
-    const statusText = item.Quantity >= item.MinThreshold ? 'OK' : 'Χαμηλό απόθεμα';
-    return `<tr>
-      <td>${item.Name}</td>
-      <td>${item.Quantity}</td>
-      <td>${item.MinThreshold}</td>
-      <td><span class="pill ${statusClass}">${statusText}</span></td>
-      <td><button class="btn btn-sm" onclick="addLog('Παραλαβή ${item.Name} — επιβεβαιώθηκε')"><i class="ti ti-check" aria-hidden="true"></i></button></td>
-    </tr>`;
-  }).join('');
+  table.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);text-align:left"><th style="padding:6px">Είδος</th><th style="padding:6px">Τελευταία Παραλαβή</th><th style="padding:6px">Κατάσταση</th><th style="padding:6px"></th></tr></thead>
+    <tbody>${receiving.map(item => {
+      const statusClass = item.Quantity > 0 ? 'p-g' : 'p-r';
+      const statusText = item.Quantity > 0 ? 'Επαρκές' : 'Ελλιπές';
+      return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary)">
+        <td style="padding:6px">${item.Name}</td>
+        <td style="padding:6px;color:var(--color-text-secondary)">—</td>
+        <td style="padding:6px"><span class="pill ${statusClass}">${statusText}</span></td>
+        <td style="padding:6px"><button class="btn btn-sm" onclick="window.addLog('Παραλαβή ${item.Name} — επιβεβαιώθηκε')"><i class="ti ti-check" aria-hidden="true"></i></button></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
 }
 
-function submitLinen() {
+window.submitLinen = function() {
   showToast('linen-toast');
   addLog('Αποστολή ιματισμού στο καθαριστήριο καταχωρήθηκε');
-}
+};
 
 /* ==============================================================
    REPORT VIEW
    ============================================================== */
-function submitReport() {
+window.submitReport = function() {
   const notes = document.getElementById('rep-notes');
   const noteText = notes ? notes.value.trim() : '';
   showToast('rep-toast');
   addLog('Αναφορά βάρδιας εστάλη στη διοίκηση' + (noteText ? ': ' + noteText : ''));
-}
+};
 
 /* ==============================================================
    TOAST
@@ -773,10 +633,10 @@ function showToast(id, msg) {
 /* ==============================================================
    LOGOUT
    ============================================================== */
-function logout() {
+window.logout = function() {
   localStorage.removeItem('hotel_user');
   window.location.href = '/pages/login.html';
-}
+};
 
 /* ==============================================================
    LOG
@@ -786,11 +646,10 @@ const logList = document.getElementById('log-list');
 function addLog(msg) {
   if (!logList) return;
   const now = new Date();
+  window.addLog = addLog;
   const t = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
   const d = document.createElement('div');
   d.style.cssText = 'display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)';
   d.innerHTML = `<span style="font-size:11px;color:var(--color-text-secondary);min-width:36px;flex-shrink:0">${t}</span><span style="width:7px;height:7px;border-radius:50%;background:#1D9E75;flex-shrink:0;margin-top:3px"></span><span>${msg}</span>`;
   logList.insertBefore(d, logList.firstChild);
 }
-
-

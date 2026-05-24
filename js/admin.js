@@ -1,4 +1,7 @@
 import { supabase } from './supabase-config.js';
+import { showToast, normalizeString, formatDate, updateLiveTime, navTo } from './utils/ui.js';
+import { isSoonCheckout, getStatusLabel, buildCheckoutMap, fetchRooms as apiFetchRooms, fetchArrivals, fetchDepartures, calculateEaster, SEASONS, getSeasonForDate } from './services/api.js';
+import { renderRoomMap } from './components/RoomMap.js';
 
 // Έλεγχος πρόσβασης: επαληθεύει τον ρόλο από τη βάση πριν φορτωθεί οτιδήποτε
 const appReady = (async () => {
@@ -27,79 +30,12 @@ const appReady = (async () => {
    ============================================================== */
 let checkoutMap = {};
 
-function isSoonCheckout(checkOutDate) {
-  if (!checkOutDate) return false;
-  const d = new Date(checkOutDate);
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(23, 59, 59, 999);
-  return d <= tomorrow;
-}
-
-async function buildCheckoutMap() {
-  const map = {};
-  try {
-    const { data: rrData } = await supabase
-      .from('RESERVATION_ROOM')
-      .select('RoomNumber, ReservationID');
-    if (!rrData || rrData.length === 0) return map;
-    const ids = rrData.map(r => r.ReservationID);
-    const { data: resData } = await supabase
-      .from('RESERVATION')
-      .select('ReservationID, CheckOutDate')
-      .in('ReservationID', ids)
-      .neq('Status', 'CheckedOut');
-    if (resData) {
-      const dateMap = {};
-      resData.forEach(r => dateMap[r.ReservationID] = r.CheckOutDate);
-      rrData.forEach(rr => { if (dateMap[rr.ReservationID]) map[rr.RoomNumber] = dateMap[rr.ReservationID]; });
-    }
-  } catch (err) {
-    console.warn('buildCheckoutMap error:', err);
-  }
-  return map;
-}
-
-function getStatusLabel(state, checkoutDate) {
-  if (state === 'free' || state === 'clean') return 'Έτοιμο για νέο πελάτη';
-  if (state === 'dirty') return 'Άδειο (χωρίς καθαριότητα)';
-  if (state === 'soon') return 'Προσεχώς άδειο';
-  if (state === 'occ') return 'Κατειλημμένο';
-  return 'Ελεύθερο';
-}
-
 /* ==============================================================
    SHARED UTILITIES
    ============================================================== */
-function normalizeString(str) {
-    return str.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
-}
-
 /* ==============================================================
    TOAST NOTIFICATION SYSTEM
    ============================================================== */
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = `live-toast ${type}`;
-
-    let iconClass = 'ti-circle-check'; // Default success
-    if (type === 'error') iconClass = 'ti-alert-circle';
-    if (type === 'info') iconClass = 'ti-info-circle';
-    if (type === 'warning') iconClass = 'ti-alert-triangle';
-
-    toast.innerHTML = `<i class="ti ${iconClass}" aria-hidden="true"></i> <span>${message}</span>`;
-    
-    container.appendChild(toast);
-
-    // Αυτόματη απόκρυψη μετά από 3.5 δευτερόλεπτα
-    setTimeout(() => {
-        toast.classList.add('fade-out');
-        setTimeout(() => toast.remove(), 300); // Περιμένει το animation
-    }, 3500);
-}
 
 // Γενική συνάρτηση για απλά κουμπιά (π.χ. "Αναφορά", "Εξαγωγή")
 window.triggerAction = function(msg, type) {
@@ -110,33 +46,9 @@ window.triggerAction = function(msg, type) {
 /* ==============================================================
    ΠΛΟΗΓΗΣΗ (NAVIGATION)
    ============================================================== */
-const viewTitles = {
-    dash: 'Πίνακας Ελέγχου', revenue: 'Έσοδα & Αναφορές', pricing: 'Δυναμική Τιμολόγηση',
-    rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Minibar & Αποθήκες',
-    vehicles: 'Οχήματα & Μεταφορές',     trips: 'Δρομολόγια Οχημάτων', reservations: 'Κρατήσεις', gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
-    payroll: 'Μισθοδοσία', users: 'Χρήστες & Ρόλοι', backup: 'Backup & Ασφάλεια',
-    'notif-history': 'Ιστορικό Ειδοποιήσεων'
-};
-
-function navTo(id) {
-    document.querySelectorAll('.sb-item').forEach(i => i.classList.toggle('active', i.dataset.v === id));
-    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'v-' + id));
-    document.getElementById('tb-title').textContent = viewTitles[id] || id;
-}
-
 document.querySelectorAll('.sb-item').forEach(el => {
     el.addEventListener('click', () => navTo(el.dataset.v));
 });
-
-
-/* ==============================================================
-   LIVE ΗΜΕΡΟΜΗΝΙΑ & ΕΙΔΟΠΟΙΗΣΕΙΣ DASHBOARD
-   ============================================================== */
-function updateLiveTime() {
-    const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-    document.getElementById('live-time').innerHTML = now.toLocaleDateString('el-GR', options);
-}
 
 
 /* ==============================================================
@@ -144,29 +56,19 @@ function updateLiveTime() {
    ============================================================== */
 let hotelRooms = []; // Κενός πίνακας που θα γεμίσει από τη βάση
 
-// 1. Ασύγχρονη συνάρτηση για την ανάκτηση των δωματίων
 async function fetchRooms() {
     try {
         const rmap = document.getElementById('rmap');
         if (rmap) rmap.innerHTML = '<div style="width:100%; text-align:center; padding: 2rem; color: var(--text-muted);"><i class="ti ti-loader" style="animation: spin 1s linear infinite; font-size: 2rem;"></i><p>Φόρτωση δωματίων από Supabase...</p></div>';
 
-        // Τραβάμε τα δωμάτια ταξινομημένα με βάση τον αριθμό τους
-        // ... μέσα στη fetchRooms
-        const { data, error } = await supabase // <--- Χωρίς window.
-            .from('ROOM')
-            .select('RoomNumber, RoomType, Status')
-            .order('RoomNumber', { ascending: true });
-
-        if (error) throw error;
+        const data = await apiFetchRooms();
 
         checkoutMap = await buildCheckoutMap();
 
-        // 2. Μετατροπή των δεδομένων της βάσης στη μορφή που θέλει το frontend
         hotelRooms = data.map(room => {
-            let uiState = 'free'; // Default κατάσταση
+            let uiState = 'free';
             const dbStatus = room.Status ? room.Status.toLowerCase().trim() : '';
-            
-            // Έξυπνο mapping: Πιάνουμε διάφορες εκδοχές των λέξεων (π.χ. 'occupied', 'occ', 'cleaning')
+
             if (dbStatus.includes('occup') || dbStatus === 'occ') uiState = 'occ';
             else if (dbStatus === 'dirty' || dbStatus.includes('cleaning')) uiState = 'dirty';
             else uiState = 'free';
@@ -182,9 +84,8 @@ async function fetchRooms() {
             };
         });
 
-        // 3. Ζωγραφίζουμε το χάρτη με τα νέα δεδομένα
         renderMap();
-        
+
     } catch (err) {
         console.error("Σφάλμα φόρτωσης δωματίων:", err.message);
         showToast("Αποτυχία φόρτωσης χάρτη δωματίων από τη βάση.", "error");
@@ -193,90 +94,8 @@ async function fetchRooms() {
 
 // 4. Ζωγραφίζει τα κουτάκια (UI)
 // 4. Ζωγραφίζει τα κουτάκια (UI)
-// HotelSystem/js/admin.js (Αντικατάσταση της συνάρτησης renderMap)
 function renderMap(filter) {
-    const rmap = document.getElementById('rmap');
-    if (!rmap) return;
-    rmap.innerHTML = '';
-    
-    if (hotelRooms.length === 0) {
-        rmap.innerHTML = '<p style="color: var(--text-muted);">Δεν βρέθηκαν δωμάτια στη βάση.</p>';
-        calculateLiveStats();
-        return;
-    }
-
-    hotelRooms.forEach(r => {
-        if (filter && filter !== 'all' && r.state !== filter) return;
-        const d = document.createElement('div');
-        d.className = 'rc rc-' + r.state;
-        
-        let prefix = r.type ? r.type.charAt(0).toUpperCase() + '-' : '';
-        d.textContent = prefix + r.id; 
-        
-        const stateGr = getStatusLabel(r.state, r.checkOutDate);
-
-        d.title = `${r.type || 'Άγνωστος Τύπος'} ${r.id} | ${stateGr}`;
-        d.style.cursor = 'pointer';
-
-        d.addEventListener('click', () => {
-            const existing = document.querySelector('.room-info-overlay');
-            if (existing) existing.remove();
-
-            const overlay = document.createElement('div');
-            overlay.className = 'inv-overlay room-info-overlay';
-
-            const statusColors = {
-                'Έτοιμο για νέο πελάτη': '#1D9E75',
-                'Άδειο (χωρίς καθαριότητα)': '#EAB308',
-                'Προσεχώς άδειο': '#F97316',
-                'Κατειλημμένο': '#DC2626'
-            };
-            const dotColor = statusColors[stateGr] || '#1D9E75';
-
-            overlay.innerHTML = `
-                <div class="inv-modal room-info-modal">
-                    <div class="room-info-colorbar" style="background:${dotColor}"></div>
-                    <div class="room-info-header">
-                        <h3>Δωμάτιο ${prefix}${r.id}</h3>
-                        <span class="room-info-close" id="room-info-close">&times;</span>
-                    </div>
-                    <div class="room-info-body">
-                        <div class="room-info-row">
-                            <span class="ri-label">Τύπος:</span>
-                            <span class="ri-value">${r.type || 'Άγνωστος'}</span>
-                        </div>
-                        <div class="room-info-row">
-                            <span class="ri-label">Κατάσταση:</span>
-                            <span class="ri-value">
-                                <span style="width:10px;height:10px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0"></span>
-                                ${stateGr}
-                            </span>
-                        </div>
-                        ${r.checkOutDate ? `
-                        <div class="room-info-row">
-                            <span class="ri-label">Αναχώρηση:</span>
-                            <span class="ri-value">${new Date(r.checkOutDate).toLocaleDateString('el-GR')}</span>
-                        </div>` : ''}
-                    </div>
-                    <div class="room-info-footer">
-                        <button class="room-info-btn" id="room-info-close-btn">Κλείσιμο</button>
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(overlay);
-
-            const closeRmInfo = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
-            overlay.addEventListener('click', (e) => { if (e.target === overlay) closeRmInfo(); });
-            overlay.querySelector('#room-info-close').addEventListener('click', closeRmInfo);
-            overlay.querySelector('#room-info-close-btn').addEventListener('click', closeRmInfo);
-            const onKey = (e) => { if (e.key === 'Escape') closeRmInfo(); };
-            document.addEventListener('keydown', onKey);
-        });
-
-        rmap.appendChild(d);
-    });
-    
+    renderRoomMap('rmap', hotelRooms, { filter });
     calculateLiveStats();
 }
 
@@ -287,7 +106,6 @@ window.filterRooms = function(f, el) {
     renderMap(f);
 };
 
-// 5. Δυναμικός Υπολογισμός Στατιστικών (δεν χρησιμοποιούμε πια το "510" καρφωτά)
 let currentOcc = 0, currentFree = 0, currentDirty = 0;
 function calculateLiveStats() {
     const totalRooms = hotelRooms.length || 1;
@@ -302,7 +120,6 @@ function calculateLiveStats() {
     const occPct = Math.round((currentOcc / totalRooms) * 100);
     const freePct = Math.round((currentFree / totalRooms) * 100);
 
-    // Ενημέρωση UI στα dashboards
     if(document.getElementById('live-occ-badge')) document.getElementById('live-occ-badge').textContent = `Πληρ. ${occPct}%`;
     if(document.getElementById('dash-occ-val')) document.getElementById('dash-occ-val').textContent = `${occPct}%`;
     if(document.getElementById('dash-occ-sub')) document.getElementById('dash-occ-sub').textContent = `${currentOcc} / ${hotelRooms.length} δωμάτια`;
@@ -331,37 +148,17 @@ async function fetchDashboardBookings() {
 
     if (!arrivalsBody && !departuresBody) return;
 
-    // Show loading state
     if (arrivalsBody) arrivalsBody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:1rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Φόρτωση...</td></tr>';
     if (departuresBody) departuresBody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:1rem;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Φόρτωση...</td></tr>';
 
     try {
-        const [arrivalsRes, departuresRes] = await Promise.all([
-            supabase
-                .from('RESERVATION')
-                .select(`
-                    ReservationID, Status,
-                    CUSTOMER (FirstName, LastName),
-                    RESERVATION_ROOM (RoomNumber)
-                `)
-                .eq('CheckInDate', today)
-                .not('Status', 'in', '("Cancelled","Deleted")'),
-            supabase
-                .from('RESERVATION')
-                .select(`
-                    ReservationID, Status,
-                    CUSTOMER (FirstName, LastName),
-                    RESERVATION_ROOM (RoomNumber)
-                `)
-                .eq('CheckOutDate', today)
-                .not('Status', 'in', '("Cancelled","Deleted","CheckedIn","CheckedOut")')
+        const [arrivals, departures] = await Promise.all([
+            fetchArrivals(today),
+            fetchDepartures(today)
         ]);
 
-        if (arrivalsRes.error) throw arrivalsRes.error;
-        if (departuresRes.error) throw departuresRes.error;
-
-        renderBookingTable('arrivals-body', arrivalsRes.data, 'arrival');
-        renderBookingTable('departures-body', departuresRes.data, 'departure');
+        renderBookingTable('arrivals-body', arrivals, 'arrival');
+        renderBookingTable('departures-body', departures, 'departure');
 
     } catch (err) {
         console.error("Σφάλμα φόρτωσης αφίξεων/αναχωρήσεων:", err.message);
@@ -565,58 +362,6 @@ function checkDynamicPricing(occPct) {
 /* ==============================================================
    ΣΥΝΤΕΛΕΣΤΕΣ ΕΠΟΧΙΚΟΤΗΤΑΣ
    ============================================================== */
-
-function calculateEaster(year) {
-    const a = year % 19;
-    const b = Math.floor(year / 100);
-    const c = year % 100;
-    const d = Math.floor(b / 4);
-    const e = b % 4;
-    const f = Math.floor((b + 8) / 25);
-    const g = Math.floor((b - f + 1) / 3);
-    const h = (19 * a + b - d - g + 15) % 30;
-    const i = Math.floor(c / 4);
-    const k = c % 4;
-    const l = (32 + 2 * e + 2 * i - h - k) % 7;
-    const m = Math.floor((a + 11 * h + 22 * l) / 451);
-    const month = Math.floor((h + l - 7 * m + 114) / 31);
-    const day = ((h + l - 7 * m + 114) % 31) + 1;
-    return new Date(year, month - 1, day);
-}
-
-const SEASONS = {
-    summer: {
-        label: 'Καλοκαίρι',
-        defaultMultiplier: 1.6,
-        isActive: (d) => { const m = d.getMonth() + 1; return m >= 6 && m <= 8; }
-    },
-    xmas: {
-        label: 'Χριστούγεννα',
-        defaultMultiplier: 1.4,
-        isActive: (d) => {
-            const m = d.getMonth() + 1, day = d.getDate();
-            return (m === 12 && day >= 15) || (m === 1 && day <= 7);
-        }
-    },
-    easter: {
-        label: 'Πάσχα',
-        defaultMultiplier: 1.3,
-        isActive: (d) => {
-            const easter = calculateEaster(d.getFullYear());
-            const start = new Date(easter); start.setDate(start.getDate() - 7);
-            const end = new Date(easter); end.setDate(end.getDate() + 7);
-            end.setHours(23, 59, 59, 999);
-            return d >= start && d <= end;
-        }
-    }
-};
-
-function getSeasonForDate(date) {
-    for (const [key, season] of Object.entries(SEASONS)) {
-        if (season.isActive(date)) return key;
-    }
-    return null;
-}
 
 function getCurrentSeason() {
     return getSeasonForDate(new Date());
@@ -1480,7 +1225,7 @@ async function fetchVehicles() {
                     nextDate.setHours(0, 0, 0, 0);
                     const diffMs = nextDate - today;
                     const daysUntil = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-                    const dateStr = nextDate.toLocaleDateString('el-GR');
+                    const dateStr = formatDate(nextDate);
                     const plate = v.PlateNumber || v.Type;
                     const vid = v.VehicleID;
 
@@ -1896,11 +1641,11 @@ window.openTripModal = async function(vehicleId, plateNumber) {
             const driverName = `${driver.FirstName || ''} ${driver.LastName || ''}`.trim() || '—';
             const customer = t.CUSTOMER || {};
             const customerName = `${customer.FirstName || ''} ${customer.LastName || ''}`.trim() || '—';
-            const dateStr = new Date(t.Date).toLocaleDateString('el-GR');
+            const dateStr = formatDate(t.Date);
 
             const res = t.RESERVATION || {};
-            const checkIn = res.CheckInDate ? new Date(res.CheckInDate).toLocaleDateString('el-GR') : '—';
-            const checkOut = res.CheckOutDate ? new Date(res.CheckOutDate).toLocaleDateString('el-GR') : '—';
+            const checkIn = res.CheckInDate ? formatDate(res.CheckInDate) : '—';
+            const checkOut = res.CheckOutDate ? formatDate(res.CheckOutDate) : '—';
             const roomType = res.RoomType || '—';
             const resStatus = res.Status ? tripStatusPill(res.Status) : '<span class="pill p-gr">—</span>';
             const endKm = t.EndKm != null ? `${Number(t.EndKm).toLocaleString()} km` : '<span class="pill p-y">Εκκρεμεί</span>';
@@ -1964,7 +1709,7 @@ async function fetchTrips() {
             const driverName = `${driver.FirstName || ''} ${driver.LastName || ''}`.trim() || '—';
             const customer = custMap[t.CustomerID] || {};
             const customerName = `${customer.FirstName || ''} ${customer.LastName || ''}`.trim() || '—';
-            const dateStr = new Date(t.Date).toLocaleDateString('el-GR');
+            const dateStr = formatDate(t.Date);
             const cost = t.Cost != null ? `€${t.Cost}` : '—';
             const statusLabel = t.Status === 'completed' ? '<span class="pill p-g">Ολοκληρώθηκε</span>' : '<span class="pill p-a">Εκκρεμεί</span>';
             return `
@@ -2180,7 +1925,7 @@ window.openLogKmModal = async function(vehicleId, plateNumber, currentKm) {
     const tripEl = document.getElementById('logkm-last-trip');
     if (trips && trips.length > 0) {
         const t = trips[0];
-        const dateStr = new Date(t.Date).toLocaleDateString('el-GR');
+        const dateStr = formatDate(t.Date);
         tripEl.textContent = `${dateStr} — ${t.Destination}${t.EndKm ? ` (καταχωρήθηκαν ${t.EndKm} km)` : ' (εκκρεμεί καταχώρηση)'}`;
     } else {
         tripEl.textContent = '—';
@@ -2429,6 +2174,7 @@ async function fetchPayroll() {
 }
 
 function renderPayroll() {
+    window.renderPayroll = renderPayroll;
     const tbody = document.getElementById('payroll-body');
     if (!tbody) return;
 
@@ -2447,7 +2193,7 @@ function renderPayroll() {
     }
 
     tbody.innerHTML = filtered.map(emp => {
-        const lastDate = emp.LastPaymentDate ? new Date(emp.LastPaymentDate).toLocaleDateString('el-GR') : 'Ποτέ';
+        const lastDate = emp.LastPaymentDate ? formatDate(emp.LastPaymentDate) : 'Ποτέ';
         const ibanFormatted = emp.IBAN ? `<code>${emp.IBAN.substring(0, 4)}...${emp.IBAN.slice(-4)}</code>` : '<span class="pill p-r">Λείπει IBAN</span>';
         const empName = `${emp.FirstName || ''} ${emp.LastName || ''}`.trim();
         
@@ -2884,7 +2630,12 @@ function getSortValue(res, column) {
         case 'CheckInDate': return new Date(res.CheckInDate).getTime();
         case 'CheckOutDate': return new Date(res.CheckOutDate).getTime();
         case 'TotalCost': return Number(res.TotalCost);
-        case 'roomNumbers': return res.roomNumbers;
+        case 'roomNumbers': {
+            const s = res.roomNumbers;
+            if (!s || s === '—') return Infinity;
+            const m = s.match(/\d+/);
+            return m ? parseInt(m[0], 10) : Infinity;
+        }
         case 'Status': return res.Status;
         default: return '';
     }
@@ -3012,8 +2763,8 @@ function renderReservations() {
     }
 
     tbody.innerHTML = pageData.map(res => {
-        const checkIn = new Date(res.CheckInDate).toLocaleDateString('el-GR');
-        const checkOut = new Date(res.CheckOutDate).toLocaleDateString('el-GR');
+        const checkIn = formatDate(res.CheckInDate);
+        const checkOut = formatDate(res.CheckOutDate);
         let statusClass = 'p-a';
         if (res.Status === 'Confirmed') statusClass = 'p-b';
         if (res.Status === 'CheckedIn') statusClass = 'p-g';
@@ -3139,6 +2890,7 @@ async function fetchUsers() {
 }
 
 function renderUsers() {
+    window.renderUsers = renderUsers;
     const tbody = document.getElementById('users-body');
     if (!tbody) return;
 

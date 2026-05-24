@@ -350,3 +350,102 @@ tr:last-child td{border-bottom:none}
   .receipt-paper { padding: 16px; }
   .receipt-info { grid-template-columns: 1fr; }
 }
+
+/* ROOM INFO OVERLAY (from admin.css) */
+.inv-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10000; animation: fadeIn 0.15s ease-out;
+}
+.inv-modal {
+    background: #fff; border-radius: 10px; padding: 24px 28px;
+    width: 400px; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+    animation: scaleIn 0.15s ease-out;
+}
+.room-info-modal {
+    max-width: 360px;
+    padding: 0;
+    overflow: hidden;
+}
+.room-info-modal .room-info-colorbar {
+    height: 4px;
+}
+.room-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px 0;
+}
+.room-info-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    color: #111827;
+}
+.room-info-body {
+    padding: 14px 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.room-info-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+.room-info-row .ri-label {
+    color: #6b7280;
+    min-width: 95px;
+    font-weight: 500;
+    font-size: 13px;
+}
+.room-info-row .ri-value {
+    color: #111827;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.room-info-row .ri-icon {
+    font-size: 15px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+    color: #9ca3af;
+}
+.room-info-footer {
+    padding: 0 20px 16px;
+    text-align: right;
+}
+.room-info-close {
+    cursor: pointer;
+    font-size: 24px;
+    color: #9ca3af;
+    line-height: 1;
+    padding: 0 4px;
+    border-radius: 4px;
+    transition: color 0.15s, background-color 0.15s;
+}
+.room-info-close:hover {
+    color: #111827;
+    background: #f3f4f6;
+}
+.room-info-btn {
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    border-radius: 6px;
+    background: #f3f4f6;
+    color: #374151;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+}
+.room-info-btn:hover {
+    background: #e5e7eb;
+    transform: scale(1.03);
+}
+.room-info-btn:active {
+    transform: scale(0.97);
+}

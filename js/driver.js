@@ -1,26 +1,10 @@
-(function() {
-    const userData = localStorage.getItem('hotel_user');
-    if (!userData) { window.location.href = "/pages/login.html"; return; }
-})();
+import { supabase } from './supabase-config.js';
+import { showToast, updateLiveTime } from './utils/ui.js';
+
+const userData = localStorage.getItem('hotel_user');
+if (!userData) { window.location.href = "/pages/login.html"; }
 
 const hiddenTripIds = new Set();
-
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-    const toast = document.createElement('div');
-    toast.className = `live-toast ${type}`;
-    let iconClass = 'ti-circle-check';
-    if (type === 'error') iconClass = 'ti-alert-circle';
-    if (type === 'info') iconClass = 'ti-info-circle';
-    if (type === 'warning') iconClass = 'ti-alert-triangle';
-    toast.innerHTML = `<i class="ti ${iconClass}"></i> <span>${message}</span>`;
-    container.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.add('fade-out');
-        setTimeout(() => toast.remove(), 300);
-    }, 3500);
-}
 
 let currentUser = null;
 let todayTrips = [];
@@ -57,11 +41,11 @@ async function loadDriverData() {
     if (!userData) { window.location.href = "/pages/login.html"; return; }
     currentUser = JSON.parse(userData);
 
-    const { error: statusErr } = await window.supabase.from('TRIP').select('Status').limit(0).maybeSingle();
+    const { error: statusErr } = await supabase.from('TRIP').select('Status').limit(0).maybeSingle();
     window._tripHasStatus = !statusErr;
 
     try {
-        const { data: empData, error: empErr } = await window.supabase
+        const { data: empData, error: empErr } = await supabase
             .from('EMPLOYEE')
             .select('*')
             .eq('EmpID', currentUser.id)
@@ -75,7 +59,7 @@ async function loadDriverData() {
         if (avName) avName.textContent = `${empData.FirstName || ''} ${empData.LastName || ''}`.trim() || 'Οδηγός';
 
         const today = new Date().toISOString().split('T')[0];
-        const { data: shiftData } = await window.supabase
+        const { data: shiftData } = await supabase
             .from('SHIFT')
             .select('Hours')
             .eq('EmpID', currentUser.id)
@@ -91,15 +75,14 @@ async function loadDriverData() {
             : 'TripID, VehicleID, Date, Cost, Destination, CUSTOMER(FirstName, LastName, IsGroup)';
         const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
         const dayEnd = new Date(); dayEnd.setHours(24, 0, 0, 0);
-        const { data: trips, error: tripErr } = await window.supabase
+        const { data: trips, error: tripErr } = await supabase
             .from('TRIP')
             .select(tripSelect)
             .eq('DriverID', currentUser.id)
             .gte('Date', dayStart.toISOString())
             .order('Date', { ascending: false });
 
-        // Also include any pending trips from the past that weren't caught by the date filter
-        const { data: pastPendingTrips } = await window.supabase
+        const { data: pastPendingTrips } = await supabase
             .from('TRIP')
             .select(tripSelect)
             .eq('DriverID', currentUser.id)
@@ -108,19 +91,17 @@ async function loadDriverData() {
             .order('Date', { ascending: false });
 
         const allTrips = (trips || []).concat(pastPendingTrips || []);
-        // Deduplicate by TripID
         const seen = new Set();
         todayTrips = allTrips.filter(t => {
             if (seen.has(t.TripID)) return false;
             seen.add(t.TripID);
             return true;
         });
-        // Sort most recent first
         todayTrips.sort((a, b) => new Date(b.Date) - new Date(a.Date));
         if (tripErr) throw tripErr;
 
         if (todayTrips.length > 0 && todayTrips[0].VehicleID) {
-            const { data: veh } = await window.supabase
+            const { data: veh } = await supabase
                 .from('VEHICLE')
                 .select('*')
                 .eq('VehicleID', todayTrips[0].VehicleID)
@@ -128,7 +109,7 @@ async function loadDriverData() {
             myVehicle = veh || null;
         }
 
-        const { data: vehicles, error: vehErr } = await window.supabase
+        const { data: vehicles, error: vehErr } = await supabase
             .from('VEHICLE')
             .select('*')
             .order('VehicleID', { ascending: true });
@@ -147,12 +128,6 @@ async function loadDriverData() {
     }
 }
 
-function updateLiveTime() {
-    const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-    const el = document.getElementById('live-time');
-    if (el) el.innerHTML = now.toLocaleDateString('el-GR', options);
-}
 setInterval(updateLiveTime, 60000);
 
 function updateOverview() {
@@ -230,7 +205,7 @@ function updateOverview() {
                 <div style="font-weight:600;font-size:14px">${next.Destination || 'Μεταφορά'}</div>
                 <div class="room-type">${time} — ${customerName} ${groupLabel}</div>
             </div>
-            <button class="btn btn-dark" onclick="navTo('schedule')">Λεπτομέρειες</button>`;
+            <button class="btn btn-dark" onclick="window.navTo('schedule')">Λεπτομέρειες</button>`;
     } else if (tripCount > 0) {
         nextCard.style.display = 'flex';
         nextCard.innerHTML = `
@@ -325,9 +300,9 @@ function renderTrips() {
                 </div>
                 <div class="trip-action">
                     ${!isDone
-                        ? `<button class="btn-complete" onclick="completeTrip(${trip.TripID})"><i class="ti ti-check"></i> Ολοκλήρωση</button>`
+                        ? `<button class="btn-complete" onclick="window.completeTrip(${trip.TripID})"><i class="ti ti-check"></i> Ολοκλήρωση</button>`
                         : `<span class="trip-check"><i class="ti ti-check"></i></span>`}
-                    <button class="btn-del" onclick="hideTrip(${trip.TripID})" title="Απόκρυψη"><i class="ti ti-eye-off"></i></button>
+                    <button class="btn-del" onclick="window.hideTrip(${trip.TripID})" title="Απόκρυψη"><i class="ti ti-eye-off"></i></button>
                 </div>
             </div>
         </div>`;
@@ -352,7 +327,7 @@ function renderHiddenBanner(container) {
 window.completeTrip = async function(tripId) {
     if (window._tripHasStatus) {
         try {
-            const { error } = await window.supabase
+            const { error } = await supabase
                 .from('TRIP')
                 .update({ Status: 'completed' })
                 .eq('TripID', tripId);
@@ -429,7 +404,7 @@ window.submitFuelExpense = async function() {
     }
 
     try {
-        const { data: maxRec } = await window.supabase
+        const { data: maxRec } = await supabase
             .from('RECEIPT')
             .select('ReceiptID')
             .order('ReceiptID', { ascending: false })
@@ -437,7 +412,7 @@ window.submitFuelExpense = async function() {
             .maybeSingle();
         const nextId = (maxRec?.ReceiptID || 0) + 1;
 
-        const { error } = await window.supabase
+        const { error } = await supabase
             .from('RECEIPT')
             .insert([{
                 ReceiptID: nextId,
@@ -477,9 +452,8 @@ window.submitFault = async function() {
         const driverName = currentUser?.name || '—';
 
         let vehicleInfo = vehicleText ? ` | Όχημα: ${vehicleText}` : '';
-        // Also fetch from DB to get PlateNumber if available
         if (vehicleId) {
-            const { data: veh } = await window.supabase
+            const { data: veh } = await supabase
                 .from('VEHICLE')
                 .select('Type, PlateNumber')
                 .eq('VehicleID', vehicleId)
@@ -489,7 +463,7 @@ window.submitFault = async function() {
             }
         }
 
-        const { error } = await window.supabase
+        const { error } = await supabase
             .from('NOTIFICATION')
             .insert([{
                 TargetRole: 'both',
@@ -507,13 +481,13 @@ window.submitFault = async function() {
     }
 };
 
-function navTo(viewId) {
+window.navTo = function(viewId) {
     const targetItem = document.querySelector(`.sb-item[data-v="${viewId}"]`);
     if (targetItem) targetItem.click();
-}
+};
 
-function logout() {
+window.logout = function() {
     localStorage.removeItem('hotel_user');
     alert("Αποσυνδεθήκατε επιτυχώς!");
     window.location.href = "/pages/login.html";
-}
+};
