@@ -2875,6 +2875,8 @@ window.logout = function() {
 let allReservations = [];
 let resSortColumn = 'CheckInDate';
 let resSortDir = 'desc';
+const RES_PAGE_SIZE = 50;
+let resPage = 1;
 
 function getSortValue(res, column) {
     switch (column) {
@@ -2895,6 +2897,16 @@ window.sortReservations = function(column) {
         resSortColumn = column;
         resSortDir = 'asc';
     }
+    resPage = 1;
+    renderReservations();
+}
+
+window.goResPage = function(dir) {
+    resPage = Math.max(1, resPage + dir);
+    renderReservations();
+}
+window.filterReservations = function() {
+    resPage = 1;
     renderReservations();
 }
 
@@ -2925,6 +2937,7 @@ async function fetchReservations() {
             };
         });
 
+        resPage = 1;
         renderReservations();
     } catch (err) {
         console.error("Σφάλμα φόρτωσης κρατήσεων:", err.message);
@@ -2983,14 +2996,22 @@ function renderReservations() {
         }
     });
 
+    const totalPages = Math.ceil(filteredReservations.length / RES_PAGE_SIZE) || 1;
+    if (resPage > totalPages) resPage = totalPages;
+    const start = (resPage - 1) * RES_PAGE_SIZE;
+    const pageData = filteredReservations.slice(start, start + RES_PAGE_SIZE);
+
     tbody.innerHTML = '';
-    if (filteredReservations.length === 0) {
+    if (pageData.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν βρέθηκαν κρατήσεις.</td></tr>';
         countEl.textContent = '0 κρατήσεις';
+        document.getElementById('res-prev-btn').disabled = true;
+        document.getElementById('res-next-btn').disabled = true;
+        document.getElementById('res-page-info').textContent = 'Σελίδα 0 / 0';
         return;
     }
 
-    tbody.innerHTML = filteredReservations.map(res => {
+    tbody.innerHTML = pageData.map(res => {
         const checkIn = new Date(res.CheckInDate).toLocaleDateString('el-GR');
         const checkOut = new Date(res.CheckOutDate).toLocaleDateString('el-GR');
         let statusClass = 'p-a';
@@ -3022,7 +3043,10 @@ function renderReservations() {
         `;
     }).join('');
 
-    countEl.textContent = `${filteredReservations.length} κρατήσεις`;
+    countEl.textContent = `${filteredReservations.length} κρατήσεις (σελ. ${resPage}/${totalPages})`;
+    document.getElementById('res-prev-btn').disabled = resPage <= 1;
+    document.getElementById('res-next-btn').disabled = resPage >= totalPages;
+    document.getElementById('res-page-info').textContent = `Σελίδα ${resPage} / ${totalPages}`;
 }
 window.renderReservations = renderReservations;
 

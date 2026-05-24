@@ -334,7 +334,7 @@
       <div class="card-hd">
         <div class="card-hd-l"><i class="ti ti-calendar-event" aria-hidden="true"></i>Όλες οι Κρατήσεις</div>
         <div style="display:flex;gap:8px;">
-          <select id="res-status-filter" class="search-input" style="max-width:160px;" onchange="renderReservations()">
+          <select id="res-status-filter" class="search-input" style="max-width:160px;" onchange="filterReservations()">
             <option value="all">Όλες οι καταστάσεις</option>
             <option value="Confirmed">Επιβεβαιωμένες</option>
             <option value="CheckedIn">Check-in</option>
@@ -342,7 +342,7 @@
             <option value="Cancelled">Ακυρωμένες</option>
             <option value="Deleted">Διαγραμμένες</option>
           </select>
-          <input type="text" id="res-search" class="search-input" placeholder="Αναζήτηση πελάτη, δωματίου ή ID" oninput="renderReservations()">
+          <input type="text" id="res-search" class="search-input" placeholder="Αναζήτηση πελάτη, δωματίου ή ID" oninput="filterReservations()">
           <button class="btn btn-sm" onclick="fetchReservations()"><i class="ti ti-refresh"></i> Ανανέωση</button>
         </div>
       </div>
@@ -363,6 +363,11 @@
         </thead>
         <tbody id="reservations-body"></tbody>
       </table>
+      <div id="res-pagination" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;">
+        <button class="btn btn-sm" onclick="goResPage(-1)" id="res-prev-btn">← Προηγούμενη</button>
+        <span id="res-page-info">Σελίδα 1 / 1</span>
+        <button class="btn btn-sm" onclick="goResPage(1)" id="res-next-btn">Επόμενη →</button>
+      </div>
     </div>
   </div>
 
