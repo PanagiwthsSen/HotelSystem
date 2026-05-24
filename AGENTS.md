@@ -49,7 +49,7 @@
 | `NOTIFICATION` | NotificationID [REQUIRED], TargetRole [REQUIRED], Type [REQUIRED], Message [REQUIRED], ItemID [OPTIONAL] FK→INVENTORY_ITEM, IsRead [REQUIRED], CreatedAt [OPTIONAL] |
 | `RECEIPT` | ReceiptID [REQUIRED], ReservationID [OPTIONAL] FK→RESERVATION, PaymentDate [REQUIRED], Amount [REQUIRED], Category [OPTIONAL] |
 | `RENTED_SHOP` | ShopID [REQUIRED], TenantName [REQUIRED], MonthlyRent [REQUIRED], ShopName [OPTIONAL] |
-| `RESERVATION` | ReservationID [REQUIRED], CustomerID [REQUIRED] FK→CUSTOMER, CheckInDate [REQUIRED], CheckOutDate [REQUIRED], TotalCost [REQUIRED], Status [REQUIRED], RoomType [OPTIONAL] |
+| `RESERVATION` | ReservationID [REQUIRED], CustomerID [REQUIRED] FK→CUSTOMER, CheckInDate [REQUIRED], CheckOutDate [REQUIRED], TotalCost [REQUIRED], Status [REQUIRED], RoomType [OPTIONAL], DeletedAt [OPTIONAL], PreviousStatus [OPTIONAL] |
 | `RESERVATION_ROOM` | ReservationID [REQUIRED] FK→RESERVATION, RoomNumber [REQUIRED] FK→ROOM |
 | `ROOM` | RoomNumber [REQUIRED], RoomType [REQUIRED], BasePrice [REQUIRED], Status [REQUIRED] |
 | `SHIFT` | ShiftID [REQUIRED], EmpID [REQUIRED] FK→EMPLOYEE, Date [REQUIRED], Hours [REQUIRED] |

@@ -340,23 +340,24 @@
             <option value="CheckedIn">Check-in</option>
             <option value="CheckedOut">Check-out</option>
             <option value="Cancelled">Ακυρωμένες</option>
+            <option value="Deleted">Διαγραμμένες</option>
           </select>
           <input type="text" id="res-search" class="search-input" placeholder="Αναζήτηση πελάτη, δωματίου ή ID" oninput="renderReservations()">
           <button class="btn btn-sm" onclick="fetchReservations()"><i class="ti ti-refresh"></i> Ανανέωση</button>
         </div>
       </div>
       <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;" id="res-count"></div>
-      <table>
+      <table id="reservations-table">
         <thead>
           <tr>
-            <th style="width:5%">ID</th>
+            <th style="width:5%;cursor:pointer;" onclick="sortReservations('ReservationID')" data-sort="ReservationID">ID</th>
             <th style="width:18%">Πελάτης</th>
-            <th style="width:12%">Check-in</th>
-            <th style="width:12%">Check-out</th>
+            <th style="width:12%;cursor:pointer;" onclick="sortReservations('CheckInDate')" data-sort="CheckInDate">Check-in</th>
+            <th style="width:12%;cursor:pointer;" onclick="sortReservations('CheckOutDate')" data-sort="CheckOutDate">Check-out</th>
             <th style="width:10%">Τύπος Δωματίου</th>
-            <th style="width:8%">Δωμ.</th>
-            <th style="width:10%">Σύνολο</th>
-            <th style="width:13%">Κατάσταση</th>
+            <th style="width:8%;cursor:pointer;" onclick="sortReservations('roomNumbers')" data-sort="roomNumbers">Δωμ.</th>
+            <th style="width:10%;cursor:pointer;" onclick="sortReservations('TotalCost')" data-sort="TotalCost">Σύνολο</th>
+            <th style="width:13%;cursor:pointer;" onclick="sortReservations('Status')" data-sort="Status">Κατάσταση</th>
             <th style="width:12%">Ενέργεια</th>
           </tr>
         </thead>

@@ -345,7 +345,7 @@ async function fetchDashboardBookings() {
                     RESERVATION_ROOM (RoomNumber)
                 `)
                 .eq('CheckInDate', today)
-                .neq('Status', 'Cancelled'),
+                .not('Status', 'in', '("Cancelled","Deleted")'),
             supabase
                 .from('RESERVATION')
                 .select(`
@@ -354,7 +354,7 @@ async function fetchDashboardBookings() {
                     RESERVATION_ROOM (RoomNumber)
                 `)
                 .eq('CheckOutDate', today)
-                .not('Status', 'in', '("Cancelled","CheckedIn","CheckedOut")')
+                .not('Status', 'in', '("Cancelled","Deleted","CheckedIn","CheckedOut")')
         ]);
 
         if (arrivalsRes.error) throw arrivalsRes.error;
@@ -435,7 +435,7 @@ async function fetchAndShowBookings(type) {
                 RESERVATION_ROOM (RoomNumber)
             `)
             .eq(dateField, today)
-            .neq('Status', 'Cancelled')
+            .not('Status', 'in', '("Cancelled","Deleted")')
             .order(dateField, { ascending: true });
 
         if (error) throw error;
@@ -2873,13 +2873,37 @@ window.logout = function() {
 }
 
 let allReservations = [];
+let resSortColumn = 'CheckInDate';
+let resSortDir = 'desc';
+
+function getSortValue(res, column) {
+    switch (column) {
+        case 'ReservationID': return res.ReservationID;
+        case 'CheckInDate': return new Date(res.CheckInDate).getTime();
+        case 'CheckOutDate': return new Date(res.CheckOutDate).getTime();
+        case 'TotalCost': return Number(res.TotalCost);
+        case 'roomNumbers': return res.roomNumbers;
+        case 'Status': return res.Status;
+        default: return '';
+    }
+}
+
+window.sortReservations = function(column) {
+    if (resSortColumn === column) {
+        resSortDir = resSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        resSortColumn = column;
+        resSortDir = 'asc';
+    }
+    renderReservations();
+}
 
 async function fetchReservations() {
     try {
         const { data, error } = await supabase
             .from('RESERVATION')
             .select(`
-                ReservationID, CheckInDate, CheckOutDate, TotalCost, Status, RoomType,
+                ReservationID, CheckInDate, CheckOutDate, TotalCost, Status, RoomType, DeletedAt, PreviousStatus,
                 CUSTOMER ( FirstName, LastName ),
                 RESERVATION_ROOM ( RoomNumber )
             `)
@@ -2887,11 +2911,19 @@ async function fetchReservations() {
 
         if (error) throw error;
 
-        allReservations = data.map(res => ({
-            ...res,
-            customerName: `${res.CUSTOMER?.FirstName || ''} ${res.CUSTOMER?.LastName || ''}`.trim() || 'Άγνωστος',
-            roomNumbers: (res.RESERVATION_ROOM || []).map(rr => rr.RoomNumber).join(', ') || '—',
-        }));
+        allReservations = data.map(res => {
+            const roomData = res.RESERVATION_ROOM;
+            let rooms = '—';
+            if (roomData) {
+                const roomArr = Array.isArray(roomData) ? roomData : [roomData];
+                rooms = roomArr.map(r => r.RoomNumber).filter(Boolean).join(', ') || '—';
+            }
+            return {
+                ...res,
+                customerName: `${res.CUSTOMER?.FirstName || ''} ${res.CUSTOMER?.LastName || ''}`.trim() || 'Άγνωστος',
+                roomNumbers: rooms,
+            };
+        });
 
         renderReservations();
     } catch (err) {
@@ -2899,6 +2931,7 @@ async function fetchReservations() {
         showToast("Αποτυχία φόρτωσης κρατήσεων.", "error");
     }
 }
+window.fetchReservations = fetchReservations;
 
 function renderReservations() {
     const searchTerm = normalizeString(document.getElementById('res-search')?.value || '');
@@ -2907,15 +2940,47 @@ function renderReservations() {
     const countEl = document.getElementById('res-count');
     if (!tbody || !countEl) return;
 
+    const statusLabels = {
+        Confirmed: 'Επιβεβαιωμένη',
+        CheckedIn: 'Check-in',
+        CheckedOut: 'Check-out',
+        Cancelled: 'Ακυρωμένη',
+        Deleted: 'Διαγραμμένη',
+    };
+
     const filteredReservations = allReservations.filter(res => {
         const matchesSearch = searchTerm === '' ||
             normalizeString(res.customerName).includes(searchTerm) ||
             normalizeString(res.ReservationID.toString()).includes(searchTerm) ||
             normalizeString(res.roomNumbers).includes(searchTerm);
 
-        const matchesStatus = statusFilter === 'all' || res.Status === statusFilter;
+        let matchesStatus;
+        if (statusFilter === 'all') {
+            matchesStatus = res.Status !== 'Deleted';
+        } else {
+            matchesStatus = res.Status === statusFilter;
+        }
 
         return matchesSearch && matchesStatus;
+    });
+
+    if (resSortColumn) {
+        filteredReservations.sort((a, b) => {
+            const va = getSortValue(a, resSortColumn);
+            const vb = getSortValue(b, resSortColumn);
+            if (typeof va === 'string' && typeof vb === 'string') {
+                return resSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+            }
+            return resSortDir === 'asc' ? va - vb : vb - va;
+        });
+    }
+
+    document.querySelectorAll('#reservations-table th[data-sort]').forEach(th => {
+        const col = th.dataset.sort;
+        th.textContent = th.textContent.replace(/[▲▼]/g, '').trim();
+        if (col === resSortColumn) {
+            th.textContent = th.textContent + ' ' + (resSortDir === 'asc' ? '▲' : '▼');
+        }
     });
 
     tbody.innerHTML = '';
@@ -2933,8 +2998,14 @@ function renderReservations() {
         if (res.Status === 'CheckedIn') statusClass = 'p-g';
         if (res.Status === 'CheckedOut') statusClass = 'p-g';
         if (res.Status === 'Cancelled') statusClass = 'p-r';
+        if (res.Status === 'Deleted') statusClass = 'p-gr';
 
+        const statusLabel = statusLabels[res.Status] || res.Status;
         const totalCost = parseFloat(res.TotalCost).toFixed(2);
+
+        const actionBtn = res.Status === 'Deleted'
+            ? `<button class="btn btn-sm btn-g" onclick="restoreReservation(${res.ReservationID})"><i class="ti ti-arrow-back-up"></i></button>`
+            : `<button class="btn btn-sm btn-r" onclick="deleteReservation(${res.ReservationID})"><i class="ti ti-trash"></i></button>`;
 
         return `
             <tr>
@@ -2945,29 +3016,72 @@ function renderReservations() {
                 <td>${res.RoomType || '—'}</td>
                 <td>${res.roomNumbers}</td>
                 <td>€${totalCost}</td>
-                <td><span class="pill ${statusClass}">${res.Status}</span></td>
-                <td>
-                    <button class="btn btn-sm btn-r" onclick="deleteReservation(${res.ReservationID})"><i class="ti ti-trash"></i></button>
-                </td>
+                <td><span class="pill ${statusClass}">${statusLabel}</span></td>
+                <td>${actionBtn}</td>
             </tr>
         `;
     }).join('');
 
     countEl.textContent = `${filteredReservations.length} κρατήσεις`;
 }
+window.renderReservations = renderReservations;
 
 window.deleteReservation = async function(reservationId) {
-    if (!await window.showConfirm('Διαγραφή κράτησης; Αυτή η ενέργεια δεν αναιρείται.')) return;
+    if (!await window.showConfirm('Διαγραφή κράτησης; Η κράτηση θα διαγραφεί οριστικά μετά από 2 εβδομάδες.')) return;
     try {
+        const { data: current, error: fetchErr } = await supabase
+            .from('RESERVATION')
+            .select('Status')
+            .eq('ReservationID', reservationId)
+            .single();
+        if (fetchErr) throw fetchErr;
+
         const { error } = await supabase
             .from('RESERVATION')
-            .delete()
+            .update({ Status: 'Deleted', PreviousStatus: current.Status, DeletedAt: new Date().toISOString() })
             .eq('ReservationID', reservationId);
         if (error) throw error;
-        showToast('Η κράτηση διαγράφηκε επιτυχώς.', 'info');
+        showToast('Η κράτηση μεταφέρθηκε στον κάδο (οριστική διαγραφή σε 2 εβδομάδες).', 'info');
         fetchReservations();
     } catch (err) {
         showToast('Σφάλμα διαγραφής κράτησης: ' + err.message, 'error');
+    }
+}
+
+window.restoreReservation = async function(reservationId) {
+    if (!await window.showConfirm('Επαναφορά κράτησης; Θα αποκατασταθεί στην προηγούμενη κατάσταση.')) return;
+    try {
+        const { data: current, error: fetchErr } = await supabase
+            .from('RESERVATION')
+            .select('PreviousStatus')
+            .eq('ReservationID', reservationId)
+            .single();
+        if (fetchErr) throw fetchErr;
+
+        const previousStatus = current.PreviousStatus || 'Confirmed';
+        const { error } = await supabase
+            .from('RESERVATION')
+            .update({ Status: previousStatus, PreviousStatus: null, DeletedAt: null })
+            .eq('ReservationID', reservationId);
+        if (error) throw error;
+        showToast('Η κράτηση επαναφέρθηκε ως "' + previousStatus + '".', 'success');
+        fetchReservations();
+    } catch (err) {
+        showToast('Σφάλμα επαναφοράς κράτησης: ' + err.message, 'error');
+    }
+}
+
+async function cleanupDeletedReservations() {
+    try {
+        const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+        const { error } = await supabase
+            .from('RESERVATION')
+            .delete()
+            .eq('Status', 'Deleted')
+            .lt('DeletedAt', twoWeeksAgo);
+        if (error) throw error;
+    } catch (err) {
+        console.error("Σφάλμα εκκαθάρισης διαγραμμένων κρατήσεων:", err.message);
     }
 }
 
@@ -3315,6 +3429,7 @@ window.deleteUser = async function(empId, name) {
 // Εκκίνηση Φόρτωσης όταν ανοίγουν τα Tabs
 document.querySelectorAll('.sb-item').forEach(el => {
     el.addEventListener('click', () => {
+        if (el.dataset.v === 'reservations') { cleanupDeletedReservations(); }
         if (el.dataset.v === 'users') fetchUsers();
         if (el.dataset.v === 'staff') { fetchStaff(); fetchComplaints(); }
     });
@@ -3331,7 +3446,7 @@ appReady.then(ok => {
       if (el.dataset.v === 'revenue') setTimeout(buildRevChart, 50);
       if (el.dataset.v === 'notif-history') setTimeout(loadNotifHistory, 50);
       if (el.dataset.v === 'trips') { fetchTrips(); }
-      if (el.dataset.v === 'reservations') { fetchReservations(); }
+      if (el.dataset.v === 'reservations') { cleanupDeletedReservations(); fetchReservations(); }
     });
   });
   const logoutBtn = document.getElementById('logout-btn');
@@ -3348,6 +3463,7 @@ appReady.then(ok => {
   if (document.getElementById('inventory-body')) fetchInventory();
   if (document.getElementById('vehicles-body')) fetchVehicles();
   if (document.getElementById('rentals-body')) fetchRentals();
+  cleanupDeletedReservations();
   if (document.getElementById('payroll-body')) fetchPayroll();
   if (document.getElementById('special-pricing-rows')) loadSpecialPricing();
   if (document.getElementById('specific-room-rows')) loadRoomSpecialPrices();
