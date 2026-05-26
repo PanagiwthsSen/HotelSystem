@@ -148,6 +148,7 @@ export function isSoonCheckout(checkOutDate) {
 export function getStatusLabel(state) {
     if (state === 'free' || state === 'clean') return 'Έτοιμο για νέο πελάτη';
     if (state === 'dirty') return 'Άδειο (χωρίς καθαριότητα)';
+    if (state === 'cleaning') return 'Σε καθαρισμό';
     if (state === 'soon') return 'Προσεχώς άδειο';
     if (state === 'occ') return 'Κατειλημμένο';
     return 'Ελεύθερο';
