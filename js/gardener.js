@@ -535,6 +535,9 @@ async function fetchGardenerNotifs() {
         if (n.Type === 'supply_acknowledged') {
             icon = 'ti ti-circle-check';
             text = msg;
+        } else if (n.Type === 'fault_acknowledged') {
+            icon = 'ti ti-tool';
+            text = msg;
         } else if (msg.startsWith('{')) {
             try {
                 const ev = JSON.parse(msg);
