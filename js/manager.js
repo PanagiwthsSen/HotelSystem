@@ -505,7 +505,11 @@ async function fetchRestockNotifs() {
     let label = 'Αίτημα Ανεφοδιασμού:';
     let cls = 'ns ns-w';
 
-    if (n.Type === 'vehicle_fault') {
+    if (n.Type === 'fuel_expense') {
+      icon = 'ti ti-receipt';
+      label = 'Δαπάνη Οδηγού:';
+      cls = 'ns ns-w';
+    } else if (n.Type === 'vehicle_fault') {
       icon = 'ti ti-alert-triangle';
       label = 'Αναφορά Βλάβης:';
       cls = 'ns ns-e';

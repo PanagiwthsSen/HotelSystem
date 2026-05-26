@@ -1308,7 +1308,7 @@ async function fetchVehicles() {
         try {
             const { data: pricingNotifs } = await supabase
                 .from('NOTIFICATION')
-                .select('NotificationID, Message, CreatedAt')
+            .select('NotificationID, Message, CreatedAt, IsRead')
                 .eq('TargetRole', 'admin')
                 .eq('Type', 'pricing')
                 .eq('IsRead', false)
@@ -2598,11 +2598,63 @@ window.exportRevenueToCSV = async function() {
 document.querySelectorAll('.sb-item').forEach(el => {
     el.addEventListener('click', () => {
         if (el.dataset.v === 'revenue') {
-            // Φορτώνουμε τα δεδομένα αμέσως μόλις γίνει το κλικ
             setTimeout(fetchRevenue, 100); 
+        } else if (el.dataset.v === 'expenses') {
+            setTimeout(fetchExpenses, 100);
         }
     });
 });
+
+/* ==============================================================
+   ΕΞΟΔΑ ΟΧΗΜΑΤΩΝ — Προβολή δαπανών από οδηγούς
+   ============================================================== */
+async function fetchExpenses() {
+    const tbody = document.getElementById('expenses-tbody');
+    if (!tbody) return;
+
+    try {
+        const { data, error } = await supabase
+            .from('NOTIFICATION')
+            .select('NotificationID, Message, CreatedAt, IsRead')
+            .eq('Type', 'fuel_expense')
+            .order('CreatedAt', { ascending: false });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν καταγεγραμμένα έξοδα.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(n => {
+            const msg = n.Message || '';
+            const parts = msg.split(' | ');
+
+            // Extract amount: "Ποσό: €XX"
+            let amount = '—';
+            const amountPart = parts.find(p => p.startsWith('Ποσό:'));
+            if (amountPart) amount = amountPart.replace('Ποσό:', '').trim();
+
+            // Extract date: "Ημ/νία: YYYY-MM-DD"
+            let date = '—';
+            const datePart = parts.find(p => p.startsWith('Ημ/νία:'));
+            if (datePart) date = datePart.replace('Ημ/νία:', '').trim();
+
+            const isRead = n.IsRead;
+
+            return `<tr>
+                <td>${date}</td>
+                <td><strong>${amount}</strong></td>
+                <td style="font-size:13px;color:var(--text-secondary)">${msg}</td>
+                <td><span class="pill ${n.IsRead ? 'p-gr' : 'p-a'}">${n.IsRead ? 'Αναγνωσμένο' : 'Νέο'}</span></td>
+            </tr>`;
+        }).join('');
+
+    } catch (err) {
+        console.error("Σφάλμα φόρτωσης εξόδων:", err.message);
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:2rem;">Σφάλμα φόρτωσης: ${err.message}</td></tr>`;
+    }
+}
 
 /* ==============================================================
    ΛΕΙΤΟΥΡΓΙΑ ΑΠΟΣΥΝΔΕΣΗΣ (LOGOUT)

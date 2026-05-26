@@ -51,6 +51,7 @@
     <div class="sb-group">Οικονομικά</div>
     <div class="sb-item" data-v="rentals"><i class="ti ti-building-store" aria-hidden="true"></i>Ενοικιαζόμενα</div>
     <div class="sb-item" data-v="payroll"><i class="ti ti-cash" aria-hidden="true"></i>Μισθοδοσία</div>
+    <div class="sb-item" data-v="expenses"><i class="ti ti-receipt" aria-hidden="true"></i>Έξοδα Οχημάτων</div>
     
     <div class="sb-group">Σύστημα</div>
     <div class="sb-item" data-v="users"><i class="ti ti-lock" aria-hidden="true"></i>Χρήστες & Ρόλοι</div>
@@ -446,6 +447,27 @@
         <thead><tr><th>Υπάλληλος</th><th>Ρόλος / Τμήμα</th><th>Μηνιαίος Μισθός</th><th>IBAN Λογαριασμού</th><th>Τελ. Πληρωμή</th><th>Ενέργεια</th></tr></thead>
         <tbody id="payroll-body"></tbody>
       </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-expenses">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-receipt" aria-hidden="true"></i>Ιστορικό Εξόδων Οχημάτων</div></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:14%">Ημερομηνία</th>
+              <th style="width:14%">Ποσό</th>
+              <th style="width:58%">Λεπτομέρειες</th>
+              <th style="width:14%">Κατάσταση</th>
+            </tr>
+          </thead>
+          <tbody id="expenses-tbody">
+            <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:2rem;">Δεν υπάρχουν καταγεγραμμένα έξοδα.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
