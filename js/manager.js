@@ -505,7 +505,11 @@ async function fetchRestockNotifs() {
     let label = 'Αίτημα Ανεφοδιασμού:';
     let cls = 'ns ns-w';
 
-    if (n.Type === 'fuel_expense') {
+    if (n.Type === 'trip_completed') {
+      icon = 'ti ti-check-circle';
+      label = 'Ολοκλήρωση Διαδρομής:';
+      cls = 'ns ns-g';
+    } else if (n.Type === 'fuel_expense') {
       icon = 'ti ti-receipt';
       label = 'Δαπάνη Οδηγού:';
       cls = 'ns ns-w';

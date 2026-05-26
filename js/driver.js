@@ -129,6 +129,47 @@ async function loadDriverData() {
 }
 
 setInterval(updateLiveTime, 60000);
+setInterval(refreshTrips, 30000);
+
+async function refreshTrips() {
+    if (!currentUser) return;
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const tripSelect = window._tripHasStatus
+        ? 'TripID, VehicleID, Date, Cost, Destination, Status, CUSTOMER(FirstName, LastName, IsGroup)'
+        : 'TripID, VehicleID, Date, Cost, Destination, CUSTOMER(FirstName, LastName, IsGroup)';
+
+    const { data: trips } = await supabase
+        .from('TRIP')
+        .select(tripSelect)
+        .eq('DriverID', currentUser.id)
+        .gte('Date', dayStart.toISOString())
+        .order('Date', { ascending: false });
+
+    const { data: pastPending } = await supabase
+        .from('TRIP')
+        .select(tripSelect)
+        .eq('DriverID', currentUser.id)
+        .eq('Status', 'pending')
+        .lt('Date', dayStart.toISOString())
+        .order('Date', { ascending: false });
+
+    const allTrips = (trips || []).concat(pastPending || []);
+    const seen = new Set();
+    const merged = allTrips.filter(t => {
+        if (seen.has(t.TripID)) return false;
+        seen.add(t.TripID);
+        return true;
+    });
+    merged.sort((a, b) => new Date(b.Date) - new Date(a.Date));
+
+    const changed = JSON.stringify(merged.map(t => t.TripID + ':' + t.Status)) !==
+                    JSON.stringify(todayTrips.map(t => t.TripID + ':' + t.Status));
+    if (changed) {
+        todayTrips = merged;
+        updateOverview();
+        renderTrips();
+    }
+}
 
 function updateOverview() {
     const visible = todayTrips.filter(t => !hiddenTripIds.has(t.TripID));
@@ -335,6 +376,29 @@ window.completeTrip = async function(tripId) {
 
             const trip = todayTrips.find(t => t.TripID === tripId);
             if (trip) trip.Status = 'completed';
+
+            const driverName = currentUser?.name || 'Οδηγός';
+            const dest = trip?.Destination || '—';
+            const cost = trip?.Cost || '—';
+            const dateStr = trip?.Date ? new Date(trip.Date).toLocaleDateString('el-GR') : '—';
+
+            let vehicleInfo = '—';
+            if (trip?.VehicleID) {
+                const { data: veh } = await supabase
+                    .from('VEHICLE')
+                    .select('PlateNumber')
+                    .eq('VehicleID', trip.VehicleID)
+                    .maybeSingle();
+                if (veh) vehicleInfo = veh.PlateNumber || '—';
+            }
+
+            await supabase.from('NOTIFICATION').insert([{
+                TargetRole: 'external_manager',
+                Type: 'trip_completed',
+                Message: `${driverName} | Προορισμός: ${dest} | Κόστος: €${cost} | Όχημα: ${vehicleInfo} | Ημ/νία: ${dateStr}`,
+                IsRead: false,
+                CreatedAt: new Date().toISOString()
+            }]);
         } catch (err) {
             showToast('Σφάλμα ενημέρωσης: ' + err.message, 'error');
             return;
@@ -345,7 +409,7 @@ window.completeTrip = async function(tripId) {
     }
     updateOverview();
     renderTrips();
-    showToast('Η διαδρομή ολοκληρώθηκε! Ενημερώθηκε η Reception.', 'success');
+    showToast('Η διαδρομή ολοκληρώθηκε!', 'success');
 };
 
 window.hideTrip = function(tripId) {
