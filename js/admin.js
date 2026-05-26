@@ -3521,3 +3521,165 @@ window.saveSpecialPricing = async function() {
     }
 };
 
+/* ==============================================================
+   ΑΝΑΘΕΣΗ ΕΡΓΑΣΙΑΣ ΣΕ ΚΗΠΟΥΡΟ
+   ============================================================== */
+window.selectGardenerPreset = function(value) {
+    const input = document.getElementById('gardener-task-name');
+    if (input) {
+        input.value = value;
+        document.getElementById('gardener-task-presets')?.classList.remove('show');
+        input.focus();
+    }
+};
+
+window.toggleGardenerEvent = function() {
+    const section = document.getElementById('gardener-event-section');
+    const cb = document.getElementById('gardener-event-toggle');
+    if (!section || !cb) return;
+    section.style.display = cb.checked ? 'block' : 'none';
+    if (cb.checked) {
+        document.getElementById('gardener-event-title')?.focus();
+        if (document.querySelectorAll('#gardener-event-rows .gardener-event-row').length === 0) addGardenerEventRow();
+    }
+};
+
+const GEV_TASK_PRESETS = ['Κλάδεμα', 'Πότισμα', 'Καθαρισμός', 'Κούρεμα γκαζόν', 'Έλεγχος'];
+const GEV_LOC_PRESETS = ['Κεντρική Είσοδος', 'Χώρος Πισίνας', 'Νότιος Κήπος', 'Parking', 'Πίσω αυλή'];
+
+function showGevPopup(input, type) {
+    const popup = document.getElementById('gardener-row-popup');
+    if (!popup) return;
+    const options = type === 'location' ? GEV_LOC_PRESETS : GEV_TASK_PRESETS;
+    popup.innerHTML = options.map(o => '<div class="gardener-dropdown-item">' + o + '</div>').join('');
+    const rect = input.getBoundingClientRect();
+    popup.style.top = (rect.bottom + 2) + 'px';
+    popup.style.left = rect.left + 'px';
+    popup.style.width = Math.max(rect.width, 120) + 'px';
+    popup.style.display = 'block';
+    popup.querySelectorAll('.gardener-dropdown-item').forEach(item => {
+        item.onclick = function() {
+            input.value = this.textContent;
+            popup.style.display = 'none';
+            input.focus();
+        };
+    });
+}
+
+function hideGevPopup() {
+    const popup = document.getElementById('gardener-row-popup');
+    if (popup) popup.style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+    const popup = document.getElementById('gardener-row-popup');
+    if (popup && popup.style.display === 'block' && !popup.contains(e.target) && !e.target.closest('.gev-name, .gev-location')) {
+        popup.style.display = 'none';
+    }
+});
+
+window.addGardenerEventRow = function() {
+    const container = document.getElementById('gardener-event-rows');
+    if (!container) return;
+    const row = document.createElement('div');
+    row.className = 'gardener-event-row';
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px';
+    const nameInp = document.createElement('input');
+    nameInp.type = 'text';
+    nameInp.className = 'gev-name';
+    nameInp.placeholder = 'π.χ. Κλάδεμα';
+    nameInp.style.cssText = 'flex:1;padding:6px 8px;border:1px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-primary);color:var(--color-text-primary);outline:none';
+    nameInp.autocomplete = 'off';
+    const locInp = document.createElement('input');
+    locInp.type = 'text';
+    locInp.className = 'gev-location';
+    locInp.placeholder = 'Τοποθεσία';
+    locInp.style.cssText = 'flex:1;padding:6px 8px;border:1px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-primary);color:var(--color-text-primary);outline:none';
+    locInp.autocomplete = 'off';
+    nameInp.addEventListener('focus', function() { showGevPopup(this, 'task'); });
+    nameInp.addEventListener('blur', function() { setTimeout(hideGevPopup, 200); });
+    locInp.addEventListener('focus', function() { showGevPopup(this, 'location'); });
+    locInp.addEventListener('blur', function() { setTimeout(hideGevPopup, 200); });
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-sm';
+    delBtn.style.cssText = 'color:#E53E3E;flex-shrink:0;padding:4px 8px';
+    delBtn.innerHTML = '<i class="ti ti-trash"></i>';
+    delBtn.onclick = function() { row.remove(); };
+    row.appendChild(nameInp);
+    row.appendChild(locInp);
+    row.appendChild(delBtn);
+    container.appendChild(row);
+    nameInp.focus();
+};
+
+window.submitGardenerTask = async function() {
+    const isEvent = document.getElementById('gardener-event-toggle')?.checked || false;
+    const name = document.getElementById('gardener-task-name');
+    const loc = document.getElementById('gardener-task-location');
+    let message;
+    if (isEvent) {
+        const title = document.getElementById('gardener-event-title');
+        const date = document.getElementById('gardener-event-date');
+        const tasks = [];
+        document.querySelectorAll('#gardener-event-rows .gardener-event-row').forEach(row => {
+            const n = row.querySelector('.gev-name');
+            const l = row.querySelector('.gev-location');
+            if (n && n.value.trim()) tasks.push({ name: n.value.trim(), location: l ? l.value.trim() : '' });
+        });
+        if (!title || !title.value.trim()) { showToast('Συμπληρώστε το όνομα εκδήλωσης.', 'warning'); return; }
+        if (!date || !date.value) { showToast('Συμπληρώστε την ημερομηνία εκδήλωσης.', 'warning'); return; }
+        if (tasks.length === 0) { showToast('Προσθέστε τουλάχιστον μία εργασία εκδήλωσης.', 'warning'); return; }
+        message = JSON.stringify({ eventTitle: title.value.trim(), eventDate: date.value, tasks });
+    } else {
+        if (!name || name.value.trim() === '') { showToast('Συμπληρώστε την περιγραφή εργασίας.', 'warning'); return; }
+        message = name.value.trim() + (loc && loc.value.trim() ? '||' + loc.value.trim() : '||');
+    }
+    try {
+        const { error } = await supabase.from('NOTIFICATION').insert({
+            TargetRole: 'gardener',
+            Type: 'gardener_task',
+            Message: message,
+            IsRead: false,
+            CreatedAt: new Date().toISOString()
+        });
+        if (error) throw error;
+        if (name) name.value = '';
+        if (loc) loc.value = '';
+        if (isEvent) {
+            document.getElementById('gardener-event-toggle').checked = false;
+            document.getElementById('gardener-event-section').style.display = 'none';
+            document.getElementById('gardener-event-title').value = '';
+            document.getElementById('gardener-event-date').value = '';
+            document.getElementById('gardener-event-rows').innerHTML = '';
+        }
+        showToast('Η εργασία ανατέθηκε στον κηπουρό!', 'success');
+    } catch (err) {
+        showToast('Αποτυχία: ' + err.message, 'error');
+    }
+};
+
+// Dropdown presets for gardener task
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('gardener-task-name');
+    const dropdown = document.getElementById('gardener-task-presets');
+    if (!input || !dropdown) return;
+
+    input.addEventListener('focus', () => dropdown.classList.add('show'));
+    input.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('show'), 150));
+    const locInput = document.getElementById('gardener-task-location');
+    const locDropdown = document.getElementById('gardener-location-presets');
+    if (locInput && locDropdown) {
+        locInput.addEventListener('focus', () => locDropdown.classList.add('show'));
+        locInput.addEventListener('blur', () => setTimeout(() => locDropdown.classList.remove('show'), 150));
+    }
+});
+
+window.selectGardenerLocation = function(value) {
+    const input = document.getElementById('gardener-task-location');
+    if (input) {
+        input.value = value;
+        document.getElementById('gardener-location-presets')?.classList.remove('show');
+        input.focus();
+    }
+};
+

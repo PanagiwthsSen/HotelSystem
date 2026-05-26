@@ -1,6 +1,6 @@
 import { supabase } from './supabase-config.js';
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     setTimeout(() => {
         const loader = document.getElementById("app-loader");
         const app = document.querySelector(".app");
@@ -41,12 +41,17 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
     sortTaskRows();
+    await refreshAll();
+    setInterval(refreshAll, 30000);
+});
 
+async function refreshAll() {
+    await fetchGardenerTasks();
+    sortTaskRows();
+    cleanupGardenerPage();
     updateBadgeTasks();
-
     updateDoneCount();
-    updatePendCount();
-
+    updateUrgentTasks();
     const eventCards = document.querySelectorAll('#v-events .room-card');
     const ovCount = document.getElementById('ov-events-count');
     const ovSub = document.getElementById('ov-events-sub');
@@ -60,11 +65,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     updateOverview();
-
     document.querySelectorAll('.room-card[data-event-id]').forEach(card => {
         checkEventComplete(card.dataset.eventId);
     });
-});
+}
 
 window.navTo = function(viewId) {
     const targetItem = document.querySelector(`.sb-item[data-v="${viewId}"]`);
@@ -90,7 +94,10 @@ window.cycleTask = function(badge) {
         const row = badge.closest('.task-row');
         const eventId = row ? row.dataset.eventId : null;
         if (eventId) checkEventComplete(eventId);
+        const notifId = row ? row.dataset.notifId : null;
+        if (notifId) resolveGardenerNotif(notifId);
     }
+    updateUrgentTasks();
 }
 
 function updateDoneCount() {
@@ -99,7 +106,53 @@ function updateDoneCount() {
     const total = rows.length;
     const done = badges.length;
     const doneEl = document.getElementById('done-count');
-    if (doneEl) doneEl.textContent = done + '/' + total;
+    const totalEl = document.getElementById('total-count');
+    if (doneEl) doneEl.textContent = done;
+    if (totalEl) totalEl.textContent = total;
+}
+
+function updateUrgentTasks() {
+    const container = document.getElementById('urgent-tasks-container');
+    if (!container) return;
+    const allRows = [...document.querySelectorAll('#v-schedule-zones .task-row')];
+    const nonCompleted = allRows.filter(r => {
+        const pill = r.querySelector('.pill');
+        return pill && pill.innerText !== 'Ολοκληρώθηκε';
+    });
+
+    if (nonCompleted.length === 0) {
+        container.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary);padding:8px;text-align:center">✓ Όλες οι εργασίες ολοκληρώθηκαν!</div>';
+        return;
+    }
+
+    const shown = nonCompleted.filter(r => r.dataset.urgentShown === 'true');
+    const notShown = nonCompleted.filter(r => r.dataset.urgentShown !== 'true');
+    const slotsLeft = 4 - shown.length;
+
+    let toShow;
+    if (slotsLeft > 0 && notShown.length > 0) {
+        const newOnes = notShown.slice(0, slotsLeft);
+        newOnes.forEach(r => r.dataset.urgentShown = 'true');
+        toShow = [...shown, ...newOnes];
+    } else if (shown.length > 0) {
+        toShow = shown;
+    } else {
+        toShow = notShown.slice(0, 4);
+        toShow.forEach(r => r.dataset.urgentShown = 'true');
+    }
+
+    container.innerHTML = toShow.map(r => {
+        const title = r.querySelector('.mb-items strong');
+        const loc = r.querySelector('.mb-items');
+        const pill = r.querySelector('.pill');
+        const name = title ? title.textContent : '';
+        const location = loc ? loc.textContent.replace(name, '').trim().replace(/^\(|\)$/g, '') : '';
+        const statusClass = pill ? pill.className.replace('task-badge', '').trim() : 'p-r';
+        const statusText = pill ? pill.textContent : 'Εκκρεμεί';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">' +
+          '<div><div style="font-weight:500;font-size:12px">' + name + '</div><div style="font-size:11px;color:var(--color-text-secondary)">' + location + '</div></div>' +
+          '<span class="' + statusClass + '">' + statusText + '</span></div>';
+    }).join('');
 }
 
 window.toggleZone = function(element) {
@@ -126,17 +179,10 @@ window.toggleZone = function(element) {
         element.querySelector('i').className = 'ti ti-check';
         element.querySelector('i').style.color = '#1D9E75';
     }
-    updatePendCount();
     updateBadgeTasks();
     updateOverview();
 
     document.querySelectorAll('.room-card[data-event-id]').forEach(c => checkEventComplete(c.dataset.eventId));
-}
-
-function updatePendCount() {
-    const pendingZones = document.querySelectorAll('#v-schedule-zones .sc[data-state="pending"]').length;
-    const pendCountEl = document.getElementById('pend-count');
-    if (pendCountEl) pendCountEl.textContent = pendingZones;
 }
 
 function updateBadgeTasks() {
@@ -162,6 +208,106 @@ function updateBadgeEvents() {
     if (badge) {
         badge.textContent = incomplete;
         badge.style.display = incomplete === 0 ? 'none' : '';
+    }
+}
+
+async function fetchGardenerTasks() {
+    if (!supabase) return;
+    const taskCard = document.querySelector('#v-schedule-zones .card');
+    if (!taskCard) return;
+    const { data, error } = await supabase
+        .from('NOTIFICATION')
+        .select('NotificationID, Message, CreatedAt')
+        .eq('TargetRole', 'gardener')
+        .eq('IsRead', false)
+        .eq('Type', 'gardener_task')
+        .order('CreatedAt', { ascending: true });
+    if (error || !data) return;
+    data.forEach(n => {
+        if (document.querySelector(`.task-row[data-notif-id="${n.NotificationID}"]`)) return;
+        const msg = n.Message || '';
+        if (msg.startsWith('{')) {
+            try {
+                const ev = JSON.parse(msg);
+                if (ev.tasks && Array.isArray(ev.tasks)) {
+                    const eventId = 'notif-' + n.NotificationID;
+                    const tasksJson = JSON.stringify(ev.tasks);
+                    ev.tasks.forEach(t => {
+                        const row = document.createElement('div');
+                        row.className = 'minibar-row task-row';
+                        row.dataset.notifId = n.NotificationID;
+                        row.dataset.eventId = eventId;
+                        if (ev.eventDate) row.dataset.eventDate = ev.eventDate;
+                        row.innerHTML = '<div class="mb-items"><strong>' + (t.name || 'Εργασία') + '</strong>' + (t.location ? ' (' + t.location + ')' : '') + '</div><span class="pill p-r task-badge" onclick="cycleTask(this)" style="cursor:pointer">Εκκρεμεί</span>';
+                        taskCard.appendChild(row);
+                    });
+                    if (ev.eventTitle) {
+                        const eventList = document.querySelector('#v-events .room-list');
+                        if (eventList) {
+                            const dateStr = ev.eventDate ? new Date(ev.eventDate + 'T00:00:00').toLocaleDateString('el-GR') : '—';
+                            const card = document.createElement('div');
+                            card.className = 'room-card';
+                            card.dataset.eventId = eventId;
+                            if (ev.eventDate) card.dataset.eventDate = ev.eventDate;
+                            card.dataset.tasks = tasksJson;
+                            card.innerHTML = '<div class="room-num" style="font-size:24px"><i class="ti ti-calendar-event"></i></div>' +
+                                '<div class="room-info"><div style="font-weight:600;font-size:14px">' + ev.eventTitle + '</div>' +
+                                '<div class="room-type">Ημερομηνία: ' + dateStr + '</div>' +
+                                '<div class="room-guest" style="color:#791F1F;font-weight:500">Απαίτηση: ' + ev.tasks.map(t => t.name).join(', ') + '</div></div>';
+                            eventList.appendChild(card);
+                        }
+                    }
+                    return;
+                }
+            } catch (_) {}
+        }
+        const parts = msg.split('||');
+        const name = parts[0] || 'Εργασία';
+        const location = parts[1] || '';
+        const row = document.createElement('div');
+        row.className = 'minibar-row task-row';
+        row.dataset.notifId = n.NotificationID;
+        row.innerHTML = '<div class="mb-items"><strong>' + name + '</strong>' + (location ? ' (' + location + ')' : '') + '</div><span class="pill p-r task-badge" onclick="cycleTask(this)" style="cursor:pointer">Εκκρεμεί</span>';
+        taskCard.appendChild(row);
+    });
+}
+
+async function resolveGardenerNotif(notifId) {
+    if (!supabase || !notifId) return;
+    const siblings = document.querySelectorAll(`.task-row[data-notif-id="${notifId}"]`);
+    if (siblings.length > 0) {
+        const allDone = [...siblings].every(r => {
+            const pill = r.querySelector('.pill');
+            return pill && pill.classList.contains('p-g');
+        });
+        if (!allDone) return;
+    }
+    try {
+        await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', notifId);
+    } catch (_) {}
+}
+
+function cleanupGardenerPage() {
+    document.querySelectorAll('#v-schedule-zones .task-row:not([data-notif-id]) .pill.p-g').forEach(pill => {
+        const row = pill.closest('.task-row');
+        if (row) row.remove();
+    });
+    const today = new Date().toISOString().split('T')[0];
+    const notifIdsToRead = [];
+    document.querySelectorAll('#v-events .room-card[data-event-date]').forEach(card => {
+        if (card.dataset.eventDate < today) {
+            const eventId = card.dataset.eventId;
+            if (eventId) {
+                document.querySelectorAll(`.task-row[data-event-id="${eventId}"]`).forEach(r => {
+                    if (r.dataset.notifId) notifIdsToRead.push(r.dataset.notifId);
+                    r.remove();
+                });
+            }
+            card.remove();
+        }
+    });
+    if (supabase && notifIdsToRead.length > 0) {
+        supabase.from('NOTIFICATION').update({ IsRead: true }).in('NotificationID', notifIdsToRead).then();
     }
 }
 
