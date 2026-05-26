@@ -531,6 +531,28 @@ async function fetchRestockNotifs() {
 
 window.dismissNotif = async function(id, el) {
   try {
+    const { data: notif } = await supabase
+      .from('NOTIFICATION')
+      .select('Type, Message')
+      .eq('NotificationID', id)
+      .single();
+    if (notif && notif.Type === 'supply_request') {
+      const msg = notif.Message || '';
+      await supabase.from('NOTIFICATION').update({ IsRead: true })
+        .eq('Type', 'supply_request')
+        .eq('TargetRole', 'admin')
+        .eq('Message', msg)
+        .eq('IsRead', false);
+      const itemMatch = msg.match(/Υλικό:\s*(.+)/);
+      const itemName = itemMatch ? itemMatch[1].trim() : 'προμήθεια';
+      await supabase.from('NOTIFICATION').insert({
+        TargetRole: 'gardener',
+        Type: 'supply_acknowledged',
+        Message: 'Το αίτημα για ' + itemName + ' ελήφθη υπόψη από τον εξωτερικό διαχειριστή.',
+        IsRead: false,
+        CreatedAt: new Date().toISOString()
+      });
+    }
     await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 300);

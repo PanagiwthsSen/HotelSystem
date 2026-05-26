@@ -480,6 +480,7 @@ async function fetchSupplyRequests() {
         .select('Message, CreatedAt')
         .eq('Type', 'supply_request')
         .eq('TargetRole', 'admin')
+        .eq('IsRead', false)
         .order('CreatedAt', { ascending: false });
     if (error || !data || data.length === 0) {
         list.innerHTML = '<div style="padding:5px 0;color:var(--color-text-tertiary)">Δεν υπάρχουν αιτήματα</div>';
@@ -521,7 +522,7 @@ async function fetchGardenerNotifs() {
     if (!card || !list) return;
     const { data, error } = await supabase
         .from('NOTIFICATION')
-        .select('NotificationID, Message, CreatedAt')
+        .select('NotificationID, Type, Message, CreatedAt')
         .eq('TargetRole', 'gardener')
         .eq('IsRead', false)
         .order('CreatedAt', { ascending: false });
@@ -531,7 +532,10 @@ async function fetchGardenerNotifs() {
         const msg = n.Message || '';
         let text = msg;
         let icon = 'ti ti-bell';
-        if (msg.startsWith('{')) {
+        if (n.Type === 'supply_acknowledged') {
+            icon = 'ti ti-circle-check';
+            text = msg;
+        } else if (msg.startsWith('{')) {
             try {
                 const ev = JSON.parse(msg);
                 if (ev.eventTitle) {
