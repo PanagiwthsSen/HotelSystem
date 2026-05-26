@@ -34,7 +34,7 @@ document.querySelectorAll('.sb-item').forEach(el => {
    STATE & ROOMS FETCHING (SUPABASE)
    ============================================================== */
 let hotelRooms = [];
-let currentOcc = 0, currentFree = 0, currentDirty = 0;
+let currentOcc = 0, currentFree = 0, currentDirty = 0, currentCleaning = 0;
 let selectedRoom = null;
 let checkoutMap = {};
 
@@ -43,6 +43,7 @@ function mapDbStatusToUI(dbStatus) {
         case 'occ': return 'occ';
         case 'free': return 'free';
         case 'dirty': return 'dirty';
+        case 'cleaning': return 'cleaning';
         case 'clean': return 'free';
         default: return 'free';
     }
@@ -79,11 +80,12 @@ async function fetchRoomsAndRender() {
 }
 
 function calculateLiveStats() {
-    currentOcc = 0; currentFree = 0; currentDirty = 0;
+    currentOcc = 0; currentFree = 0; currentDirty = 0; currentCleaning = 0;
     
     hotelRooms.forEach(r => {
         if (r.state === 'occ') currentOcc++;
         else if (r.state === 'dirty') currentDirty++;
+        else if (r.state === 'cleaning') currentCleaning++;
         else currentFree++;
     });
     
@@ -110,6 +112,7 @@ function calculateLiveStats() {
         document.getElementById('stat-occ-bar').style.width = `${occPct}%`;
         document.getElementById('stat-free').textContent = currentFree;
         document.getElementById('stat-dirty').textContent = currentDirty;
+        document.getElementById('stat-cleaning').textContent = currentCleaning;
     }
 }
 

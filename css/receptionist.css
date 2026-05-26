@@ -141,6 +141,7 @@ tr:last-child td{border-bottom:none}
 .rc-dirty { background: #EAB308; color: #fff; } /* Άδειο (χωρίς καθαριότητα) - Κίτρινο */
 .rc-clean { background: #1D9E75; } /* Έτοιμο για νέο πελάτη */
 .rc-soon  { background: #F97316; color: #fff; } /* Προσεχώς άδειο - Πορτοκαλί */
+.rc-cleaning { background: #378ADD; color: #fff; } /* Σε καθαρισμό - Μπλε */
 
 .active-filter { background: #0A1628 !important; color: #fff !important; }
 

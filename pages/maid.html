@@ -34,8 +34,8 @@
   <nav class="sb-nav">
       <div class="sb-group">Κύριο</div>
     <div class="sb-item active" data-v="overview"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Επισκόπηση</div>
-    <div class="sb-item" data-v="rooms"><i class="ti ti-door" aria-hidden="true"></i>Δωμάτια Βάρδιας<span class="sb-badge" id="badge-rooms">12</span></div>
-    <div class="sb-item" data-v="minibar"><i class="ti ti-fridge" aria-hidden="true"></i>Mini-bar<span class="sb-badge" id="badge-mb">4</span></div>
+    <div class="sb-item" data-v="rooms"><i class="ti ti-door" aria-hidden="true"></i>Δωμάτια Βάρδιας<span class="sb-badge" id="badge-rooms">0</span></div>
+    <div class="sb-item" data-v="minibar"><i class="ti ti-fridge" aria-hidden="true"></i>Mini-bar<span class="sb-badge" id="badge-mb">0</span></div>
     <div class="sb-group">Ιματισμός</div>
     <div class="sb-item" data-v="linen"><i class="ti ti-shirt" aria-hidden="true"></i>Αποστολή & Παραλαβή</div>
     <div class="sb-item" data-v="stock"><i class="ti ti-package" aria-hidden="true"></i>Αποθεματικό</div>
@@ -60,9 +60,9 @@
       </div>
     </div>
     <div class="tb-r">
-      <span class="badge b-teal">Ολοκλ. <span id="done-count">3</span>/15</span>
-      <span class="badge b-gold">Εκκρεμή <span id="pend-count">12</span></span>
-      <span class="badge b-red">Mini-bar <span id="mb-count">4</span> εκκρ.</span>
+      <span class="badge b-teal">Ολοκλ. <span id="done-count">0</span>/<span id="total-count">0</span></span>
+      <span class="badge b-gold">Εκκρεμή <span id="pend-count">0</span></span>
+      <span class="badge b-red">Mini-bar <span id="mb-count">0</span> εκκρ.</span>
     </div>
   </div>
 
@@ -99,6 +99,7 @@
           <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('urgent',this)" data-filter="urgent">Επείγον (0)</button>
           <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('priority',this)" data-filter="priority">Προτεραιότ. (0)</button>
           <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('pending',this)" data-filter="pending">Εκκρεμή (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('inprogress',this)" data-filter="inprogress">Σε εξέλιξη (0)</button>
           <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('done',this)" data-filter="done">Ολοκλ. (0)</button>
         </div>
         <button class="btn btn-sm btn-dark" onclick="exportToPDF('room-list', 'GrandKavala_Maid_Schedule')"><i class="ti ti-file-download" aria-hidden="true"></i> Πρόγραμμα (PDF)</button>
@@ -111,36 +112,7 @@
     <div class="toast" id="mb-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i><span>Mini-bar καταχωρήθηκε — υποδοχή ενημερώθηκε αυτόματα!</span></div>
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-fridge" aria-hidden="true"></i>Εκκρεμείς Ελέγχοι Mini-bar</div></div>
-      <div id="mb-list">
-        <div class="minibar-row" id="mb-205">
-          <div class="mb-room">Μ-205</div>
-          <div class="mb-items">2× Νερό €2 · 1× Μπύρα €4 · 1× Σοκολάτα €2</div>
-          <div class="mb-total">€18</div>
-          <span class="pill p-r" style="margin-left:4px">Εκκρ.</span>
-          <button class="btn btn-sm btn-teal" onclick="chargeMb('mb-205','Μ-205','€18')">Καταχώρηση</button>
-        </div>
-        <div class="minibar-row" id="mb-302">
-          <div class="mb-room">Φ-302</div>
-          <div class="mb-items">3× Αναψυκτικό €1.5 · 2× Snack €2</div>
-          <div class="mb-total">€14</div>
-          <span class="pill p-r" style="margin-left:4px">Εκκρ.</span>
-          <button class="btn btn-sm btn-teal" onclick="chargeMb('mb-302','Φ-302','€14')">Καταχώρηση</button>
-        </div>
-        <div class="minibar-row" id="mb-415">
-          <div class="mb-room">Δ-415</div>
-          <div class="mb-items">1× Κρασί €10 · 1× Nuts €2</div>
-          <div class="mb-total">€22</div>
-          <span class="pill p-r" style="margin-left:4px">Εκκρ.</span>
-          <button class="btn btn-sm btn-teal" onclick="chargeMb('mb-415','Δ-415','€22')">Καταχώρηση</button>
-        </div>
-        <div class="minibar-row" id="mb-s02">
-          <div class="mb-room">S-02</div>
-          <div class="mb-items">2× Σαμπάνια €18 · 3× Χυμός €3</div>
-          <div class="mb-total">€45</div>
-          <span class="pill p-r" style="margin-left:4px">Εκκρ.</span>
-          <button class="btn btn-sm btn-teal" onclick="chargeMb('mb-s02','S-02','€45')">Καταχώρηση</button>
-        </div>
-      </div>
+      <div id="mb-list"></div>
     </div>
 
     <div class="card">
@@ -194,11 +166,11 @@
   <div class="view" id="v-report">
     <div class="toast" id="rep-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i><span>Αναφορά βάρδιας εστάλη στη διοίκηση!</span></div>
     <div class="card" id="maid-report-area">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-notes" aria-hidden="true"></i>Αναφορά Βάρδιας — 9/5/2026</div></div>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-notes" aria-hidden="true"></i>Αναφορά Βάρδιας — <span id="rpt-date"></span></div></div>
       <div class="g3" style="margin-bottom:12px">
         <div class="sc"><div class="sc-lbl">Δωμάτια ολοκλ.</div><div class="sc-val" id="rpt-done">3</div></div>
-        <div class="sc"><div class="sc-lbl">Mini-bar χρεώσεις</div><div class="sc-val">2</div></div>
-        <div class="sc"><div class="sc-lbl">Ιματισμός στάλθηκε</div><div class="sc-val">430 τεμ.</div></div>
+        <div class="sc"><div class="sc-lbl">Mini-bar χρεώσεις</div><div class="sc-val" id="rpt-mb-charges">0</div></div>
+        <div class="sc"><div class="sc-lbl">Ιματισμός στάλθηκε</div><div class="sc-val" id="rpt-linen-sent">0</div></div>
       </div>
       <div class="fg"><label>Προβλήματα / Σχόλια</label>
         <textarea id="rep-notes" placeholder="π.χ. Δωμάτιο Δ-415: λείπει ένα προσκέφαλο. Πετσέτες παρελήφθησαν 5 λιγότερες..."></textarea>

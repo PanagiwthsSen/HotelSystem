@@ -109,6 +109,32 @@ tr:last-child td{border-bottom:none}
 
 .b-gold{background:#FAEEDA;color:#633806}
 
+/* CONFIRM MODAL */
+.confirm-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10001; animation: fadeIn 0.2s ease-out;
+}
+.confirm-modal {
+  background: #fff; border-radius: 14px; width: 420px; max-width: 90vw;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.2); overflow: hidden;
+  animation: scaleIn 0.2s ease-out;
+}
+.confirm-modal .pw-head {
+  padding: 16px 18px; font-size: 14px; font-weight: 500;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.confirm-modal .pw-head i { color: #D85A30; font-size: 18px; }
+.confirm-modal .pw-close {
+  margin-left: auto; cursor: pointer; font-size: 20px; color: var(--color-text-secondary);
+}
+.confirm-modal .pw-foot {
+  padding: 12px 18px; display: flex; gap: 8px; justify-content: flex-end;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
 /* LOADING SCREEN */
 .app-loader {
   position: fixed; inset: 0; z-index: 999999;

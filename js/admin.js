@@ -446,6 +446,23 @@ async function loadPrices() {
 
         updateLivePrices();
         updateSeasonality();
+        const { data: config } = await supabase
+            .from('NOTIFICATION')
+            .select('Message')
+            .eq('Type', 'pricing_config')
+            .eq('TargetRole', 'both')
+            .order('CreatedAt', { ascending: false })
+            .limit(1);
+        if (config && config[0]) {
+            try {
+                const mults = JSON.parse(config[0].Message);
+                ['summer', 'xmas', 'easter', 'low'].forEach(s => {
+                    const el = document.getElementById('mult-' + s);
+                    if (el && mults[s]) el.value = mults[s];
+                });
+                updateSeasonality();
+            } catch (_) {}
+        }
     } catch (err) {
         console.error("Σφάλμα φόρτωσης τιμών:", err.message);
     }
@@ -478,6 +495,20 @@ window.savePrices = async function() {
             if (error) throw error;
         }
 
+        await supabase.from('NOTIFICATION').delete().eq('Type', 'pricing_config').eq('TargetRole', 'both');
+        const mults = {
+            summer: document.getElementById('mult-summer')?.value || '1.5',
+            xmas: document.getElementById('mult-xmas')?.value || '1.4',
+            easter: document.getElementById('mult-easter')?.value || '1.3',
+            low: document.getElementById('mult-low')?.value || '0.85'
+        };
+        await supabase.from('NOTIFICATION').insert({
+            TargetRole: 'both',
+            Type: 'pricing_config',
+            Message: JSON.stringify(mults),
+            IsRead: true,
+            CreatedAt: new Date().toISOString()
+        });
         showToast("Οι νέες τιμές αποθηκεύτηκαν σε όλα τα δωμάτια!", "success");
     } catch (err) {
         console.error("Σφάλμα ενημέρωσης τιμών:", err.message);
