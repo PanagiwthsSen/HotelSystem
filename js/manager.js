@@ -540,22 +540,39 @@ window.dismissNotif = async function(id, el) {
       .select('Type, Message')
       .eq('NotificationID', id)
       .single();
-    if (notif && notif.Type === 'supply_request') {
+    if (notif) {
       const msg = notif.Message || '';
-      await supabase.from('NOTIFICATION').update({ IsRead: true })
-        .eq('Type', 'supply_request')
-        .eq('TargetRole', 'admin')
-        .eq('Message', msg)
-        .eq('IsRead', false);
-      const itemMatch = msg.match(/Υλικό:\s*(.+)/);
-      const itemName = itemMatch ? itemMatch[1].trim() : 'προμήθεια';
-      await supabase.from('NOTIFICATION').insert({
-        TargetRole: 'gardener',
-        Type: 'supply_acknowledged',
-        Message: 'Το αίτημα για ' + itemName + ' ελήφθη υπόψη από τον εξωτερικό διαχειριστή.',
-        IsRead: false,
-        CreatedAt: new Date().toISOString()
-      });
+      if (notif.Type === 'supply_request') {
+        await supabase.from('NOTIFICATION').update({ IsRead: true })
+          .eq('Type', 'supply_request')
+          .eq('TargetRole', 'admin')
+          .eq('Message', msg)
+          .eq('IsRead', false);
+        const itemMatch = msg.match(/Υλικό:\s*(.+)/);
+        const itemName = itemMatch ? itemMatch[1].trim() : 'προμήθεια';
+        await supabase.from('NOTIFICATION').insert({
+          TargetRole: 'gardener',
+          Type: 'supply_acknowledged',
+          Message: 'Το αίτημα για ' + itemName + ' ελήφθη υπόψη από τον εξωτερικό διαχειριστή.',
+          IsRead: false,
+          CreatedAt: new Date().toISOString()
+        });
+      } else if (notif.Type === 'fault') {
+        await supabase.from('NOTIFICATION').update({ IsRead: true })
+          .eq('Type', 'fault')
+          .eq('TargetRole', 'admin')
+          .eq('Message', msg)
+          .eq('IsRead', false);
+        const zoneMatch = msg.match(/Ζώνη:\s*(.+)/);
+        const zoneName = zoneMatch ? zoneMatch[1].trim() : 'βλάβη';
+        await supabase.from('NOTIFICATION').insert({
+          TargetRole: 'gardener',
+          Type: 'fault_acknowledged',
+          Message: 'Η αναφορά βλάβης (' + zoneName + ') ελήφθη υπόψη από τον εξωτερικό διαχειριστή.',
+          IsRead: false,
+          CreatedAt: new Date().toISOString()
+        });
+      }
     }
     await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
     el.style.opacity = '0';
