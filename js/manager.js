@@ -459,9 +459,16 @@ window.submitTrip = async function() {
     return;
   }
 
-  await supabase.from('VEHICLE').update({ Status: 'in_use' }).eq('VehicleID', parseInt(vehicleId));
+  const { error: vehErr } = await supabase
+    .from('VEHICLE')
+    .update({ Status: 'in_use' })
+    .eq('VehicleID', parseInt(vehicleId));
 
-  showToast('Η μεταφορά καταχωρήθηκε επιτυχώς!', 'info');
+  if (vehErr) {
+    showToast('Η διαδρομή καταχωρήθηκε, αλλά υπήρξε πρόβλημα ενημέρωσης του οχήματος.', 'warning');
+  } else {
+    showToast('Η μεταφορά καταχωρήθηκε επιτυχώς!', 'success');
+  }
 
   fetchDriverSchedule();
   fetchOverview();
