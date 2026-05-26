@@ -65,6 +65,8 @@ async function refreshAll() {
         }
     }
     updateOverview();
+    await fetchGardenerNotifs();
+    await fetchSupplyRequests();
     document.querySelectorAll('.room-card[data-event-id]').forEach(card => {
         checkEventComplete(card.dataset.eventId);
     });
@@ -404,6 +406,7 @@ window.submitSupply = async function() {
         item.value = '';
         qty.value = '';
         reason.value = '';
+        fetchSupplyRequests();
     } catch (err) {
         alert('Σφάλμα κατά την αποστολή: ' + err.message);
     }
@@ -468,7 +471,101 @@ function sortTaskRows() {
     rows.forEach(row => card.appendChild(row));
 }
 
+async function fetchSupplyRequests() {
+    if (!supabase) return;
+    const list = document.getElementById('supplies-list');
+    if (!list) return;
+    const { data, error } = await supabase
+        .from('NOTIFICATION')
+        .select('Message, CreatedAt')
+        .eq('Type', 'supply_request')
+        .eq('TargetRole', 'admin')
+        .order('CreatedAt', { ascending: false });
+    if (error || !data || data.length === 0) {
+        list.innerHTML = '<div style="padding:5px 0;color:var(--color-text-tertiary)">Δεν υπάρχουν αιτήματα</div>';
+        return;
+    }
+    const seen = new Set();
+    const rows = [];
+    data.forEach(n => {
+        const msg = n.Message || '';
+        const itemMatch = msg.match(/Υλικό:\s*(.+)/);
+        const qtyMatch = msg.match(/Ποσότητα:\s*(.+)/);
+        const name = itemMatch ? itemMatch[1].trim() : '';
+        const qty = qtyMatch ? qtyMatch[1].trim() : '';
+        if (name && !seen.has(name)) {
+            seen.add(name);
+            rows.push({ name, qty, time: n.CreatedAt });
+        }
+    });
+    list.innerHTML = rows.map((r, i) => {
+        const border = i < rows.length - 1 ? 'border-bottom:0.5px solid var(--color-border-tertiary)' : '';
+        return '<div style="display:flex;justify-content:space-between;padding:5px 0;' + border + '">' +
+            '<span style="color:var(--color-text-secondary)">' + r.name + '</span>' +
+            '<span style="font-weight:500;color:#EF9F27">' + r.qty + '</span></div>';
+    }).join('');
+}
+
 window.logout = function() {
     localStorage.removeItem('hotel_user');
     window.location.href = "/pages/login.html";
+};
+
+/* ==============================================================
+   NOTIFICATIONS (από admin/manager)
+   ============================================================== */
+async function fetchGardenerNotifs() {
+    if (!supabase) return;
+    const card = document.getElementById('gardener-notif-card');
+    const list = document.getElementById('gardener-notif-list');
+    if (!card || !list) return;
+    const { data, error } = await supabase
+        .from('NOTIFICATION')
+        .select('NotificationID, Message, CreatedAt')
+        .eq('TargetRole', 'gardener')
+        .eq('IsRead', false)
+        .order('CreatedAt', { ascending: false });
+    if (error || !data || data.length === 0) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    list.innerHTML = data.map(n => {
+        const msg = n.Message || '';
+        let text = msg;
+        let icon = 'ti ti-bell';
+        if (msg.startsWith('{')) {
+            try {
+                const ev = JSON.parse(msg);
+                if (ev.eventTitle) {
+                    const taskList = ev.tasks ? ev.tasks.map(t => t.name).join(', ') : '';
+                    text = '<strong>' + ev.eventTitle + '</strong> (' + (ev.eventDate || '—') + ')<br><span style="font-size:11px;color:var(--color-text-secondary)">' + taskList + '</span>';
+                    icon = 'ti ti-calendar-event';
+                } else if (ev.tasks) {
+                    text = '<strong>Εργασίες:</strong> ' + ev.tasks.map(t => t.name + (t.location ? ' (' + t.location + ')' : '')).join(', ');
+                    icon = 'ti ti-calendar-event';
+                }
+            } catch (_) {}
+        } else {
+            const parts = msg.split('||');
+            if (parts[0]) text = '<strong>' + parts[0] + '</strong>' + (parts[1] ? ' — ' + parts[1] : '');
+        }
+        const time = n.CreatedAt
+            ? new Date(n.CreatedAt).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })
+            : '';
+        return '<div class="ns ns-w" style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:default">' +
+            '<i class="' + icon + '" style="flex-shrink:0"></i>' +
+            '<div style="flex:1;font-size:12px;line-height:1.4">' + text + '</div>' +
+            '<span style="font-size:10px;color:var(--color-text-tertiary);flex-shrink:0">' + time + '</span>' +
+            '<i class="ti ti-circle-check" style="cursor:pointer;color:#1D9E75;flex-shrink:0;font-size:18px" onclick="dismissGardenerNotif(' + n.NotificationID + ', this)" title="Ολοκλήρωση"></i></div>';
+    }).join('');
+}
+
+window.dismissGardenerNotif = async function(id, el) {
+    if (!supabase) return;
+    try {
+        await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
+        const row = el.closest('.ns');
+        if (row) row.remove();
+        const list = document.getElementById('gardener-notif-list');
+        const card = document.getElementById('gardener-notif-card');
+        if (list && card && list.children.length === 0) card.style.display = 'none';
+    } catch (_) {}
 };

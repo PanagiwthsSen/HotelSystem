@@ -67,8 +67,11 @@
       <div class="sc"><div class="sc-lbl">Εκδηλώσεις</div><div class="sc-val" style="color:#378ADD" id="ov-events-count">1</div><div class="sc-sub" id="ov-events-sub">Στον Κεντρικό Κήπο</div></div>
     </div>
 
-    <div class="ns ns-w"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>Συντήρηση Πισίνας:</strong> Ο καθαρισμός εξωτερικού χώρου πισίνας πρέπει να τελειώσει πριν τις 10:00.</div></div>
-    <div class="ns ns-ok"><i class="ti ti-circle-check" aria-hidden="true"></i><div><strong>Πότισμα (Ανατολική Πτέρυγα):</strong> Το αυτόματο πότισμα ολοκληρώθηκε επιτυχώς στις 06:00.</div></div>
+    <div class="card" id="gardener-notif-card" style="display:none;margin-bottom:12px">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-bell"></i>Νέες Αναθέσεις</div></div>
+      <div id="gardener-notif-list"></div>
+    </div>
+
 
     <div class="g2">
       <div class="card">
@@ -77,11 +80,7 @@
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-hd-l"><i class="ti ti-seeding" aria-hidden="true"></i>Αποθέματα σε έλλειψη</div><button class="btn btn-sm" onclick="navTo('supplies')">Αίτημα →</button></div>
-        <div style="font-size:12px">
-          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><span style="color:var(--color-text-secondary)">Λίπασμα Τριανταφυλλιάς</span><span style="font-weight:500;color:#EF9F27">Μόνο 2kg</span></div>
-          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)"><span style="color:var(--color-text-secondary)">Ανταλλακτικά Μπεκ</span><span style="font-weight:500;color:#E24B4A">Καθόλου</span></div>
-          <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--color-text-secondary)">Χώμα (Σακιά)</span><span style="font-weight:500">4 τεμ. (ΟΚ)</span></div>
-        </div>
+        <div id="supplies-list" style="font-size:12px"></div>
       </div>
     </div>
   </div>
