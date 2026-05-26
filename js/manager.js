@@ -1,7 +1,7 @@
 import { supabase } from './supabase-config.js';
 import { showToast } from './utils/ui.js';
 
-const vT={overview:'Πίνακας Ελέγχου',fleet:'Στόλος Οχημάτων',schedule:'Πρόγραμμα Οδηγών','new-trip':'Νέα Μεταφορά','trip-logs':'Αρχείο Μεταφορών',payroll:'Κόστη & Πληρωμές Οδηγών',inventory:'Υλικά & Ελλείψεις'};
+const vT={overview:'Πίνακας Ελέγχου',fleet:'Στόλος Οχημάτων',schedule:'Πρόγραμμα Οδηγών','new-trip':'Νέα Μεταφορά','trip-logs':'Αρχείο Μεταφορών',payroll:'Κόστη & Πληρωμές Οδηγών',inventory:'Υλικά & Ελλείψεις',gardener:'Ανάθεση σε Κηπουρό',pricing:'Τιμολόγηση Δωματίων',hr:'Κατάσταση Προσωπικού',rents:'Ενοίκια & Νομικά'};
 window.navTo = function(id){
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.toggle('active',i.dataset.v===id));
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='v-'+id));
@@ -26,55 +26,149 @@ async function fetchOverview() {
   const dayEnd = new Date();
   dayEnd.setHours(24, 0, 0, 0);
 
-  const { data: drivers } = await supabase
-    .from('EMPLOYEE')
-    .select('EmpID')
-    .eq('Role', 'driver')
-    .eq('isActive', true);
+  // External manager (fleet/drivers) — guard with element existence
+  const driverEl = document.getElementById('driver-availability');
+  if (driverEl) {
+    const { data: drivers } = await supabase
+      .from('EMPLOYEE')
+      .select('EmpID')
+      .eq('Role', 'driver')
+      .eq('isActive', true);
 
-  const totalDrivers = drivers ? drivers.length : 0;
+    const totalDrivers = drivers ? drivers.length : 0;
 
-  const { data: tripsToday } = await supabase
-    .from('TRIP')
-    .select('TripID, DriverID, Status')
-    .gte('Date', dayStart.toISOString())
-    .lt('Date', dayEnd.toISOString());
+    const { data: tripsToday } = await supabase
+      .from('TRIP')
+      .select('TripID, DriverID, Status')
+      .gte('Date', dayStart.toISOString())
+      .lt('Date', dayEnd.toISOString());
 
-  const activeTrips = (tripsToday || []).filter(t => t.Status !== 'completed');
-  const busyDrivers = activeTrips.length > 0 ? new Set(activeTrips.map(t => t.DriverID)).size : 0;
-  const available = totalDrivers - busyDrivers;
+    const activeTrips = (tripsToday || []).filter(t => t.Status !== 'completed');
+    const busyDrivers = activeTrips.length > 0 ? new Set(activeTrips.map(t => t.DriverID)).size : 0;
+    const available = totalDrivers - busyDrivers;
 
-  document.getElementById('driver-availability').textContent = available + '/' + totalDrivers;
-  document.getElementById('driver-status').textContent = busyDrivers + ' σε μεταφορά';
+    driverEl.textContent = available + '/' + totalDrivers;
+    const ds = document.getElementById('driver-status');
+    if (ds) ds.textContent = busyDrivers + ' σε μεταφορά';
 
-  const { data: vehicles } = await supabase
-    .from('VEHICLE')
-    .select('Status');
+    document.getElementById('trips-today').textContent = tripsToday ? tripsToday.length : '0';
+    document.getElementById('trips-details').textContent = 'Πελάτες & Προϊόντα';
+  }
 
-  let free = 0, inUse = 0, maintenance = 0;
-  (vehicles || []).forEach(v => {
-    if (v.Status === 'available') free++;
-    else if (v.Status === 'in_use') inUse++;
-    else if (v.Status === 'maintenance') maintenance++;
-  });
+  const vehEl = document.getElementById('fleet-status');
+  if (vehEl) {
+    const { data: vehicles } = await supabase
+      .from('VEHICLE')
+      .select('Status');
 
-  document.getElementById('fleet-status').textContent = free + ' διαθέσιμα';
-  document.getElementById('fleet-maintenance').textContent = maintenance + ' οχήματα σε Service';
+    let free = 0, inUse = 0, maintenance = 0;
+    (vehicles || []).forEach(v => {
+      if (v.Status === 'available') free++;
+      else if (v.Status === 'in_use') inUse++;
+      else if (v.Status === 'maintenance') maintenance++;
+    });
 
-  const { data: items } = await supabase
-    .from('INVENTORY_ITEM')
-    .select('*');
+    vehEl.textContent = free + ' διαθέσιμα';
+    document.getElementById('fleet-maintenance').textContent = maintenance + ' οχήματα σε Service';
+  }
 
-  const shortages = (items || []).filter(i => i.Quantity < i.MinThreshold);
-  document.getElementById('material-shortages').textContent = shortages.length + ' Είδη';
-  document.getElementById('material-order').textContent = shortages.length > 0 ? 'Απαιτείται Παραγγελία' : 'Επαρκές απόθεμα';
+  const matEl = document.getElementById('material-shortages');
+  if (matEl) {
+    const { data: items } = await supabase
+      .from('INVENTORY_ITEM')
+      .select('*');
 
-  document.getElementById('trips-today').textContent = tripsToday ? tripsToday.length : '0';
-  document.getElementById('trips-details').textContent = 'Πελάτες & Προϊόντα';
+    const shortages = (items || []).filter(i => i.Quantity < i.MinThreshold);
+    matEl.textContent = shortages.length + ' Είδη';
+    document.getElementById('material-order').textContent = shortages.length > 0 ? 'Απαιτείται Παραγγελία' : 'Επαρκές απόθεμα';
+  }
+
+  // Internal manager (rooms/staff) — guard with element existence
+  const occEl = document.getElementById('stat-occupancy');
+  if (occEl) {
+    const { count: totalRooms } = await supabase
+      .from('ROOM')
+      .select('*', { count: 'exact', head: true });
+
+    const today = new Date().toISOString().split('T')[0];
+    const { count: occupiedRooms } = await supabase
+      .from('RESERVATION')
+      .select('*', { count: 'exact', head: true })
+      .lte('CheckInDate', today)
+      .gte('CheckOutDate', today)
+      .neq('Status', 'cancelled');
+
+    const occPct = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+    occEl.textContent = occPct + '%';
+    occEl.style.color = occPct < 60 ? '#D85A30' : '#1D9E75';
+    const occSub = document.getElementById('stat-occupancy-sub');
+    if (occSub) occSub.textContent = occPct < 60 ? 'Κάτω από το όριο (60%)' : 'Εντός ορίου';
+
+    let zPctOverview = 10;
+    const { data: cfgData } = await supabase
+      .from('NOTIFICATION')
+      .select('Message')
+      .eq('Type', 'pricing_config')
+      .eq('TargetRole', 'both')
+      .order('CreatedAt', { ascending: false })
+      .limit(1);
+    if (cfgData && cfgData[0]) {
+      try { const m = JSON.parse(cfgData[0].Message); if (m.low) zPctOverview = Math.round((1 - parseFloat(m.low)) * 100); } catch (_) {}
+    }
+    const discountEl = document.getElementById('stat-discount');
+    const discountSub = document.getElementById('stat-discount-sub');
+    const badge = document.getElementById('discount-badge');
+    if (discountEl) {
+      if (occPct < 60) {
+        discountEl.textContent = 'Ενεργοποιήθηκε';
+        discountEl.style.color = '#1D9E75';
+        if (discountSub) discountSub.textContent = 'Αυτόματη προσαρμογή -' + zPctOverview + '%';
+        if (badge) badge.textContent = 'Ενεργή Έκπτωση -' + zPctOverview + '% (<60%)';
+      } else {
+        discountEl.textContent = 'Απενεργοποιημένο';
+        discountEl.style.color = '#888';
+        if (discountSub) discountSub.textContent = 'Πληρότητα > 60%';
+        if (badge) badge.textContent = 'Έκπτωση Ανενεργή';
+      }
+    }
+
+    const availEl = document.getElementById('stat-available');
+    if (availEl) {
+      const available = totalRooms - occupiedRooms;
+      availEl.textContent = available;
+      const availSub = document.getElementById('stat-available-sub');
+      if (availSub) availSub.textContent = 'Από τα ' + totalRooms + ' συνολικά';
+    }
+
+    const { count: activeStaff } = await supabase
+      .from('EMPLOYEE')
+      .select('*', { count: 'exact', head: true })
+      .eq('isActive', true);
+
+    const staffEl = document.getElementById('stat-staff');
+    if (staffEl) {
+      staffEl.textContent = activeStaff;
+      const staffSub = document.getElementById('stat-staff-sub');
+      if (staffSub) staffSub.textContent = 'Ενεργοί υπάλληλοι';
+    }
+  }
 
   const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   const dateStr = new Date().toLocaleDateString('el-GR', opts);
-  document.getElementById('tb-meta').textContent = dateStr + ' · Ενεργά Οχήματα: ' + (vehicles ? vehicles.length : 0);
+  const metaEl = document.getElementById('tb-meta');
+  if (metaEl) {
+    if (driverEl) {
+      const { count: vCount } = await supabase
+        .from('VEHICLE')
+        .select('*', { count: 'exact', head: true });
+      metaEl.textContent = dateStr + ' · Ενεργά Οχήματα: ' + (vCount || 0);
+    } else if (occEl) {
+      const { count: totalRooms } = await supabase
+        .from('ROOM')
+        .select('*', { count: 'exact', head: true });
+      metaEl.textContent = dateStr + ' · Πληρότητα: ' + occEl.textContent + ' · Σύνολο Δωματίων: ' + totalRooms;
+    }
+  }
 }
 
 /* ==============================================================
@@ -505,7 +599,11 @@ async function fetchRestockNotifs() {
     let label = 'Αίτημα Ανεφοδιασμού:';
     let cls = 'ns ns-w';
 
-    if (n.Type === 'vehicle_fault') {
+    if (n.Type === 'fuel_expense') {
+      icon = 'ti ti-receipt';
+      label = 'Δαπάνη Οδηγού:';
+      cls = 'ns ns-w';
+    } else if (n.Type === 'vehicle_fault') {
       icon = 'ti ti-alert-triangle';
       label = 'Αναφορά Βλάβης:';
       cls = 'ns ns-e';
@@ -531,12 +629,215 @@ async function fetchRestockNotifs() {
 
 window.dismissNotif = async function(id, el) {
   try {
+    const { data: notif } = await supabase
+      .from('NOTIFICATION')
+      .select('Type, Message')
+      .eq('NotificationID', id)
+      .single();
+    if (notif) {
+      const msg = notif.Message || '';
+      if (notif.Type === 'supply_request') {
+        await supabase.from('NOTIFICATION').update({ IsRead: true })
+          .eq('Type', 'supply_request')
+          .eq('TargetRole', 'admin')
+          .eq('Message', msg)
+          .eq('IsRead', false);
+        const itemMatch = msg.match(/Υλικό:\s*(.+)/);
+        const itemName = itemMatch ? itemMatch[1].trim() : 'προμήθεια';
+        await supabase.from('NOTIFICATION').insert({
+          TargetRole: 'gardener',
+          Type: 'supply_acknowledged',
+          Message: 'Το αίτημα για ' + itemName + ' ελήφθη υπόψη από τον εξωτερικό διαχειριστή.',
+          IsRead: false,
+          CreatedAt: new Date().toISOString()
+        });
+      } else if (notif.Type === 'fault') {
+        await supabase.from('NOTIFICATION').update({ IsRead: true })
+          .eq('Type', 'fault')
+          .eq('TargetRole', 'admin')
+          .eq('Message', msg)
+          .eq('IsRead', false);
+        const zoneMatch = msg.match(/Ζώνη:\s*(.+)/);
+        const zoneName = zoneMatch ? zoneMatch[1].trim() : 'βλάβη';
+        await supabase.from('NOTIFICATION').insert({
+          TargetRole: 'gardener',
+          Type: 'fault_acknowledged',
+          Message: 'Η αναφορά βλάβης (' + zoneName + ') ελήφθη υπόψη από τον εξωτερικό διαχειριστή.',
+          IsRead: false,
+          CreatedAt: new Date().toISOString()
+        });
+      }
+    }
     await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 300);
     showToast('Η ειδοποίηση απορρίφθηκε.', 'info');
   } catch (err) {
     showToast('Σφάλμα απόρριψης.', 'error');
+  }
+};
+
+/* ==============================================================
+   INTERNAL MANAGER — ΣΥΝΔΕΣΗ ΜΕ SUPABASE
+   ============================================================== */
+async function fetchPricing() {
+  const tbody = document.getElementById('pricing-table-body');
+  if (!tbody) return;
+  const { data: rooms } = await supabase
+    .from('ROOM')
+    .select('RoomType, BasePrice');
+  if (!rooms) return;
+  let multSummer = 1.5, multLow = 0.85;
+  const { data: config } = await supabase
+    .from('NOTIFICATION')
+    .select('Message')
+    .eq('Type', 'pricing_config')
+    .eq('TargetRole', 'both')
+    .order('CreatedAt', { ascending: false })
+    .limit(1);
+  if (config && config[0]) {
+    try {
+      const m = JSON.parse(config[0].Message);
+      if (m.summer) multSummer = parseFloat(m.summer);
+      if (m.low) multLow = parseFloat(m.low);
+    } catch (_) {}
+  }
+  const grouped = {};
+  rooms.forEach(r => {
+    const t = r.RoomType || 'Άλλο';
+    if (!grouped[t]) grouped[t] = { count: 0, prices: [] };
+    grouped[t].count++;
+    grouped[t].prices.push(Number(r.BasePrice) || 0);
+  });
+  const typeMap = {
+    'double': 'Δίκλινα', 'queen': 'Φαρδύκλινα', 'single': 'Μονόκλινα', 'suite': 'Σουίτες',
+    'twin': 'Δίκλινα', 'king': 'Φαρδύκλινα', 'standard': 'Μονόκλινα'
+  };
+  const rows = ['double', 'queen', 'single', 'suite'].map(key => {
+    const g = grouped[key];
+    const grName = typeMap[key] || key;
+    if (!g) return '<tr style="border-bottom:1px solid var(--color-border-tertiary)"><td style="padding:8px;font-weight:500">' + grName + '</td><td style="padding:8px">0</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px;font-weight:bold">—</td></tr>';
+    const baseMin = Math.min(...g.prices);
+    const baseMax = Math.max(...g.prices);
+    const baseStr = baseMin === baseMax ? baseMin + '€' : baseMin + '€ – ' + baseMax + '€';
+    const highSeason = Math.round(baseMax * multSummer) + '€';
+    const zPct = Math.round((1 - multLow) * 100);
+    const zPrice = Math.round(baseMin * multLow) + '€';
+    return '<tr style="border-bottom:1px solid var(--color-border-tertiary)">'
+      + '<td style="padding:8px;font-weight:500">' + grName + '</td>'
+      + '<td style="padding:8px">' + g.count + '</td>'
+      + '<td style="padding:8px">' + baseStr + '</td>'
+      + '<td style="padding:8px">' + highSeason + '</td>'
+      + '<td style="padding:8px;font-weight:bold">' + zPrice + '</td></tr>';
+  }).join('');
+  tbody.innerHTML = rows;
+  const zHeader = document.getElementById('pricing-z-header');
+  const zCol = document.getElementById('pricing-z-col');
+  const zLabel = '*' + (zPct >= 0 ? 'Μείωση ' + zPct + '%' : 'Αύξηση ' + Math.abs(zPct) + '%') + ' (Πληρότητα < 60%)';
+  if (zHeader) zHeader.textContent = zLabel;
+  if (zCol) zCol.textContent = 'Τελική με -' + zPct + '%';
+}
+
+async function fetchHR() {
+  const tbody = document.getElementById('hr-table-body');
+  if (!tbody) return;
+  const { data: employees } = await supabase
+    .from('EMPLOYEE')
+    .select('FirstName, LastName, Role, Leaves, LastPaymentDate, isActive, EmpID')
+    .order('LastName');
+  if (!employees) return;
+  const { data: shifts } = await supabase
+    .from('SHIFT')
+    .select('EmpID, Hours, Date');
+  const shiftMap = {};
+  (shifts || []).forEach(s => {
+    if (!shiftMap[s.EmpID]) shiftMap[s.EmpID] = [];
+    shiftMap[s.EmpID].push(s);
+  });
+  const rows = employees.map(e => {
+    const name = (e.FirstName || '') + ' ' + (e.LastName || '');
+    const empShifts = shiftMap[e.EmpID] || [];
+    const latestShift = empShifts.sort((a, b) => new Date(b.Date) - new Date(a.Date))[0];
+    const shiftStr = latestShift ? latestShift.Hours + ' ώρες' : (e.isActive ? '—' : '<span class="pill p-a">Σε Άδεια</span>');
+    const leaves = e.Leaves != null ? e.Leaves + ' ημ. Υπόλοιπο' : '—';
+    const paid = e.LastPaymentDate ? '<span style="font-weight:bold;color:#1D9E75">Εκκαθαρίστηκε</span>' : '<span style="font-weight:bold;color:#D85A30">Εκκρεμεί</span>';
+    return '<tr style="border-bottom:1px solid var(--color-border-tertiary)">'
+      + '<td style="padding:8px;font-weight:500">' + (name.trim() || e.EmpID) + '</td>'
+      + '<td style="padding:8px">' + (e.Role || '—') + '</td>'
+      + '<td style="padding:8px">' + shiftStr + '</td>'
+      + '<td style="padding:8px">' + leaves + '</td>'
+      + '<td style="padding:8px">' + paid + '</td></tr>';
+  }).join('');
+  tbody.innerHTML = rows || '<tr><td style="padding:8px;color:var(--color-text-tertiary)" colspan="5">Δεν υπάρχουν υπάλληλοι</td></tr>';
+}
+
+async function fetchRents() {
+  const list = document.getElementById('rents-list');
+  if (!list) return;
+  const { data: shops } = await supabase
+    .from('RENTED_SHOP')
+    .select('ShopID, ShopName, TenantName, MonthlyRent');
+  if (!shops || shops.length === 0) {
+    list.innerHTML = '<div style="padding:12px;color:var(--color-text-tertiary);font-size:13px">Δεν υπάρχουν καταστήματα</div>';
+    return;
+  }
+  const { data: payments } = await supabase
+    .from('LEASE_PAYMENT')
+    .select('ShopID, Amount, IsDelayed, PaymentID');
+  const paymentMap = {};
+  (payments || []).forEach(p => {
+    if (!paymentMap[p.ShopID]) paymentMap[p.ShopID] = [];
+    paymentMap[p.ShopID].push(p);
+  });
+  let hasDelayed = false;
+  const cards = shops.map(s => {
+    const shopPayments = paymentMap[s.ShopID] || [];
+    const hasDelayedPayment = shopPayments.some(p => p.IsDelayed);
+    if (hasDelayedPayment) hasDelayed = true;
+    const lastPay = shopPayments.sort((a, b) => b.PaymentID - a.PaymentID)[0];
+    const status = hasDelayedPayment ? 'Καθυστέρηση πληρωμής' : (lastPay ? 'Πληρώθηκε' : 'Αναμονή');
+    const urgency = hasDelayedPayment ? 'urgent' : '';
+    const pilClass = hasDelayedPayment ? 'p-r' : 'p-g';
+    const name = (s.ShopName || 'Κατάστημα ' + s.ShopID) + (s.TenantName ? ' (' + s.TenantName + ')' : '');
+    return '<div class="room-card' + (urgency ? ' ' + urgency : '') + '">'
+      + '<div class="room-info"><div style="font-weight:600;font-size:14px">' + name + '</div>'
+      + '<div class="room-type">Ενοίκιο: ' + status + (lastPay ? ' (' + (lastPay.Amount || '—') + '€)' : '') + '</div>'
+      + (hasDelayedPayment ? '<div class="room-guest" style="color:#791F1F">Καθυστέρηση πληρωμής ενοικίου</div>' : '')
+      + '</div>'
+      + '<span class="pill ' + pilClass + '">' + (hasDelayedPayment ? 'Καθυστέρηση' : 'ΟΚ') + '</span>'
+      + (hasDelayedPayment ? '<button class="btn btn-dark" onclick="resolveDelayedPayment(' + s.ShopID + ')">Ειδοποίηση Δικηγόρου</button>' : '')
+      + '</div>';
+  }).join('');
+  list.innerHTML = cards;
+  const delCountEl = document.querySelector('.sb-item[data-v="rents"] .sb-badge');
+  if (delCountEl) {
+    delCountEl.textContent = hasDelayed ? '1' : '0';
+    delCountEl.style.display = hasDelayed ? '' : 'none';
+  }
+  const legalNotice = document.getElementById('legal-notice');
+  const legalText = document.getElementById('legal-notice-text');
+  if (legalNotice && legalText) {
+    if (hasDelayed) {
+      legalNotice.style.display = '';
+      legalText.textContent = 'Καθυστέρηση πληρωμής από Μισθωτή Καταστήματος. Απαιτείται ειδοποίηση δικηγόρου.';
+    } else {
+      legalNotice.style.display = 'none';
+    }
+  }
+}
+
+window.resolveDelayedPayment = async function(shopId) {
+  if (!supabase) return;
+  try {
+    await supabase
+      .from('LEASE_PAYMENT')
+      .update({ IsDelayed: false })
+      .eq('ShopID', shopId)
+      .eq('IsDelayed', true);
+    showToast('legal-toast');
+    fetchRents();
+  } catch (err) {
+    showToast('Σφάλμα ενημέρωσης: ' + err.message, 'error');
   }
 };
 
@@ -574,6 +875,171 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchPayroll();
   fetchTripFormData();
   fetchTripLogs();
+  fetchPricing();
+  fetchHR();
+  fetchRents();
   fetchRestockNotifs();
   setInterval(fetchRestockNotifs, 30000);
 });
+
+/* ==============================================================
+   ΑΝΑΘΕΣΗ ΕΡΓΑΣΙΑΣ ΣΕ ΚΗΠΟΥΡΟ
+   ============================================================== */
+window.selectGardenerPreset = function(value) {
+    const input = document.getElementById('gardener-task-name');
+    if (input) {
+        input.value = value;
+        document.getElementById('gardener-task-presets')?.classList.remove('show');
+        input.focus();
+    }
+};
+
+window.toggleGardenerEvent = function() {
+    const section = document.getElementById('gardener-event-section');
+    const cb = document.getElementById('gardener-event-toggle');
+    if (!section || !cb) return;
+    section.style.display = cb.checked ? 'block' : 'none';
+    if (cb.checked) {
+        document.getElementById('gardener-event-title')?.focus();
+        if (document.querySelectorAll('#gardener-event-rows .gardener-event-row').length === 0) addGardenerEventRow();
+    }
+};
+
+const GEV_TASK_PRESETS = ['Κλάδεμα', 'Πότισμα', 'Καθαρισμός', 'Κούρεμα γκαζόν', 'Έλεγχος'];
+const GEV_LOC_PRESETS = ['Κεντρική Είσοδος', 'Χώρος Πισίνας', 'Νότιος Κήπος', 'Parking', 'Πίσω αυλή'];
+
+function showGevPopup(input, type) {
+    const popup = document.getElementById('gardener-row-popup');
+    if (!popup) return;
+    const options = type === 'location' ? GEV_LOC_PRESETS : GEV_TASK_PRESETS;
+    popup.innerHTML = options.map(o => '<div class="gardener-dropdown-item">' + o + '</div>').join('');
+    const rect = input.getBoundingClientRect();
+    popup.style.top = (rect.bottom + 2) + 'px';
+    popup.style.left = rect.left + 'px';
+    popup.style.width = Math.max(rect.width, 120) + 'px';
+    popup.style.display = 'block';
+    popup.querySelectorAll('.gardener-dropdown-item').forEach(item => {
+        item.onclick = function() {
+            input.value = this.textContent;
+            popup.style.display = 'none';
+            input.focus();
+        };
+    });
+}
+
+function hideGevPopup() {
+    const popup = document.getElementById('gardener-row-popup');
+    if (popup) popup.style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+    const popup = document.getElementById('gardener-row-popup');
+    if (popup && popup.style.display === 'block' && !popup.contains(e.target) && !e.target.closest('.gev-name, .gev-location')) {
+        popup.style.display = 'none';
+    }
+});
+
+window.addGardenerEventRow = function() {
+    const container = document.getElementById('gardener-event-rows');
+    if (!container) return;
+    const row = document.createElement('div');
+    row.className = 'gardener-event-row';
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px';
+    const nameInp = document.createElement('input');
+    nameInp.type = 'text';
+    nameInp.className = 'gev-name';
+    nameInp.placeholder = 'π.χ. Κλάδεμα';
+    nameInp.style.cssText = 'flex:1;padding:6px 8px;border:1px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-primary);color:var(--color-text-primary);outline:none';
+    nameInp.autocomplete = 'off';
+    const locInp = document.createElement('input');
+    locInp.type = 'text';
+    locInp.className = 'gev-location';
+    locInp.placeholder = 'Τοποθεσία';
+    locInp.style.cssText = 'flex:1;padding:6px 8px;border:1px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-primary);color:var(--color-text-primary);outline:none';
+    locInp.autocomplete = 'off';
+    nameInp.addEventListener('focus', function() { showGevPopup(this, 'task'); });
+    nameInp.addEventListener('blur', function() { setTimeout(hideGevPopup, 200); });
+    locInp.addEventListener('focus', function() { showGevPopup(this, 'location'); });
+    locInp.addEventListener('blur', function() { setTimeout(hideGevPopup, 200); });
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-sm';
+    delBtn.style.cssText = 'color:#E53E3E;flex-shrink:0;padding:4px 8px';
+    delBtn.innerHTML = '<i class="ti ti-trash"></i>';
+    delBtn.onclick = function() { row.remove(); };
+    row.appendChild(nameInp);
+    row.appendChild(locInp);
+    row.appendChild(delBtn);
+    container.appendChild(row);
+    nameInp.focus();
+};
+
+window.submitGardenerTask = async function() {
+    const isEvent = document.getElementById('gardener-event-toggle')?.checked || false;
+    const name = document.getElementById('gardener-task-name');
+    const loc = document.getElementById('gardener-task-location');
+    let message;
+    if (isEvent) {
+        const title = document.getElementById('gardener-event-title');
+        const date = document.getElementById('gardener-event-date');
+        const tasks = [];
+        document.querySelectorAll('#gardener-event-rows .gardener-event-row').forEach(row => {
+            const n = row.querySelector('.gev-name');
+            const l = row.querySelector('.gev-location');
+            if (n && n.value.trim()) tasks.push({ name: n.value.trim(), location: l ? l.value.trim() : '' });
+        });
+        if (!title || !title.value.trim()) { showToast('Συμπληρώστε το όνομα εκδήλωσης.', 'warning'); return; }
+        if (!date || !date.value) { showToast('Συμπληρώστε την ημερομηνία εκδήλωσης.', 'warning'); return; }
+        if (tasks.length === 0) { showToast('Προσθέστε τουλάχιστον μία εργασία εκδήλωσης.', 'warning'); return; }
+        message = JSON.stringify({ eventTitle: title.value.trim(), eventDate: date.value, tasks });
+    } else {
+        if (!name || name.value.trim() === '') { showToast('Συμπληρώστε την περιγραφή εργασίας.', 'warning'); return; }
+        message = name.value.trim() + (loc && loc.value.trim() ? '||' + loc.value.trim() : '||');
+    }
+    try {
+        const { error } = await supabase.from('NOTIFICATION').insert({
+            TargetRole: 'gardener',
+            Type: 'gardener_task',
+            Message: message,
+            IsRead: false,
+            CreatedAt: new Date().toISOString()
+        });
+        if (error) throw error;
+        if (name) name.value = '';
+        if (loc) loc.value = '';
+        if (isEvent) {
+            document.getElementById('gardener-event-toggle').checked = false;
+            document.getElementById('gardener-event-section').style.display = 'none';
+            document.getElementById('gardener-event-title').value = '';
+            document.getElementById('gardener-event-date').value = '';
+            document.getElementById('gardener-event-rows').innerHTML = '';
+        }
+        showToast('Η εργασία ανατέθηκε στον κηπουρό!', 'success');
+    } catch (err) {
+        showToast('Αποτυχία: ' + err.message, 'error');
+    }
+};
+
+// Dropdown presets for gardener task
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('gardener-task-name');
+    const dropdown = document.getElementById('gardener-task-presets');
+    if (!input || !dropdown) return;
+
+    input.addEventListener('focus', () => dropdown.classList.add('show'));
+    input.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('show'), 150));
+    const locInput = document.getElementById('gardener-task-location');
+    const locDropdown = document.getElementById('gardener-location-presets');
+    if (locInput && locDropdown) {
+        locInput.addEventListener('focus', () => locDropdown.classList.add('show'));
+        locInput.addEventListener('blur', () => setTimeout(() => locDropdown.classList.remove('show'), 150));
+    }
+});
+
+window.selectGardenerLocation = function(value) {
+    const input = document.getElementById('gardener-task-location');
+    if (input) {
+        input.value = value;
+        document.getElementById('gardener-location-presets')?.classList.remove('show');
+        input.focus();
+    }
+};

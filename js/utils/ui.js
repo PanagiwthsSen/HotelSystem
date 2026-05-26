@@ -45,7 +45,7 @@ export function navTo(id) {
         rooms: 'Κατάσταση Δωματίων', staff: 'Διαχείριση Προσωπικού', restaurant: 'Minibar & Αποθήκες',
         vehicles: 'Οχήματα & Μεταφορές', trips: 'Δρομολόγια Οχημάτων', reservations: 'Κρατήσεις',
         gardens: 'Κήποι & Εξωτερικοί Χώροι', rentals: 'Ενοικιαζόμενα Καταστήματα',
-        payroll: 'Μισθοδοσία', users: 'Χρήστες & Ρόλοι', backup: 'Backup & Ασφάλεια',
+        payroll: 'Μισθοδοσία', expenses: 'Έξοδα Οχημάτων', users: 'Χρήστες & Ρόλοι', backup: 'Backup & Ασφάλεια',
         'notif-history': 'Ιστορικό Ειδοποιήσεων'
     };
     const el = document.getElementById('tb-title');
