@@ -50,11 +50,11 @@
     <div class="tb-l">
       <div>
         <div class="tb-title" id="tb-title">Επισκόπηση Εσωτερικών Λειτουργιών</div>
-        <div class="tb-meta" id="tb-meta">Πληρότητα: 58% · Σύνολο Δωματίων: 510</div>
+        <div class="tb-meta" id="tb-meta">Φόρτωση...</div>
       </div>
     </div>
     <div class="tb-r">
-      <span class="badge b-amber">Ενεργή Έκπτωση Z% (<60%)</span>
+      <span class="badge b-amber" id="discount-badge">Ενεργή Έκπτωση Z% (<60%)</span>
     </div>
   </div>
 
@@ -62,39 +62,43 @@
     
   <div class="view active" id="v-overview">
     <div class="g4">
-      <div class="sc"><div class="sc-lbl">Ενεργή Πληρότητα</div><div class="sc-val" style="color:#D85A30">58%</div><div class="sc-sub">Κάτω από το όριο (60%)</div></div>
-      <div class="sc"><div class="sc-lbl">Έκπτωση Z%</div><div class="sc-val" style="color:#1D9E75">Ενεργοποιήθηκε</div><div class="sc-sub">Αυτόματη προσαρμογή</div></div>
-      <div class="sc"><div class="sc-lbl">Διαθέσιμα Δωμάτια</div><div class="sc-val">214</div><div class="sc-sub">Από τα 510 συνολικά</div></div>
-      <div class="sc"><div class="sc-lbl">Προσωπικό Βάρδιας</div><div class="sc-val">42</div><div class="sc-sub">Όλα τα τμήματα</div></div>
+      <div class="sc"><div class="sc-lbl">Ενεργή Πληρότητα</div><div class="sc-val" id="stat-occupancy" style="color:#D85A30">—</div><div class="sc-sub" id="stat-occupancy-sub">Φόρτωση...</div></div>
+      <div class="sc"><div class="sc-lbl">Έκπτωση Z%</div><div class="sc-val" id="stat-discount" style="color:#1D9E75">—</div><div class="sc-sub" id="stat-discount-sub">Φόρτωση...</div></div>
+      <div class="sc"><div class="sc-lbl">Διαθέσιμα Δωμάτια</div><div class="sc-val" id="stat-available">—</div><div class="sc-sub" id="stat-available-sub">Φόρτωση...</div></div>
+      <div class="sc"><div class="sc-lbl">Προσωπικό Βάρδιας</div><div class="sc-val" id="stat-staff">—</div><div class="sc-sub" id="stat-staff-sub">Φόρτωση...</div></div>
     </div>
 
     <div id="manager-notifications"></div>
 
-    <div class="ns ns-e"><i class="ti ti-gavel"></i><div><strong>Νομική Ειδοποίηση (Ενοίκια):</strong> Καθυστέρηση πληρωμής από Μισθωτή Καταστήματος #2. Απαιτείται ειδοποίηση δικηγόρου.</div></div>
+    <div class="ns ns-e" id="legal-notice" style="display:none"><i class="ti ti-gavel"></i><div><strong>Νομική Ειδοποίηση (Ενοίκια):</strong> <span id="legal-notice-text">Καθυστέρηση πληρωμής από Μισθωτή.</span></div></div>
   </div>
 
   <div class="view" id="v-pricing">
     <div class="card">
       <div class="card-hd">
         <div class="card-hd-l"><i class="ti ti-adjustments-alt"></i>Δυναμική Τιμολόγηση (Βάσει Εποχής, Τύπου & Κράτησης)</div>
-        <div style="font-size:12px; color:#D85A30; font-weight:bold;">*Ενεργή μείωση Z% (Πληρότητα < 60%)</div>
+        <div style="font-size:12px; color:#D85A30; font-weight:bold;" id="pricing-z-header">*Ενεργή μείωση Z% (Πληρότητα < 60%)</div>
       </div>
       <table style="width:100%; border-collapse:collapse; font-size:12px">
+        <thead>
         <tr style="border-bottom:1px solid var(--color-border-tertiary); text-align:left; color:var(--color-text-secondary)">
-          <th style="padding:8px">Τύπος Δωματίου</th><th style="padding:8px">Σύνολο</th><th style="padding:8px">Βασική Τιμή (Χειμώνας)</th><th style="padding:8px">High Season / Εκθέσεις</th><th style="padding:8px; color:#D85A30">Τελική με -Z%</th>
+          <th style="padding:8px">Τύπος Δωματίου</th><th style="padding:8px">Σύνολο</th><th style="padding:8px">Βασική Τιμή (Χειμώνας)</th><th style="padding:8px">High Season / Εκθέσεις</th>          <th style="padding:8px; color:#D85A30" id="pricing-z-col">Τελική με -Z%</th>
+        </tr>
+        </thead>
+        <tbody id="pricing-table-body">
+        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
+          <td style="padding:8px; font-weight:500">Δίκλινα</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
         </tr>
         <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Δίκλινα</td><td style="padding:8px">300</td><td style="padding:8px">100€</td><td style="padding:8px">150€</td><td style="padding:8px; font-weight:bold">90€</td>
+          <td style="padding:8px; font-weight:500">Φαρδύκλινα</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
         </tr>
         <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Φαρδύκλινα</td><td style="padding:8px">150</td><td style="padding:8px">120€</td><td style="padding:8px">180€</td><td style="padding:8px; font-weight:bold">108€</td>
+          <td style="padding:8px; font-weight:500">Μονόκλινα</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
         </tr>
         <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Μονόκλινα</td><td style="padding:8px">50</td><td style="padding:8px">70€</td><td style="padding:8px">110€</td><td style="padding:8px; font-weight:bold">63€</td>
+          <td style="padding:8px; font-weight:500">Σουίτες</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
         </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Σουίτες</td><td style="padding:8px">10</td><td style="padding:8px">300€</td><td style="padding:8px">500€</td><td style="padding:8px; font-weight:bold">270€</td>
-        </tr>
+        </tbody>
       </table>
       <p style="font-size:11px; margin-top:10px; color:var(--color-text-secondary)">*Το τελικό κόστος διαμορφώνεται περαιτέρω από τον Τύπο Κράτησης (π.χ. Group > 20 ατόμων / Πρακτορεία).</p>
     </div>
@@ -104,18 +108,14 @@
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-users"></i>Κατάσταση Προσωπικού & Μισθοδοσία</div></div>
       <table style="width:100%; border-collapse:collapse; font-size:12px">
+        <thead>
         <tr style="border-bottom:1px solid var(--color-border-tertiary); text-align:left; color:var(--color-text-secondary)">
           <th style="padding:8px">Υπάλληλος</th><th style="padding:8px">Ρόλος</th><th style="padding:8px">Ωράριο (Βάρδια)</th><th style="padding:8px">Άδειες</th><th style="padding:8px">Μισθοδοσία (Μήνα)</th>
         </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Ελένη Κ.</td><td style="padding:8px">Receptionist</td><td style="padding:8px">07:00 - 15:00</td><td style="padding:8px">15 ημ. Υπόλοιπο</td><td style="padding:8px; font-weight:bold; color:#1D9E75">Εκκαθαρίστηκε</td>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Μαρία Π.</td><td style="padding:8px">Καμαριέρα</td><td style="padding:8px">-</td><td style="padding:8px"><span class="pill p-a">Σε Άδεια</span></td><td style="padding:8px; font-weight:bold; color:#D85A30">Εκκρεμεί</td>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Γιώργος Ν.</td><td style="padding:8px">Receptionist</td><td style="padding:8px">15:00 - 23:00</td><td style="padding:8px">20 ημ. Υπόλοιπο</td><td style="padding:8px; font-weight:bold; color:#1D9E75">Εκκαθαρίστηκε</td>
-        </tr>
+        </thead>
+        <tbody id="hr-table-body">
+        <tr><td style="padding:8px;color:var(--color-text-tertiary)" colspan="5">Φόρτωση...</td></tr>
+        </tbody>
       </table>
     </div>
   </div>
@@ -124,21 +124,8 @@
     <div class="toast" id="legal-toast"><i class="ti ti-circle-check"></i>Ο δικηγόρος ενημερώθηκε μέσω email για την καθυστέρηση.</div>
     <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-building-bank"></i>Έλεγχος Ενοικίων & Ειδοποίηση Δικηγόρου</div></div>
-      <div class="room-list">
-        <div class="room-card">
-          <div class="room-info">
-            <div style="font-weight:600; font-size:14px">Κατάστημα 1 (Boutique)</div>
-            <div class="room-type">Ενοίκιο: Πληρώθηκε (02/05/2026)</div>
-          </div>
-          <span class="pill p-g">ΟΚ</span>
-        </div>
-        <div class="room-card urgent">
-          <div class="room-info">
-            <div style="font-weight:600; font-size:14px">Κατάστημα 2 (Ενοικιάσεις Αυτοκινήτων)</div>
-            <div class="room-guest" style="color:#791F1F">Καθυστέρηση πληρωμής ενοικίου: 18 ημέρες</div>
-          </div>
-          <button class="btn btn-dark" onclick="showToast('legal-toast')">Ειδοποίηση Δικηγόρου</button>
-        </div>
+      <div class="room-list" id="rents-list">
+        <div style="padding:12px;color:var(--color-text-tertiary);font-size:13px">Φόρτωση...</div>
       </div>
     </div>
   </div>
