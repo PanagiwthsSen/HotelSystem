@@ -422,6 +422,21 @@ window.submitFuelExpense = async function() {
             }]);
         if (error) throw error;
 
+        const driverName = currentUser?.name || 'Οδηγός';
+        const vehicleStr = myVehicle
+            ? `${myVehicle.Type || 'Όχημα'} (${myVehicle.PlateNumber || '—'})`
+            : '—';
+        const odometerStr = odometer ? ` | Χλμ: ${odometer}` : '';
+
+        const { error: notifErr } = await supabase.from('NOTIFICATION').insert([{
+            TargetRole: 'external_manager',
+            Type: 'fuel_expense',
+            Message: `${driverName} | Τύπος: ${type} | Ποσό: €${amount} | Όχημα: ${vehicleStr}${odometerStr} | Ημ/νία: ${new Date().toISOString().split('T')[0]}`,
+            IsRead: false,
+            CreatedAt: new Date().toISOString()
+        }]);
+        if (notifErr) throw notifErr;
+
         showToast('Το αίτημα εξόδων υποβλήθηκε για έγκριση.', 'success');
         document.getElementById('exp-amount').value = '';
         if (document.getElementById('exp-odometer')) document.getElementById('exp-odometer').value = '';
@@ -466,7 +481,7 @@ window.submitFault = async function() {
         const { error } = await supabase
             .from('NOTIFICATION')
             .insert([{
-                TargetRole: 'both',
+                TargetRole: 'external_manager',
                 Type: 'vehicle_fault',
                 Message: `${isUrgent ? ' [ΕΠΕΙΓΟΝ]' : ''}Βλάβη από ${driverName}${vehicleInfo} | Ώρα: ${timeStr} | Περιγραφή: ${desc.trim()}`,
                 IsRead: false,
