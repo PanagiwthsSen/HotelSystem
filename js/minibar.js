@@ -8,7 +8,7 @@ let historyData = [];
 let consumptionCount = 0;
 
 async function loadItemMap() {
-    const { data } = await supabase.from('INVENTORY_ITEM').select('*');
+    const { data } = await supabase.from('INVENTORY_ITEM').select('*').neq('Category', 'κηπος');
     inventoryItems = {};
     (data || []).forEach(item => {
         inventoryItems[item.Name] = item;
@@ -18,7 +18,8 @@ async function loadItemMap() {
 window.requestRestockAll = async function () {
     const { data: allItems } = await supabase
         .from('INVENTORY_ITEM')
-        .select('*');
+        .select('*')
+        .neq('Category', 'κηπος');
 
     const items = (allItems || []).filter(
         item => item.Quantity === 0 || item.Quantity <= item.MinThreshold
@@ -158,7 +159,7 @@ async function loadDashboard() {
     const [res1, res3, res4] = await Promise.all([
         supabase.from('RESERVATION').select('ReservationID', { count: 'exact', head: true }).eq('Status', 'CheckedIn'),
         supabase.from('RESERVATION').select('ReservationID', { count: 'exact', head: true }).eq('Status', 'CheckedIn').eq('CheckOutDate', today),
-        supabase.from('INVENTORY_ITEM').select('*')
+        supabase.from('INVENTORY_ITEM').select('*').neq('Category', 'κηπος')
     ]);
 
     const roomsToCheck = res1.count || 0;
@@ -194,12 +195,11 @@ async function loadDashboard() {
             const div = document.createElement('div');
             div.className = 'ns ns-e';
             div.style.cursor = 'pointer';
-            div.title = 'Κλικ για αντιγραφή στο πρόχειρο';
+            div.title = 'Κλικ για καταχώρηση κατανάλωσης';
             div.innerHTML = `<i class="ti ti-alert-triangle" aria-hidden="true"></i><div><strong>ΕΠΕΙΓΟΝ — ${room} (${guest}):</strong> Ο πελάτης αναχωρεί σήμερα. Ελέγξτε το mini-bar ΑΜΕΣΑ.</div>`;
             div.addEventListener('click', () => {
-                navigator.clipboard.writeText(div.textContent.trim())
-                    .then(() => showToast('Αντιγράφηκε στο πρόχειρο', 'info'))
-                    .catch(() => showToast('Αποτυχία αντιγραφής', 'error'));
+                window.navTo('consumption');
+                window.setRoomSelect(room);
             });
             notifContainer.appendChild(div);
         });
@@ -218,6 +218,11 @@ async function loadDashboard() {
         .order('CheckOutDate', { ascending: true });
 
     let list = (checkedIn || []).filter(r => !checkedToday.has(r.ReservationID));
+    list.sort((a, b) => {
+        const aU = a.CheckOutDate === today ? 0 : 1;
+        const bU = b.CheckOutDate === today ? 0 : 1;
+        return aU - bU;
+    });
 
     document.getElementById('stat-rooms').textContent = list.length;
 
@@ -297,7 +302,7 @@ async function loadRoomSelect() {
    SUPABASE — STOCK
    ============================================================== */
 async function loadStock() {
-    const { data: items } = await supabase.from('INVENTORY_ITEM').select('*').order('Name');
+    const { data: items } = await supabase.from('INVENTORY_ITEM').select('*').neq('Category', 'κηπος').order('Name');
 
     const tbody = document.getElementById('stock-list');
     tbody.innerHTML = '';
@@ -509,11 +514,6 @@ window.submitConsumption = async function() {
         items.push({ itemId, qty, charge: qty * price, name });
     });
 
-    if (items.length === 0) {
-        showToast('Παρακαλώ συμπληρώστε ποσότητα σε τουλάχιστον ένα προϊόν.', 'error');
-        return;
-    }
-
     let successCount = 0;
     for (const item of items) {
         const { error: insertErr } = await supabase
@@ -558,15 +558,27 @@ window.submitConsumption = async function() {
         successCount++;
     }
 
-    if (successCount > 0) {
-        showToast(`Επιτυχία! Το ${room} ενημερώθηκε (${successCount} προϊόντα).`, 'success');
-        checkedToday.add(resId);
-        todayChargesTotal += items.reduce((s, i) => s + i.charge, 0);
-        setRoomSelect('');
-        await loadItemMap();
-        await loadConsumptionItems();
-        refreshAll();
+    checkedToday.add(resId);
+
+    // If room is clean (maid already cleaned), set it to free
+    const { data: roomRow } = await supabase
+        .from('ROOM')
+        .select('Status')
+        .eq('RoomNumber', room)
+        .single();
+    if (roomRow && roomRow.Status === 'clean') {
+        await supabase.from('ROOM').update({ Status: 'free' }).eq('RoomNumber', room);
     }
+
+    const msg = successCount > 0
+        ? `Επιτυχία! Το ${room} ενημερώθηκε (${successCount} προϊόντα).`
+        : `Το ${room} ελέγχθηκε — καμία κατανάλωση.`;
+    showToast(msg, 'success');
+    todayChargesTotal += items.reduce((s, i) => s + i.charge, 0);
+    setRoomSelect('');
+    await loadItemMap();
+    await loadConsumptionItems();
+    refreshAll();
 };
 
 /* ==============================================================

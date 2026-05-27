@@ -207,6 +207,22 @@ function renderCards(container, rooms, filter, options) {
             </div>`;
         }
 
+        if (r.state === 'clean') {
+            return `<div class="room-card" id="rc-${r.id}" style="opacity:.85">
+                <div>
+                    <div class="room-num">${r.num}</div>
+                    <div class="room-type">${r.type}</div>
+                </div>
+                <div class="room-info">
+                    <div style="font-size:12px;font-weight:500">Καθαρίστηκε</div>
+                    <div class="room-guest">Εκκρεμεί έλεγχος mini-bar</div>
+                </div>
+                <div class="room-actions">
+                    <span class="pill p-b">Καθαρίστηκε</span>
+                </div>
+            </div>`;
+        }
+
         const pillClass = isUrgent ? 'p-r' : isPriority ? 'p-a' : isInProgress ? 'p-t' : 'p-b';
         const pillText = isUrgent ? 'Επείγον' : isPriority ? 'Προτεραιότητα' : isInProgress ? 'Σε εξέλιξη' : 'Εκκρεμεί';
         const guestText = r.guest || (isUrgent ? 'Αναχώρηση' : '');
