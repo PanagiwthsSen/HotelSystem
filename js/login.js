@@ -58,6 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         Role: data.Role
                     }));
 
+                    await supabase.from('EMPLOYEE').update({ IsLoggedIn: true }).eq('EmpID', data.EmpID);
+
                     redirectToRole(data.Role);
                 } else {
                     restoreBtn();

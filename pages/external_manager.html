@@ -29,6 +29,7 @@
   <nav class="sb-nav">
     <div class="sb-group">Λειτουργίες</div>
     <div class="sb-item active" data-v="overview"><i class="ti ti-layout-dashboard"></i>Επισκόπηση</div>
+    <div class="sb-item" data-v="pricing"><i class="ti ti-receipt-tax"></i>Τιμολόγηση Δωματίων</div>
     <div class="sb-item" data-v="inventory"><i class="ti ti-box"></i>Υλικά & Αποθήκη</div>
     <div class="sb-item" data-v="gardener"><i class="ti ti-plant"></i>Ανάθεση σε Κηπουρό</div>
     
@@ -72,6 +73,37 @@
     <div class="card" style="margin-top:12px">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-bell"></i>Ειδοποιήσεις</div></div>
       <div id="manager-notifications"></div>
+    </div>
+  </div>
+
+  <div class="view" id="v-pricing">
+    <div class="card">
+      <div class="card-hd">
+        <div class="card-hd-l"><i class="ti ti-adjustments-alt"></i>Δυναμική Τιμολόγηση (Βάσει Εποχής, Τύπου & Κράτησης)</div>
+        <div style="font-size:12px; color:#D85A30; font-weight:bold;" id="pricing-z-header">*Ενεργή μείωση Z% (Πληρότητα < 60%)</div>
+      </div>
+      <table style="width:100%; border-collapse:collapse; font-size:12px">
+        <thead>
+        <tr style="border-bottom:1px solid var(--color-border-tertiary); text-align:left; color:var(--color-text-secondary)">
+          <th style="padding:8px">Τύπος Δωματίου</th><th style="padding:8px">Σύνολο</th><th style="padding:8px">Βασική Τιμή (Χειμώνας)</th><th style="padding:8px">High Season / Εκθέσεις</th>          <th style="padding:8px; color:#D85A30" id="pricing-z-col">Τελική με -Z%</th>
+        </tr>
+        </thead>
+        <tbody id="pricing-table-body">
+        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
+          <td style="padding:8px; font-weight:500">Δίκλινα</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
+          <td style="padding:8px; font-weight:500">Φαρδύκλινα</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
+          <td style="padding:8px; font-weight:500">Μονόκλινα</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
+          <td style="padding:8px; font-weight:500">Σουίτες</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
+        </tr>
+        </tbody>
+      </table>
+      <p style="font-size:11px; margin-top:10px; color:var(--color-text-secondary)">*Το τελικό κόστος διαμορφώνεται περαιτέρω από τον Τύπο Κράτησης (π.χ. Group > 20 ατόμων / Πρακτορεία).</p>
     </div>
   </div>
 
