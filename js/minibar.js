@@ -34,7 +34,7 @@ window.requestRestockAll = async function () {
     const msg = `Αίτημα παραγγελίας αποθέματος από minibar: ${summary} || ${ids}`;
 
     await supabase.from('NOTIFICATION').insert({
-        TargetRole: 'external_manager',
+        TargetRole: 'internal_manager',
         Type: 'restock_request',
         Message: msg,
         IsRead: false
@@ -540,14 +540,14 @@ window.submitConsumption = async function() {
 
             if (newQty === 0) {
                 supabase.from('NOTIFICATION').insert({
-                    TargetRole: 'external_manager',
+                    TargetRole: 'internal_manager',
                     Type: 'restock_request',
                     Message: `Αίτημα παραγγελίας αποθέματος από minibar: ${item.name} || ${item.itemId}`,
                     IsRead: false
                 }).then();
             } else if (newQty <= invItem.data.MinThreshold) {
                 supabase.from('NOTIFICATION').insert({
-                    TargetRole: 'external_manager',
+                    TargetRole: 'internal_manager',
                     Type: 'restock_request',
                     Message: `Αίτημα παραγγελίας αποθέματος από minibar: ${item.name} || ${item.itemId}`,
                     IsRead: false
@@ -595,7 +595,7 @@ window.requestRestock = async function(btn) {
             try {
                 const msg = `Αίτημα παραγγελίας αποθέματος από minibar: ${itemName} || ${item.ItemID}`;
                 await supabase.from('NOTIFICATION').insert({
-                    TargetRole: 'external_manager',
+                    TargetRole: 'internal_manager',
                     Type: 'restock_request',
                     Message: msg,
                     IsRead: false

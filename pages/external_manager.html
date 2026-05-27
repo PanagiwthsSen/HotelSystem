@@ -29,9 +29,9 @@
   <nav class="sb-nav">
     <div class="sb-group">Λειτουργίες</div>
     <div class="sb-item active" data-v="overview"><i class="ti ti-layout-dashboard"></i>Επισκόπηση</div>
-    <div class="sb-item" data-v="pricing"><i class="ti ti-receipt-tax"></i>Τιμολόγηση Δωματίων</div>
     <div class="sb-item" data-v="inventory"><i class="ti ti-box"></i>Υλικά &amp; Αποθήκη</div>
     <div class="sb-item" data-v="gardener"><i class="ti ti-plant"></i>Ανάθεση σε Κηπουρό</div>
+    <div class="sb-item" data-v="gardener-history"><i class="ti ti-history"></i>Ιστορικό Αναθέσεων</div>
     
     <div class="sb-group">Στόλος &amp; Μεταφορές</div>
     <div class="sb-item" data-v="schedule"><i class="ti ti-route"></i>Πρόγραμμα Οδηγών</div>
@@ -73,37 +73,6 @@
     <div class="card" style="margin-top:12px">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-bell"></i>Ειδοποιήσεις</div></div>
       <div id="manager-notifications"></div>
-    </div>
-  </div>
-
-  <div class="view" id="v-pricing">
-    <div class="card">
-      <div class="card-hd">
-        <div class="card-hd-l"><i class="ti ti-adjustments-alt"></i>Δυναμική Τιμολόγηση (Βάσει Εποχής, Τύπου &amp; Κράτησης)</div>
-        <div style="font-size:12px; color:#D85A30; font-weight:bold;" id="pricing-z-header">*Ενεργή μείωση Z% (Πληρότητα &lt; 60%)</div>
-      </div>
-      <table style="width:100%; border-collapse:collapse; font-size:12px">
-        <thead>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary); text-align:left; color:var(--color-text-secondary)">
-          <th style="padding:8px">Τύπος Δωματίου</th><th style="padding:8px">Σύνολο</th><th style="padding:8px">Βασική Τιμή (Χειμώνας)</th><th style="padding:8px">High Season / Εκθέσεις</th>          <th style="padding:8px; color:#D85A30" id="pricing-z-col">Τελική με -Z%</th>
-        </tr>
-        </thead>
-        <tbody id="pricing-table-body">
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Δίκλινα</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Φαρδύκλινα</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Μονόκλινα</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
-        </tr>
-        <tr style="border-bottom:1px solid var(--color-border-tertiary)">
-          <td style="padding:8px; font-weight:500">Σουίτες</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px; font-weight:bold">—</td>
-        </tr>
-        </tbody>
-      </table>
-      <p style="font-size:11px; margin-top:10px; color:var(--color-text-secondary)">*Το τελικό κόστος διαμορφώνεται περαιτέρω από τον Τύπο Κράτησης (π.χ. Group > 20 ατόμων / Πρακτορεία).</p>
     </div>
   </div>
 
@@ -245,22 +214,22 @@
           <label>Περιγραφή εργασίας *</label>
           <input type="text" id="gardener-task-name" placeholder="π.χ. Κλάδεμα θάμνων" autocomplete="off">
           <div id="gardener-task-presets" class="gardener-preset-dropdown">
-            <div class="gardener-dropdown-item" onclick="selectGardenerPreset('Κλάδεμα')">Κλάδεμα</div>
-            <div class="gardener-dropdown-item" onclick="selectGardenerPreset('Πότισμα')">Πότισμα</div>
-            <div class="gardener-dropdown-item" onclick="selectGardenerPreset('Καθαρισμός')">Καθαρισμός</div>
-            <div class="gardener-dropdown-item" onclick="selectGardenerPreset('Κούρεμα γκαζόν')">Κούρεμα γκαζόν</div>
-            <div class="gardener-dropdown-item" onclick="selectGardenerPreset('Έλεγχος')">Έλεγχος</div>
+            <div class="gardener-dropdown-item" onmousedown="selectGardenerPreset('Κλάδεμα')">Κλάδεμα</div>
+            <div class="gardener-dropdown-item" onmousedown="selectGardenerPreset('Πότισμα')">Πότισμα</div>
+            <div class="gardener-dropdown-item" onmousedown="selectGardenerPreset('Καθαρισμός')">Καθαρισμός</div>
+            <div class="gardener-dropdown-item" onmousedown="selectGardenerPreset('Κούρεμα γκαζόν')">Κούρεμα γκαζόν</div>
+            <div class="gardener-dropdown-item" onmousedown="selectGardenerPreset('Έλεγχος')">Έλεγχος</div>
           </div>
         </div>
         <div class="fg" style="position:relative">
           <label>Τοποθεσία / Ζώνη</label>
           <input type="text" id="gardener-task-location" placeholder="π.χ. Νότιος Κήπος" autocomplete="off">
           <div id="gardener-location-presets" class="gardener-preset-dropdown">
-            <div class="gardener-dropdown-item" onclick="selectGardenerLocation('Κεντρική Είσοδος')">Κεντρική Είσοδος</div>
-            <div class="gardener-dropdown-item" onclick="selectGardenerLocation('Χώρος Πισίνας')">Χώρος Πισίνας</div>
-            <div class="gardener-dropdown-item" onclick="selectGardenerLocation('Νότιος Κήπος')">Νότιος Κήπος</div>
-            <div class="gardener-dropdown-item" onclick="selectGardenerLocation('Parking')">Parking</div>
-            <div class="gardener-dropdown-item" onclick="selectGardenerLocation('Πίσω αυλή')">Πίσω αυλή</div>
+            <div class="gardener-dropdown-item" onmousedown="selectGardenerLocation('Κεντρική Είσοδος')">Κεντρική Είσοδος</div>
+            <div class="gardener-dropdown-item" onmousedown="selectGardenerLocation('Χώρος Πισίνας')">Χώρος Πισίνας</div>
+            <div class="gardener-dropdown-item" onmousedown="selectGardenerLocation('Νότιος Κήπος')">Νότιος Κήπος</div>
+            <div class="gardener-dropdown-item" onmousedown="selectGardenerLocation('Parking')">Parking</div>
+            <div class="gardener-dropdown-item" onmousedown="selectGardenerLocation('Πίσω αυλή')">Πίσω αυλή</div>
           </div>
         </div>
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border-tertiary)">
@@ -287,6 +256,19 @@
         <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
           <button class="btn btn-dark" onclick="submitGardenerTask()"><i class="ti ti-send"></i> Ανάθεση Εργασίας</button>
         </div>
+      </div>
+    </div>
+  </div>
+  <div class="view" id="v-gardener-history">
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-history"></i>Ιστορικό Αναθέσεων σε Κηπουρό</div></div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px" id="gardener-history-table">
+          <tr style="border-bottom:1px solid var(--color-border-tertiary);text-align:left;color:var(--color-text-secondary)">
+            <th style="padding:8px">Εργασία</th><th style="padding:8px">Τοποθεσία</th><th style="padding:8px">Ανάθεση</th><th style="padding:8px">Κατάσταση</th>
+          </tr>
+          <tbody id="gardener-history-body"></tbody>
+        </table>
       </div>
     </div>
   </div>

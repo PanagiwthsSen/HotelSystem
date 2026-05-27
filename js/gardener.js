@@ -41,6 +41,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     });
     sortTaskRows();
+    await populateSupplyItems();
+    await showStockDisplay();
     await refreshAll();
     setInterval(refreshAll, 30000);
 
@@ -58,6 +60,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function refreshAll() {
+    generateBaseTasks();
     await fetchGardenerTasks();
     sortTaskRows();
     cleanupGardenerPage();
@@ -77,6 +80,8 @@ async function refreshAll() {
         }
     }
     updateOverview();
+    await populateSupplyItems();
+    await showStockDisplay();
     await fetchGardenerNotifs();
     await fetchSupplyRequests();
     document.querySelectorAll('.room-card[data-event-id]').forEach(card => {
@@ -89,6 +94,8 @@ window.navTo = function(viewId) {
     if(targetItem) targetItem.click();
 };
 
+let _pendingBadge = null;
+
 window.cycleTask = function(badge) {
     const text = badge.innerText;
 
@@ -96,22 +103,86 @@ window.cycleTask = function(badge) {
         badge.className = 'pill p-a task-badge';
         badge.innerText = 'Σε εξέλιξη';
     } else if (text === 'Σε εξέλιξη') {
-        badge.className = 'pill p-g task-badge';
-        badge.innerText = 'Ολοκληρώθηκε';
-        badge.style.pointerEvents = 'none';
-        badge.style.cursor = 'default';
-        showToast('task-toast');
-        updateDoneCount();
-        updateBadgeTasks();
-        updateOverview();
-
-        const row = badge.closest('.task-row');
-        const eventId = row ? row.dataset.eventId : null;
-        if (eventId) checkEventComplete(eventId);
-        const notifId = row ? row.dataset.notifId : null;
-        if (notifId) resolveGardenerNotif(notifId);
+        _pendingBadge = badge;
+        showMaterialModal();
     }
     updateUrgentTasks();
+}
+
+function completeTask(badge) {
+    badge.className = 'pill p-g task-badge';
+    badge.innerText = 'Ολοκληρώθηκε';
+    badge.style.pointerEvents = 'none';
+    badge.style.cursor = 'default';
+    showToast('task-toast');
+
+    const row = badge.closest('.task-row');
+    const eventId = row ? row.dataset.eventId : null;
+    if (eventId) checkEventComplete(eventId);
+    const notifId = row ? row.dataset.notifId : null;
+    if (notifId) resolveGardenerNotif(notifId);
+    const baseTaskId = row ? row.dataset.baseTaskId : null;
+    if (baseTaskId) baseTaskCompleted.add(baseTaskId);
+
+    updateDoneCount();
+    updateBadgeTasks();
+    updateOverview();
+
+    if (row) {
+        setTimeout(() => {
+            row.style.transition = 'opacity 0.3s, transform 0.3s';
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(20px)';
+            setTimeout(() => {
+                row.remove();
+                updateDoneCount();
+                updateBadgeTasks();
+                updateOverview();
+                updateUrgentTasks();
+            }, 300);
+        }, 500);
+    }
+}
+
+function showMaterialModal() {
+    const body = document.getElementById('material-modal-body');
+    if (!body) { if (_pendingBadge) completeTask(_pendingBadge); return; }
+    const items = Object.values(supplyItemMap);
+    if (items.length === 0) {
+        if (_pendingBadge) completeTask(_pendingBadge);
+        return;
+    }
+    body.innerHTML = items.map(item =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--color-border-tertiary)">' +
+        '<div style="flex:1;font-size:13px">' + item.Name + ' <span style="color:var(--color-text-secondary);font-size:11px">(διαθ. ' + item.Quantity + ')</span></div>' +
+        '<input type="number" class="mat-qty" data-item="' + item.Name + '" min="0" max="' + item.Quantity + '" value="0" ' +
+        'style="width:60px;padding:4px 6px;border:1px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;text-align:center"></div>'
+    ).join('');
+    document.getElementById('material-modal').style.display = 'flex';
+}
+
+window.closeMaterialModal = function() {
+    document.getElementById('material-modal').style.display = 'none';
+    if (_pendingBadge) { completeTask(_pendingBadge); _pendingBadge = null; }
+}
+
+window.confirmMaterialUsage = async function() {
+    const inputs = document.querySelectorAll('#material-modal-body .mat-qty');
+    const deductions = [];
+    inputs.forEach(inp => {
+        const qty = parseInt(inp.value) || 0;
+        if (qty > 0) deductions.push({ name: inp.dataset.item, qty });
+    });
+    if (deductions.length > 0 && supabase) {
+        for (const d of deductions) {
+            const item = supplyItemMap[d.name];
+            if (item && item.Quantity >= d.qty) {
+                await supabase.from('INVENTORY_ITEM').update({ Quantity: item.Quantity - d.qty }).eq('ItemID', item.ItemID);
+            }
+        }
+    }
+    document.getElementById('material-modal').style.display = 'none';
+    if (_pendingBadge) { completeTask(_pendingBadge); _pendingBadge = null; }
 }
 
 function updateDoneCount() {
@@ -225,6 +296,30 @@ function updateBadgeEvents() {
     }
 }
 
+const BASE_TASKS = [
+    { name: 'Έλεγχος αυτόματου ποτίσματος', location: 'Όλες οι ζώνες' },
+    { name: 'Κλάδεμα θάμνων', location: 'Είσοδος & Parking' },
+    { name: 'Καθαρισμός μονοπατιών', location: 'Νότιος Κήπος' },
+    { name: 'Κούρεμα γκαζόν', location: 'Πίσω αυλή / Χώρος δεξιώσεων' },
+];
+const baseTaskCompleted = new Set();
+
+function generateBaseTasks() {
+    const taskCard = document.querySelector('#v-schedule-zones .card');
+    if (!taskCard) return;
+    BASE_TASKS.forEach((task, index) => {
+        const taskId = 'base-' + index;
+        if (baseTaskCompleted.has(taskId)) return;
+        if (document.querySelector(`.task-row[data-base-task-id="${taskId}"]`)) return;
+        const row = document.createElement('div');
+        row.className = 'minibar-row task-row';
+        row.dataset.baseTaskId = taskId;
+        row.innerHTML = '<div class="mb-items"><strong>' + task.name + '</strong> (' + task.location + ')</div>' +
+            '<span class="pill p-r task-badge" onclick="cycleTask(this)" style="cursor:pointer">Εκκρεμεί</span>';
+        taskCard.appendChild(row);
+    });
+}
+
 async function fetchGardenerTasks() {
     if (!supabase) return;
     const taskCard = document.querySelector('#v-schedule-zones .card');
@@ -302,7 +397,7 @@ async function resolveGardenerNotif(notifId) {
 }
 
 function cleanupGardenerPage() {
-    document.querySelectorAll('#v-schedule-zones .task-row:not([data-notif-id]) .pill.p-g').forEach(pill => {
+    document.querySelectorAll('#v-schedule-zones .task-row:not([data-notif-id]):not([data-base-task-id]) .pill.p-g').forEach(pill => {
         const row = pill.closest('.task-row');
         if (row) row.remove();
     });
@@ -402,11 +497,19 @@ window.submitSupply = async function() {
     const item = document.getElementById('sup-item');
     const qty = document.getElementById('sup-qty');
     const reason = document.getElementById('sup-reason');
-    if (item.value.trim() === '' || qty.value.trim() === '') {
-        alert("Παρακαλώ συμπληρώστε Είδος και Ποσότητα.");
+    if (!item.value || qty.value.trim() === '') {
+        alert("Παρακαλώ επιλέξτε Υλικό και συμπληρώστε Ποσότητα.");
         return;
     }
-    const message = 'Υλικό: ' + item.value.trim() + '\nΠοσότητα: ' + qty.value.trim() + (reason.value.trim() ? '\nΑιτιολογία: ' + reason.value.trim() : '');
+    const inv = supplyItemMap[item.value];
+    if (inv) {
+        const orderQty = parseInt(qty.value) || 0;
+        if (inv.Quantity + orderQty > 50) {
+            alert('Η παραγγελία + τρέχον απόθεμα (' + inv.Quantity + '+' + orderQty + ') δεν μπορεί να υπερβαίνει το ανώτατο όριο των 50.');
+            return;
+        }
+    }
+    const message = 'Υλικό: ' + item.value + '\nΠοσότητα: ' + qty.value.trim() + (reason.value.trim() ? '\nΑιτιολογία: ' + reason.value.trim() : '');
     const payload = { Type: 'supply_request', Message: message, IsRead: false, CreatedAt: new Date().toISOString() };
     try {
         const { error } = await supabase.from('NOTIFICATION').insert([
@@ -415,7 +518,7 @@ window.submitSupply = async function() {
         ]);
         if (error) throw error;
         showToast('supply-toast');
-        item.value = '';
+        item.selectedIndex = 0;
         qty.value = '';
         reason.value = '';
         fetchSupplyRequests();
@@ -487,6 +590,14 @@ async function fetchSupplyRequests() {
     if (!supabase) return;
     const list = document.getElementById('supplies-list');
     if (!list) return;
+
+    const { data: shortages } = await supabase
+        .from('INVENTORY_ITEM')
+        .select('Name, Quantity, MinThreshold')
+        .eq('Category', 'κηπος')
+        .lt('Quantity', 'MinThreshold')
+        .order('Name');
+
     const { data, error } = await supabase
         .from('NOTIFICATION')
         .select('Message, CreatedAt')
@@ -494,29 +605,83 @@ async function fetchSupplyRequests() {
         .eq('TargetRole', 'admin')
         .eq('IsRead', false)
         .order('CreatedAt', { ascending: false });
-    if (error || !data || data.length === 0) {
-        list.innerHTML = '<div style="padding:5px 0;color:var(--color-text-tertiary)">Δεν υπάρχουν αιτήματα</div>';
-        return;
-    }
-    const seen = new Set();
-    const rows = [];
-    data.forEach(n => {
-        const msg = n.Message || '';
-        const itemMatch = msg.match(/Υλικό:\s*(.+)/);
-        const qtyMatch = msg.match(/Ποσότητα:\s*(.+)/);
-        const name = itemMatch ? itemMatch[1].trim() : '';
-        const qty = qtyMatch ? qtyMatch[1].trim() : '';
-        if (name && !seen.has(name)) {
-            seen.add(name);
-            rows.push({ name, qty, time: n.CreatedAt });
-        }
+
+    let html = '';
+
+    (shortages || []).forEach(item => {
+        const need = item.MinThreshold - item.Quantity;
+        html += '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">' +
+            '<span style="color:#D85A30">' + item.Name + '</span>' +
+            '<span style="font-weight:500;color:#D85A30">-' + need + '</span></div>';
     });
-    list.innerHTML = rows.map((r, i) => {
-        const border = i < rows.length - 1 ? 'border-bottom:0.5px solid var(--color-border-tertiary)' : '';
-        return '<div style="display:flex;justify-content:space-between;padding:5px 0;' + border + '">' +
-            '<span style="color:var(--color-text-secondary)">' + r.name + '</span>' +
-            '<span style="font-weight:500;color:#EF9F27">' + r.qty + '</span></div>';
-    }).join('');
+
+    if (data && data.length > 0) {
+        const seen = new Set();
+        data.forEach(n => {
+            const msg = n.Message || '';
+            const itemMatch = msg.match(/Υλικό:\s*(.+)/);
+            const qtyMatch = msg.match(/Ποσότητα:\s*(.+)/);
+            const name = itemMatch ? itemMatch[1].trim() : '';
+            const qty = qtyMatch ? qtyMatch[1].trim() : '';
+            if (name && !seen.has(name)) {
+                seen.add(name);
+                html += '<div style="display:flex;justify-content:space-between;padding:5px 0">' +
+                    '<span style="color:var(--color-text-secondary)">' + name + '</span>' +
+                    '<span style="font-weight:500;color:#EF9F27">' + qty + '</span></div>';
+            }
+        });
+    }
+
+    list.innerHTML = html || '<div style="padding:5px 0;color:var(--color-text-tertiary)">Δεν υπάρχουν ελλείψεις</div>';
+}
+
+const supplyItemMap = {};
+
+async function populateSupplyItems() {
+    const sel = document.getElementById('sup-item');
+    if (!sel) return;
+    if (!supabase) return;
+    const { data: items } = await supabase
+        .from('INVENTORY_ITEM')
+        .select('ItemID, Name, Quantity, MinThreshold')
+        .eq('Category', 'κηπος')
+        .order('Name');
+    sel.innerHTML = '<option value="">— Επιλέξτε Υλικό —</option>';
+    (items || []).forEach(item => {
+        sel.innerHTML += '<option value="' + item.Name + '">' + item.Name + ' (απόθεμα: ' + item.Quantity + ')</option>';
+        supplyItemMap[item.Name] = item;
+    });
+    sel.onchange = function() {
+        const qtyInput = document.getElementById('sup-qty');
+        const item = supplyItemMap[this.value];
+        if (item && item.Quantity < item.MinThreshold) {
+            qtyInput.value = item.MinThreshold - item.Quantity;
+        } else {
+            qtyInput.value = '';
+        }
+    };
+}
+
+async function showStockDisplay() {
+    const el = document.getElementById('stock-display');
+    if (!el) return;
+    if (!supabase) { el.textContent = ''; return; }
+    const { data: items } = await supabase
+        .from('INVENTORY_ITEM')
+        .select('Name, Quantity, MinThreshold')
+        .eq('Category', 'κηπος')
+        .order('Name');
+    if (!items || items.length === 0) { el.textContent = 'Δεν υπάρχουν υλικά.'; return; }
+    el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 60px;gap:4px;max-width:320px;font-weight:500">' +
+        '<div style="padding:4px 0;border-bottom:1px solid var(--color-border-secondary);font-size:11px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.3px">Υλικό</div>' +
+        '<div style="padding:4px 0;border-bottom:1px solid var(--color-border-secondary);font-size:11px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.3px;text-align:right">Απόθεμα</div>' +
+        items.map(item => {
+            const isLow = item.Quantity < item.MinThreshold;
+            return '<div style="padding:4px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:13px' + (isLow ? ';color:#D85A30;font-weight:600' : '') + '">' + item.Name + '</div>' +
+                '<div style="padding:4px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:13px;text-align:right;font-weight:600' + (isLow ? ';color:#D85A30' : '') + '">' + item.Quantity +
+                (isLow ? ' <span style="font-size:10px;color:#D85A30;font-weight:500">(έλλειψη ' + (item.MinThreshold - item.Quantity) + ')</span>' : '') +
+                '</div>';
+        }).join('') + '</div>';
 }
 
 window.logout = async function() {
