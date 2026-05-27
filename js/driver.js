@@ -378,47 +378,36 @@ function renderHiddenBanner(container) {
 }
 
 window.completeTrip = async function(tripId) {
-    if (window._tripHasStatus) {
-        try {
-            const { error } = await supabase
-                .from('TRIP')
-                .update({ Status: 'completed' })
-                .eq('TripID', tripId);
-            if (error) throw error;
+    try {
+        await supabase.from('TRIP').update({ Status: 'completed' }).eq('TripID', tripId);
+    } catch (_) {}
 
-            const trip = todayTrips.find(t => t.TripID === tripId);
-            if (trip) trip.Status = 'completed';
+    const trip = todayTrips.find(t => t.TripID === tripId);
+    if (trip) trip.Status = 'completed';
 
-            const driverName = currentUser?.name || 'Οδηγός';
-            const dest = trip?.Destination || '—';
-            const cost = trip?.Cost || '—';
-            const dateStr = trip?.Date ? new Date(trip.Date).toLocaleDateString('el-GR') : '—';
+    const driverName = currentUser?.name || 'Οδηγός';
+    const dest = trip?.Destination || '—';
+    const cost = trip?.Cost != null ? '€' + trip.Cost : '—';
+    const dateStr = trip?.Date ? new Date(trip.Date).toLocaleDateString('el-GR') : '—';
 
-            let vehicleInfo = '—';
-            if (trip?.VehicleID) {
-                const { data: veh } = await supabase
-                    .from('VEHICLE')
-                    .select('PlateNumber')
-                    .eq('VehicleID', trip.VehicleID)
-                    .maybeSingle();
-                if (veh) vehicleInfo = veh.PlateNumber || '—';
-            }
-
-            await supabase.from('NOTIFICATION').insert([{
-                TargetRole: 'external_manager',
-                Type: 'trip_completed',
-                Message: `${driverName} | Προορισμός: ${dest} | Κόστος: €${cost} | Όχημα: ${vehicleInfo} | Ημ/νία: ${dateStr}`,
-                IsRead: false,
-                CreatedAt: new Date().toISOString()
-            }]);
-        } catch (err) {
-            showToast('Σφάλμα ενημέρωσης: ' + err.message, 'error');
-            return;
-        }
-    } else {
-        const idx = todayTrips.findIndex(t => t.TripID === tripId);
-        if (idx !== -1) localCompleted.add(idx);
+    let vehicleInfo = '—';
+    if (trip?.VehicleID) {
+        const { data: veh } = await supabase
+            .from('VEHICLE')
+            .select('PlateNumber')
+            .eq('VehicleID', trip.VehicleID)
+            .maybeSingle();
+        if (veh) vehicleInfo = veh.PlateNumber || '—';
     }
+
+    await supabase.from('NOTIFICATION').insert([{
+        TargetRole: 'both',
+        Type: 'trip_completed',
+        Message: `${driverName} | Προορισμός: ${dest} | Κόστος: ${cost} | Όχημα: ${vehicleInfo} | Ημ/νία: ${dateStr}`,
+        IsRead: false,
+        CreatedAt: new Date().toISOString()
+    }]);
+
     updateOverview();
     renderTrips();
     showToast('Η διαδρομή ολοκληρώθηκε!', 'success');

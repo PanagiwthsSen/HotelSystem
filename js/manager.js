@@ -396,7 +396,7 @@ async function fetchTripFormData() {
 
   const [driversRes, vehiclesRes, customersRes, maxTripRes] = await Promise.all([
     supabase.from('EMPLOYEE').select('EmpID, FirstName, LastName').eq('Role', 'driver').eq('isActive', true).order('FirstName'),
-    supabase.from('VEHICLE').select('VehicleID, PlateNumber, PlateNumber').neq('Status', 'maintenance').order('PlateNumber'),
+    supabase.from('VEHICLE').select('VehicleID, PlateNumber, Type').neq('Status', 'maintenance').order('PlateNumber'),
     supabase.from('CUSTOMER').select('CustomerID, FirstName, LastName').order('FirstName'),
     supabase.from('TRIP').select('TripID', { count: 'exact', head: true }).order('TripID', { ascending: false }).limit(1)
   ]);
@@ -417,7 +417,7 @@ async function fetchTripFormData() {
   if (vehicleSel) {
     vehicleSel.innerHTML = '<option value="">— Επιλέξτε Όχημα —</option>';
     vehicles.forEach(v => {
-      vehicleSel.innerHTML += '<option value="' + v.VehicleID + '">' + (v.PlateNumber || v.VehicleID) + '</option>';
+      vehicleSel.innerHTML += '<option value="' + v.VehicleID + '">' + (v.Type || 'Όχημα') + ' (' + (v.PlateNumber || v.VehicleID) + ')</option>';
     });
   }
 
@@ -610,7 +610,7 @@ async function fetchRestockNotifs() {
     .order('CreatedAt', { ascending: false });
 
   if (role === 'external_manager') {
-    query = query.eq('TargetRole', 'external_manager');
+    query = query.in('TargetRole', ['external_manager', 'both']);
   } else {
     query = query.in('TargetRole', ['manager', 'both', 'internal_manager']);
   }
