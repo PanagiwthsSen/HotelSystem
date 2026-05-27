@@ -295,7 +295,7 @@ async function fetchFleetMaintenance() {
 
     rows += '<tr style="border-bottom:1px solid var(--color-border-tertiary)">'
       + '<td style="padding:8px; font-weight:500">' + (v.PlateNumber || v.VehicleID) + '</td>'
-      + '<td style="padding:8px">—</td>'
+      + '<td style="padding:8px">' + (v.CurrentKm != null ? Number(v.CurrentKm).toLocaleString() + ' km' : '—') + '</td>'
       + '<td style="padding:8px">' + lastDate + '</td>'
       + '<td style="padding:8px">' + statusHtml + '</td>'
       + '</tr>';
