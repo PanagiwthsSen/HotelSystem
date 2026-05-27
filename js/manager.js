@@ -626,6 +626,19 @@ async function fetchRestockNotifs() {
       icon = 'ti ti-seeding';
       label = 'Αίτημα Προμηθειών Κήπου:';
       cls = 'ns ns-w';
+    } else if (n.Type === 'restock_request') {
+      const parts = n.Message.split(' || ');
+      const displayMsg = parts[0] || n.Message;
+
+      html += '<div class="ns ns-w" style="flex-wrap:wrap;gap:8px">'
+        + '<i class="ti ti-shopping-cart"></i>'
+        + '<div><strong>Αίτημα Παραγγελίας Αποθέματος:</strong> ' + displayMsg + '</div>'
+        + '<div style="display:flex;gap:6px;flex-shrink:0">'
+        + '<button class="btn btn-sm btn-dark" onclick="event.stopPropagation(); window.acceptRestockRequest(' + n.NotificationID + ')"><i class="ti ti-check"></i> Αποδοχή</button>'
+        + '<button class="btn btn-sm" onclick="event.stopPropagation(); window.denyRestockRequest(' + n.NotificationID + ', this)"><i class="ti ti-x"></i> Απόρριψη</button>'
+        + '</div>'
+        + '</div>';
+      return;
     }
 
     html += '<div class="' + cls + '" onclick="window.dismissNotif(' + n.NotificationID + ', this)" style="cursor:pointer">'
@@ -685,6 +698,98 @@ window.dismissNotif = async function(id, el) {
     showToast('Η ειδοποίηση απορρίφθηκε.', 'info');
   } catch (err) {
     showToast('Σφάλμα απόρριψης.', 'error');
+  }
+};
+
+window.acceptRestockRequest = async function (id) {
+  try {
+    const { data: notif } = await supabase
+      .from('NOTIFICATION')
+      .select('Message')
+      .eq('NotificationID', id)
+      .single();
+
+    if (!notif) return;
+
+    const parts = notif.Message.split(' || ');
+    const idsStr = parts[1];
+    const displayMsg = parts[0] || '';
+
+    if (idsStr) {
+      const itemIds = idsStr.split(',').map(Number).filter(Boolean);
+      for (const itemId of itemIds) {
+        const { data: item } = await supabase
+          .from('INVENTORY_ITEM')
+          .select('MinThreshold')
+          .eq('ItemID', itemId)
+          .single();
+
+        if (item) {
+          const newQty = Math.max(item.MinThreshold * 2, 10);
+          await supabase
+            .from('INVENTORY_ITEM')
+            .update({ Quantity: newQty })
+            .eq('ItemID', itemId);
+        }
+      }
+    }
+
+    const itemNames = displayMsg.replace(/^Αίτημα παραγγελίας αποθέματος από minibar:\s*/, '');
+
+    await supabase.from('NOTIFICATION').insert({
+      TargetRole: 'minibar',
+      Type: 'restock_accepted',
+      Message: 'Επιτυχής ανεφοδιασμός: ' + itemNames + ' — Το απόθεμα ανανεώθηκε.',
+      IsRead: false,
+      CreatedAt: new Date().toISOString()
+    });
+
+    await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
+
+    const el = document.querySelector(`[onclick*="acceptRestockRequest(${id})"]`)?.closest('.ns');
+    if (el) {
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    }
+
+    showToast('Το αίτημα έγινε αποδεκτό — το απόθεμα ανανεώθηκε.', 'success');
+  } catch (err) {
+    showToast('Σφάλμα αποδοχής: ' + (err.message || err), 'error');
+  }
+};
+
+window.denyRestockRequest = async function (id, btn) {
+  try {
+    const { data: notif } = await supabase
+      .from('NOTIFICATION')
+      .select('Message')
+      .eq('NotificationID', id)
+      .single();
+
+    const parts = notif ? notif.Message.split(' || ') : [];
+    const displayMsg = parts[0] || '';
+
+    const itemNames = displayMsg.replace(/^Αίτημα παραγγελίας αποθέματος από minibar:\s*/, '');
+
+    await supabase.from('NOTIFICATION').insert({
+      TargetRole: 'minibar',
+      Type: 'restock_denied',
+      Message: 'Το αίτημα παραγγελίας αποθέματος απορρίφθηκε: ' + itemNames,
+      IsRead: false,
+      CreatedAt: new Date().toISOString()
+    });
+
+    await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
+
+    const el = btn?.closest('.ns');
+    if (el) {
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    }
+
+    showToast('Το αίτημα απορρίφθηκε.', 'info');
+  } catch (err) {
+    showToast('Σφάλμα απόρριψης: ' + (err.message || err), 'error');
   }
 };
 
