@@ -112,7 +112,7 @@
 - **Arrivals/departures**: Only 1 reservation starting 2026-05-20. For today's data, insert with CheckInDate/CheckOutDate = '2026-05-19'
 - **Revenue chart**: No receipts exist — insert sample rows to test
 - **Room map**: All 510 rooms are `free` — no occupied/dirty states visible yet
-- **Maid page**: Connected to Supabase (ROOM, RESERVATION_ROOM, RESERVATION, INVENTORY_ITEM, NOTIFICATION)
+- **Maid page**: Connected to Supabase (ROOM, RESERVATION_ROOM, RESERVATION, INVENTORY_ITEM, NOTIFICATION). Known issues fixed: `submitReport()` → `window.submitReport()` for ES module scope; cleaned departure rooms removed from stale `departures` array; all Supabase calls now destructure `{ error }` and throw on failure (prevent silent DB update failures where page refresh shows room as dirty again). All static HTML onclick handlers prefixed with `window.` for ES module scope safety. All Supabase queries (`markDepartureCleaned`, `reportRoomIssue`, `submitReport`, `submitNewMb`, `submitLinen`, `receiveLinen`, `reportLowStock`) now properly destructure `{ error }`.
 - **Minibar page**: Connected to Supabase (RESERVATION, RESERVATION_ROOM, INVENTORY_ITEM, NOTIFICATION)
 - **Manager page**: Connected to Supabase (EMPLOYEE, TRIP, VEHICLE, SHIFT, INVENTORY_ITEM, NOTIFICATION)
 - **Gardener page**: Uses hardcoded HTML data (no Supabase queries)

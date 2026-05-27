@@ -46,7 +46,7 @@
     <div class="av">
       <div class="av-circle">ΜΚ</div>
       <div><div class="av-name">Μαρία Κ.</div><div class="av-shift">09:00 – 17:00</div></div>
-      <i class="ti ti-logout" style="cursor:pointer;" title="Αποσύνδεση" id="logout-btn" onclick="logout()"></i>
+      <i class="ti ti-logout" style="cursor:pointer;" title="Αποσύνδεση" id="logout-btn" onclick="window.logout()"></i>
     </div>
   </div>
 </aside>
@@ -80,11 +80,11 @@
 
     <div class="g2">
       <div class="card">
-        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door" aria-hidden="true"></i>Επόμενα δωμάτια</div><button class="btn btn-sm" onclick="navTo('rooms')">Όλα →</button></div>
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-door" aria-hidden="true"></i>Επόμενα δωμάτια</div><button class="btn btn-sm" onclick="window.navTo('rooms')">Όλα →</button></div>
         <div style="display:flex;flex-direction:column;gap:6px" id="ov-room-list"></div>
       </div>
       <div class="card">
-        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-shirt" aria-hidden="true"></i>Ιματισμός σήμερα</div><button class="btn btn-sm" onclick="navTo('linen')">Λεπτομ. →</button></div>
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-shirt" aria-hidden="true"></i>Ιματισμός σήμερα</div><button class="btn btn-sm" onclick="window.navTo('linen')">Λεπτομ. →</button></div>
         <div id="ov-linen" style="font-size:12px"></div>
       </div>
     </div>
@@ -95,14 +95,14 @@
     
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('all',this)" data-filter="all">Όλα (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('urgent',this)" data-filter="urgent">Επείγον (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('priority',this)" data-filter="priority">Προτεραιότ. (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('pending',this)" data-filter="pending">Εκκρεμή (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('inprogress',this)" data-filter="inprogress">Σε εξέλιξη (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="filterRooms('done',this)" data-filter="done">Ολοκλ. (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('all',this)" data-filter="all">Όλα (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('urgent',this)" data-filter="urgent">Επείγον (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('priority',this)" data-filter="priority">Προτεραιότ. (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('pending',this)" data-filter="pending">Εκκρεμή (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('inprogress',this)" data-filter="inprogress">Σε εξέλιξη (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('done',this)" data-filter="done">Ολοκλ. (0)</button>
         </div>
-        <button class="btn btn-sm btn-dark" onclick="exportToPDF('room-list', 'GrandKavala_Maid_Schedule')"><i class="ti ti-file-download" aria-hidden="true"></i> Πρόγραμμα (PDF)</button>
+        <button class="btn btn-sm btn-dark" onclick="window.exportToPDF('room-list', 'GrandKavala_Maid_Schedule')"><i class="ti ti-file-download" aria-hidden="true"></i> Πρόγραμμα (PDF)</button>
     </div>
 
     <div class="room-list" id="room-list"></div>
@@ -128,14 +128,14 @@
           <select id="mb-status-sel"><option>Προς καθαρισμό</option><option>Ήδη καθαρό</option></select>
         </div>
       </div>
-      <button class="btn btn-dark" onclick="submitNewMb()"><i class="ti ti-send" aria-hidden="true"></i> Αποστολή στην Υποδοχή</button>
+      <button class="btn btn-dark" onclick="window.submitNewMb()"><i class="ti ti-send" aria-hidden="true"></i> Αποστολή στην Υποδοχή</button>
     </div>
   </div>
 
   <div class="view" id="v-linen">
     <div class="toast" id="linen-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i><span>Αποστολή καταχωρήθηκε!</span></div>
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-truck-delivery" aria-hidden="true"></i>Αποστολή στο Καθαριστήριο</div><button class="btn btn-sm btn-dark" onclick="submitLinen()"><i class="ti ti-check" aria-hidden="true"></i> Καταχώρηση</button></div>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-truck-delivery" aria-hidden="true"></i>Αποστολή στο Καθαριστήριο</div><button class="btn btn-sm btn-dark" onclick="window.submitLinen()"><i class="ti ti-check" aria-hidden="true"></i> Καταχώρηση</button></div>
       <div id="linen-send-list" style="margin-bottom:8px">
         <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--color-text-secondary)">
           <span>Είδος</span><span style="text-align:center">Απόθεμα</span><span style="text-align:center">Ελάχ. Απόθ.</span>
@@ -179,8 +179,8 @@
         <textarea placeholder="π.χ. S-02 χρειάζεται επιπλέον στρώμα..."></textarea>
       </div>
       <div style="display:flex;gap:7px;margin-top:4px">
-        <button class="btn btn-dark" onclick="submitReport()"><i class="ti ti-send" aria-hidden="true"></i> Αποστολή Αναφοράς</button>
-        <button class="btn" onclick="exportToPDF('maid-report-area', 'GrandKavala_Maid_Report')"><i class="ti ti-printer" aria-hidden="true"></i> Εκτύπωση (PDF)</button>
+        <button class="btn btn-dark" onclick="window.submitReport()"><i class="ti ti-send" aria-hidden="true"></i> Αποστολή Αναφοράς</button>
+        <button class="btn" onclick="window.exportToPDF('maid-report-area', 'GrandKavala_Maid_Report')"><i class="ti ti-printer" aria-hidden="true"></i> Εκτύπωση (PDF)</button>
       </div>
 
       <div style="margin-top:14px;border-top:0.5px solid var(--color-border-tertiary);padding-top:12px">
