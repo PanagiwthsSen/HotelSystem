@@ -1,6 +1,6 @@
 import { supabase } from './supabase-config.js';
 import { showToast, normalizeString, formatDate, updateLiveTime } from './utils/ui.js';
-import { isSoonCheckout, getStatusLabel, buildCheckoutMap, calcDynamicPrice, fetchSpecialPricing, fetchOccupancyPercentage } from './services/api.js';
+import { isSoonCheckout, getStatusLabel, buildCheckoutMap, calcDynamicPrice, fetchSpecialPricing, fetchOccupancyPercentage, mapDbStatusToUI } from './services/api.js';
 import { renderRoomMap } from './components/RoomMap.js';
 
 /* ==============================================================
@@ -37,17 +37,6 @@ let hotelRooms = [];
 let currentOcc = 0, currentFree = 0, currentDirty = 0, currentCleaning = 0;
 let selectedRoom = null;
 let checkoutMap = {};
-
-function mapDbStatusToUI(dbStatus) {
-    switch (dbStatus) {
-        case 'occ': return 'occ';
-        case 'free': return 'free';
-        case 'dirty': return 'dirty';
-        case 'cleaning': return 'cleaning';
-        case 'clean': return 'free';
-        default: return 'free';
-    }
-}
 
 async function fetchRoomsAndRender() {
     try {

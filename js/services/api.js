@@ -172,6 +172,17 @@ export function getStatusLabel(state) {
     return 'Ελεύθερο';
 }
 
+export function mapDbStatusToUI(dbStatus) {
+    switch (dbStatus) {
+        case 'occ': return 'occ';
+        case 'free': return 'free';
+        case 'dirty': return 'dirty';
+        case 'cleaning': return 'cleaning';
+        case 'clean': return 'free';
+        default: return 'free';
+    }
+}
+
 export async function buildCheckoutMap() {
     const map = {};
     try {

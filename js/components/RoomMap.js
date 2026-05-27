@@ -121,8 +121,118 @@ function showRoomModal(r, prefix, stateGr) {
     document.addEventListener('keydown', onKey);
 }
 
+function renderCards(container, rooms, filter, options) {
+    const { departures = [] } = options;
+
+    const data = filter === 'all'
+        ? rooms
+        : rooms.filter(r => r.state === filter);
+
+    if (data.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-secondary)">Δεν υπάρχουν δωμάτια για αυτό το φίλτρο.</div>';
+        return;
+    }
+
+    const depRoomNums = new Set(departures.map(d => d.room));
+
+    data.sort((a, b) => {
+        const orderMap = { dirty: 1, occ: 0, cleaning: 2, free: 3, done: 4 };
+        const oa = depRoomNums.has(a.num) && a.state === 'dirty' ? 0 : orderMap[a.state] || 3;
+        const ob = depRoomNums.has(b.num) && b.state === 'dirty' ? 0 : orderMap[b.state] || 3;
+        return oa - ob;
+    });
+
+    container.innerHTML = data.map(r => {
+        const isUrgent = r.state === 'dirty';
+        const isPriority = r.state === 'occ';
+        const isInProgress = r.state === 'cleaning';
+        const isFree = r.state === 'free';
+        const isDep = depRoomNums.has(r.num);
+
+        if (isDep && r.state === 'dirty') {
+            const d = departures.find(x => x.room == r.num);
+            if (d) {
+                const mbHtml = d.mbTotal > 0
+                    ? `<span class="pill p-b">€${d.mbTotal.toFixed(2)}</span>`
+                    : '<span class="pill p-g" style="font-size:10px">—</span>';
+                return `<div class="room-card" id="rc-${r.id}">
+                    <div>
+                        <div class="room-num">${r.num}</div>
+                        <div class="room-type">${r.type}</div>
+                    </div>
+                    <div class="room-info">
+                        <div style="font-size:12px;font-weight:500">${d.customerName}</div>
+                        <div class="room-guest">Αναχώρηση σήμερα</div>
+                    </div>
+                    <div class="room-actions">
+                        ${mbHtml}
+                        <span class="pill p-r">Εκκρεμεί</span>
+                        <button class="btn btn-sm btn-teal" onclick="window.markDepartureCleaned('${d.room}')"><i class="ti ti-check" aria-hidden="true"></i> Καθαρίστηκε</button>
+                    </div>
+                </div>`;
+            }
+        }
+
+        if (isFree) {
+            return `<div class="room-card" id="rc-${r.id}" style="opacity:.7">
+                <div>
+                    <div class="room-num">${r.num}</div>
+                    <div class="room-type">${r.type}</div>
+                </div>
+                <div class="room-info">
+                    <div style="font-size:12px;font-weight:500">Διαθέσιμο</div>
+                    ${r.note ? `<div class="room-guest">${r.note}</div>` : ''}
+                </div>
+                <div class="room-actions">
+                    <span class="pill p-g">Διαθέσιμο</span>
+                    <button class="btn btn-sm" onclick="window.reportRoomIssue('${r.id}')"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Αναφορά</button>
+                </div>
+            </div>`;
+        }
+
+        if (r.state === 'done') {
+            const ts = r.completedAt ? new Date(r.completedAt).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' }) : '';
+            return `<div class="room-card done" id="rc-${r.id}">
+                <div>
+                    <div class="room-num">${r.num}</div>
+                    <div class="room-type">${r.type}</div>
+                </div>
+                <div class="room-info">
+                    <div style="font-size:12px;font-weight:500">Ολοκληρώθηκε</div>
+                    ${ts ? `<div class="room-guest">${ts}</div>` : ''}
+                </div>
+                <div class="room-actions">
+                    <span class="pill p-g">Ολοκληρώθηκε</span>
+                </div>
+            </div>`;
+        }
+
+        const pillClass = isUrgent ? 'p-r' : isPriority ? 'p-a' : isInProgress ? 'p-t' : 'p-b';
+        const pillText = isUrgent ? 'Επείγον' : isPriority ? 'Προτεραιότητα' : isInProgress ? 'Σε εξέλιξη' : 'Εκκρεμεί';
+        const guestText = r.guest || (isUrgent ? 'Αναχώρηση' : '');
+        return `<div class="room-card ${isUrgent ? 'urgent' : ''}" id="rc-${r.id}">
+            <div>
+                <div class="room-num">${r.num}</div>
+                <div class="room-type">${r.type}</div>
+            </div>
+            <div class="room-info">
+                <div style="font-size:12px;font-weight:500">${guestText || 'Κανονικός καθαρισμός'}</div>
+                ${r.note ? `<div class="room-guest">${r.note}</div>` : ''}
+            </div>
+            <div class="room-actions">
+                <span class="pill ${pillClass}">${pillText}</span>
+                ${isInProgress
+                    ? `<button class="btn btn-sm btn-dark" onclick="window.setRoomDone('${r.id}')"><i class="ti ti-check" aria-hidden="true"></i> Ολοκλήρωση</button>`
+                    : `<button class="btn btn-sm btn-teal" onclick="window.setRoomInProgress('${r.id}')"><i class="ti ti-player-play" aria-hidden="true"></i> ${isUrgent ? 'Καθαρισμός' : 'Έναρξη'}</button>`
+                }
+                <button class="btn btn-sm" onclick="window.reportRoomIssue('${r.id}')"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Αναφορά</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
 export function renderRoomMap(containerId, rooms, options = {}) {
-    const { filter = 'all', onRoomClick = null } = options;
+    const { filter = 'all', onRoomClick = null, mode = 'grid' } = options;
     const container = document.getElementById(containerId);
     if (!container) return;
 
@@ -130,6 +240,11 @@ export function renderRoomMap(containerId, rooms, options = {}) {
 
     if (!rooms || rooms.length === 0) {
         container.innerHTML = '<p style="color: var(--text-muted);">Δεν βρέθηκαν δωμάτια στη βάση.</p>';
+        return;
+    }
+
+    if (mode === 'cards') {
+        renderCards(container, rooms, filter, options);
         return;
     }
 

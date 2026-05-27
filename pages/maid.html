@@ -38,6 +38,7 @@
     <div class="sb-item" data-v="minibar"><i class="ti ti-fridge" aria-hidden="true"></i>Mini-bar<span class="sb-badge" id="badge-mb">0</span></div>
     <div class="sb-group">Ιματισμός</div>
     <div class="sb-item" data-v="linen"><i class="ti ti-shirt" aria-hidden="true"></i>Αποστολή & Παραλαβή</div>
+    <div class="sb-item" data-v="laundry"><i class="ti ti-wash-machine" aria-hidden="true"></i>Διαχείριση Ιματισμού</div>
     <div class="sb-item" data-v="stock"><i class="ti ti-package" aria-hidden="true"></i>Αποθεματικό</div>
     <div class="sb-group">Άλλα</div>
     <div class="sb-item" data-v="report"><i class="ti ti-notes" aria-hidden="true"></i>Αναφορά Βάρδιας</div>
@@ -84,6 +85,10 @@
         <div style="display:flex;flex-direction:column;gap:6px" id="ov-room-list"></div>
       </div>
       <div class="card">
+        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-fridge" aria-hidden="true"></i>Mini-bar σήμερα</div><button class="btn btn-sm" onclick="window.navTo('minibar')">Λεπτομ. →</button></div>
+        <div id="ov-minibar-list" style="font-size:12px"></div>
+      </div>
+      <div class="card">
         <div class="card-hd"><div class="card-hd-l"><i class="ti ti-shirt" aria-hidden="true"></i>Ιματισμός σήμερα</div><button class="btn btn-sm" onclick="window.navTo('linen')">Λεπτομ. →</button></div>
         <div id="ov-linen" style="font-size:12px"></div>
       </div>
@@ -96,11 +101,11 @@
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('all',this)" data-filter="all">Όλα (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('urgent',this)" data-filter="urgent">Επείγον (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('priority',this)" data-filter="priority">Προτεραιότ. (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('pending',this)" data-filter="pending">Εκκρεμή (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('inprogress',this)" data-filter="inprogress">Σε εξέλιξη (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('done',this)" data-filter="done">Ολοκλ. (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('free',this)" data-filter="free">Διαθέσιμα (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('dirty',this)" data-filter="dirty">Επείγον (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('occ',this)" data-filter="occ">Προτεραιότ. (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('cleaning',this)" data-filter="cleaning">Σε εξέλιξη (0)</button>
+          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('completed',this)" data-filter="completed">Ολοκληρωμένα (0)</button>
         </div>
         <button class="btn btn-sm btn-dark" onclick="window.exportToPDF('room-list', 'GrandKavala_Maid_Schedule')"><i class="ti ti-file-download" aria-hidden="true"></i> Πρόγραμμα (PDF)</button>
     </div>
@@ -111,7 +116,12 @@
   <div class="view" id="v-minibar">
     <div class="toast" id="mb-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i><span>Mini-bar καταχωρήθηκε — υποδοχή ενημερώθηκε αυτόματα!</span></div>
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-fridge" aria-hidden="true"></i>Εκκρεμείς Ελέγχοι Mini-bar</div></div>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-fridge" aria-hidden="true"></i>Δωμάτια Βάρδιας Mini-bar</div></div>
+      <div id="mb-assigned-rooms" style="font-size:12px;color:var(--color-text-secondary);padding:8px 0">Φόρτωση δωματίων...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-list" aria-hidden="true"></i>Εκκρεμείς Χρεώσεις</div></div>
       <div id="mb-list"></div>
     </div>
 
@@ -160,6 +170,80 @@
         <thead><tr><th style="width:30%">Είδος</th><th style="width:14%">Κατηγορία</th><th style="width:16%">Απόθεμα</th><th style="width:14%">Ελάχ.</th><th style="width:20%">Κατάσταση</th><th style="width:16%">Ενέργεια</th></tr></thead>
         <tbody id="stock-body"></tbody>
       </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-laundry">
+    <div class="toast" id="laundry-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i><span>Καταχωρήθηκε!</span></div>
+
+    <!-- SUB NAV -->
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-dark" style="font-size:11px" onclick="window.laundrySubNav('dispatch')" data-laundry="dispatch">Αποστολή</button>
+      <button class="btn btn-sm" style="font-size:11px" onclick="window.laundrySubNav('receive')" data-laundry="receive">Παραλαβή</button>
+      <button class="btn btn-sm" style="font-size:11px" onclick="window.laundrySubNav('history')" data-laundry="history">Ιστορικό</button>
+      <button class="btn btn-sm" style="font-size:11px" onclick="window.laundrySubNav('damage')" data-laundry="damage">Ζημιές</button>
+    </div>
+
+    <!-- DISPATCH FORM -->
+    <div class="card laundry-sub" id="ls-dispatch">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-truck-delivery" aria-hidden="true"></i>Αποστολή Ιματισμού στο Πλυντήριο</div><button class="btn btn-sm btn-dark" id="btn-dispatch-laundry"><i class="ti ti-send" aria-hidden="true"></i> Αποστολή</button></div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px">Επιλέξτε είδη και ποσότητες προς αποστολή. Το απόθεμα θα μηδενιστεί προσωρινά.</div>
+      <div id="laundry-dispatch-items">
+        <div style="padding:1rem;text-align:center;color:var(--color-text-secondary)">Φόρτωση ειδών...</div>
+      </div>
+    </div>
+
+    <!-- RECEIVE FORM -->
+    <div class="card laundry-sub" id="ls-receive" style="display:none">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-package-import" aria-hidden="true"></i>Παραλαβή Ιματισμού από Πλυντήριο</div><button class="btn btn-sm btn-dark" id="btn-receive-laundry"><i class="ti ti-check" aria-hidden="true"></i> Καταχώρηση Παραλαβής</button></div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px">Επιλέξτε εκκρεμή αποστολή και καταχωρήστε τις ποσότητες που επιστρέφονται.</div>
+      <div class="fg" style="margin-bottom:8px">
+        <label>Εκκρεμής Αποστολή</label>
+        <select id="laundry-receive-dispatch" style="width:100%;padding:6px;border-radius:6px;border:0.5px solid var(--color-border-tertiary);background:var(--color-bg);color:var(--color-text)"></select>
+      </div>
+      <div id="laundry-receive-items">
+        <div style="padding:1rem;text-align:center;color:var(--color-text-secondary)">Επιλέξτε αποστολή πρώτα</div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="card laundry-sub" id="ls-history" style="display:none">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-history" aria-hidden="true"></i>Ιστορικό Ιματισμού</div></div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:500;margin-bottom:4px">Τελευταίες Αποστολές</div>
+        <div id="laundry-dispatch-history" style="font-size:11px;overflow-x:auto"></div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:500;margin-bottom:4px">Τελευταίες Παραλαβές</div>
+        <div id="laundry-receive-history" style="font-size:11px;overflow-x:auto"></div>
+      </div>
+    </div>
+
+    <!-- DAMAGE LOG -->
+    <div class="card laundry-sub" id="ls-damage" style="display:none">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Αναφορές Ζημιών & Απωλειών</div></div>
+      <div id="laundry-damage-list" style="font-size:11px;overflow-x:auto">
+        <div style="padding:1rem;text-align:center;color:var(--color-text-secondary)">Καμία καταγεγραμμένη ζημιά</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Issue Modal -->
+  <div class="inv-overlay" id="report-issue-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10001;align-items:center;justify-content:center">
+    <div class="inv-modal" style="background:#fff;border-radius:14px;width:440px;max-width:90vw;padding:20px;animation:scaleIn 0.2s ease-out">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;border-bottom:0.5px solid var(--color-border-tertiary);padding-bottom:12px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:#D85A30"></i>
+        <span style="font-size:14px;font-weight:500">Αναφορά Προβλήματος — Δωμάτιο <span id="ri-room-num"></span></span>
+        <i class="ti ti-x" id="ri-close" style="margin-left:auto;cursor:pointer;font-size:20px;color:var(--color-text-secondary)"></i>
+      </div>
+      <div class="fg">
+        <label>Περιγραφή προβλήματος</label>
+        <textarea id="ri-desc" style="min-height:100px;padding:9px;border:0.5px solid var(--color-border-secondary);border-radius:8px;font-size:13px;font-family:inherit;width:100%;resize:vertical" placeholder="π.χ. Σπασμένο φωτιστικό, βουλωμένη τουαλέτα, λείπει πετσέτα..."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn" id="ri-cancel">Ακύρωση</button>
+        <button class="btn btn-dark" id="ri-submit"><i class="ti ti-send"></i> Αποστολή Αναφοράς</button>
+      </div>
     </div>
   </div>
 

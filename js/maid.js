@@ -1,5 +1,7 @@
 import { supabase } from './supabase-config.js';
 import { updateLiveTime } from './utils/ui.js';
+import { fetchRooms, mapDbStatusToUI } from './services/api.js';
+import { renderRoomMap } from './components/RoomMap.js';
 
 /* ==============================================================
    STATE
@@ -8,11 +10,11 @@ let hotelUser = null;
 let maidRooms = [];
 let inventoryItems = [];
 let notifications = [];
-let roomStates = {};
 let mbCount = 0;
 let currentFilter = 'all';
 let departures = [];
-const vTitles = { overview: 'Επισκόπηση Βάρδιας', rooms: 'Δωμάτια Βάρδιας', minibar: 'Mini-bar', linen: 'Ιματισμός — Αποστολή & Παραλαβή', stock: 'Αποθεματικό', report: 'Αναφορά Βάρδιας' };
+let completedRooms = [];
+const vTitles = { overview: 'Επισκόπηση Βάρδιας', rooms: 'Δωμάτια Βάρδιας', minibar: 'Mini-bar', linen: 'Ιματισμός — Αποστολή & Παραλαβή', stock: 'Αποθεματικό', report: 'Αναφορά Βάρδιας', laundry: 'Διαχείριση Ιματισμού' };
 
 /* ==============================================================
    INIT
@@ -58,7 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'MINIBAR_CONSUMPTION' }, async () => {
         await fetchPendingMb();
         recomputeCounters();
-        if (document.getElementById('v-minibar')?.classList.contains('active')) renderPendingMb();
+        if (document.getElementById('v-minibar')?.classList.contains('active')) { renderPendingMb(); renderMinibarAssignedRooms(); }
         renderOverview();
       }).subscribe();
 
@@ -78,6 +80,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (document.getElementById('v-linen')?.classList.contains('active')) renderLinen();
         renderOverview();
       }).subscribe();
+
+    supabase.channel('maid-laundry')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'LAUNDRY_DISPATCH' }, async () => {
+        await fetchLaundryDispatches();
+        if (document.getElementById('v-laundry')?.classList.contains('active')) {
+          renderLaundryDispatchForm();
+          renderLaundryReceiveSelect();
+          if (currentLaundrySub === 'history') renderLaundryHistory();
+        }
+      }).subscribe();
+
+    supabase.channel('maid-laundry-receive')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'LAUNDRY_RECEIVE' }, async () => {
+        await fetchLaundryReceives();
+        if (document.getElementById('v-laundry')?.classList.contains('active')) {
+          renderLaundryReceiveSelect();
+          if (currentLaundrySub === 'history') renderLaundryHistory();
+          if (currentLaundrySub === 'receive') renderLaundryReceiveForm();
+        }
+      }).subscribe();
+
+    supabase.channel('maid-laundry-damage')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'LAUNDRY_DAMAGE' }, async () => {
+        await fetchLaundryDamages();
+        if (document.getElementById('v-laundry')?.classList.contains('active') && currentLaundrySub === 'damage') {
+          renderLaundryDamages();
+        }
+      }).subscribe();
+
+    supabase.channel('maid-inventory-updated')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'INVENTORY_ITEM' }, async () => {
+        await fetchInventory();
+        if (document.getElementById('v-laundry')?.classList.contains('active')) {
+          if (currentLaundrySub === 'dispatch') renderLaundryDispatchForm();
+          if (currentLaundrySub === 'receive') renderLaundryReceiveForm();
+        }
+        if (document.getElementById('v-stock')?.classList.contains('active')) renderStock();
+        if (document.getElementById('v-linen')?.classList.contains('active')) renderLinen();
+      }).subscribe();
   }
   subscribeToChanges();
 
@@ -88,11 +129,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     await fetchPendingMb();
     await fetchTodayDepartures();
     await fetchInventory();
+    await fetchLaundryDispatches();
+    await fetchLaundryReceives();
+    await fetchLaundryDamages();
     recomputeCounters();
     if (document.getElementById('v-rooms')?.classList.contains('active')) renderRooms(currentFilter);
     if (document.getElementById('v-minibar')?.classList.contains('active')) renderPendingMb();
     if (document.getElementById('v-stock')?.classList.contains('active')) renderStock();
     if (document.getElementById('v-linen')?.classList.contains('active')) renderLinen();
+    if (document.getElementById('v-laundry')?.classList.contains('active')) {
+      if (currentLaundrySub === 'dispatch') renderLaundryDispatchForm();
+      if (currentLaundrySub === 'receive') { renderLaundryReceiveSelect(); renderLaundryReceiveForm(); }
+      if (currentLaundrySub === 'history') renderLaundryHistory();
+      if (currentLaundrySub === 'damage') renderLaundryDamages();
+    }
     renderOverview();
   }, 120000);
 
@@ -111,14 +161,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ==============================================================
-   EFFECTIVE STATUS & COUNTER RECOMPUTE
+   COUNTER RECOMPUTE
    ============================================================== */
-
-function getEffectiveStatus(roomId) {
-  if (roomStates[roomId]) return roomStates[roomId];
-  const room = maidRooms.find(r => r.id === roomId);
-  return room ? room.status : 'pending';
-}
 
 function recomputeCounters() {
   if (maidRooms.length === 0) {
@@ -137,19 +181,19 @@ function recomputeCounters() {
     return;
   }
 
-  const counts = { done: 0, urgent: 0, priority: 0, pending: 0, inprogress: 0 };
+  const counts = {};
   maidRooms.forEach(r => {
-    const s = getEffectiveStatus(r.id);
+    const s = r.status;
     counts[s] = (counts[s] || 0) + 1;
   });
 
-  const doneCount = counts.done || 0;
-  const urgentCount = counts.urgent || 0;
-  const inProgressCount = counts.inprogress || 0;
-  const pendingCount = maidRooms.length - doneCount;
+  const doneCount = completedRooms.length;
+  const urgentCount = counts.dirty || 0;
+  const inProgressCount = counts.cleaning || 0;
+  const pendingCount = (counts.dirty || 0) + (counts.cleaning || 0) + (counts.occ || 0);
 
   const totalEl = document.getElementById('total-count');
-  if (totalEl) totalEl.textContent = maidRooms.length;
+  if (totalEl) totalEl.textContent = pendingCount;
   const doneEl = document.getElementById('done-count');
   if (doneEl) doneEl.textContent = doneCount;
   const pendEl = document.getElementById('pend-count');
@@ -172,7 +216,7 @@ function recomputeCounters() {
   if (ovUrgent) ovUrgent.textContent = urgentCount;
   const ovPct = document.getElementById('ov-progress-pct');
   const ovFill = document.querySelector('.prog-fill');
-  const pct = maidRooms.length > 0 ? Math.round(doneCount / maidRooms.length * 100) : 0;
+  const pct = (pendingCount + doneCount) > 0 ? Math.round(doneCount / (pendingCount + doneCount) * 100) : 0;
   if (ovPct) ovPct.textContent = pct;
   if (ovFill) ovFill.style.width = pct + '%';
 
@@ -190,9 +234,10 @@ window.navTo = function(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'v-' + id));
   document.getElementById('tb-title').textContent = vTitles[id] || id;
   if (id === 'rooms') renderRooms(currentFilter);
-  if (id === 'minibar') renderPendingMb();
+  if (id === 'minibar') { renderPendingMb(); renderMinibarAssignedRooms(); }
   if (id === 'stock') renderStock();
   if (id === 'linen') renderLinen();
+  if (id === 'laundry') renderLaundryView();
 };
 
 document.querySelectorAll('.sb-item').forEach(el => el.addEventListener('click', () => window.navTo(el.dataset.v)));
@@ -219,7 +264,10 @@ async function loadAllData() {
       fetchInventory(),
       fetchMaidNotifications(),
       fetchPendingMb(),
-      fetchTodayDepartures()
+      fetchTodayDepartures(),
+      fetchLaundryDispatches(),
+      fetchLaundryReceives(),
+      fetchLaundryDamages()
     ]);
   } catch (e) {
     console.error('Σφάλμα φόρτωσης δεδομένων:', e);
@@ -229,17 +277,13 @@ async function loadAllData() {
   await computeReportStats();
   renderOverview();
   recomputeCounters();
+  renderLaundryView();
 }
 
 async function fetchMaidRooms() {
-  const prevRoomIds = new Set(maidRooms.map(r => r.id));
   try {
-    const { data: rooms, error: roomsErr } = await supabase
-      .from('ROOM')
-      .select('RoomNumber, RoomType, Status')
-      .order('RoomNumber', { ascending: true });
-    if (roomsErr) throw roomsErr;
-    if (!rooms) return;
+    const rooms = await fetchRooms();
+    if (!rooms || rooms.length === 0) { maidRooms = []; return; }
 
     const { data: resRooms, error: rrErr } = await supabase
       .from('RESERVATION_ROOM')
@@ -271,51 +315,32 @@ async function fetchMaidRooms() {
       }
     }
 
-    maidRooms = rooms.map(r => {
-      const guests = rrMap[r.RoomNumber];
-      let status = 'pending';
-      let note = '';
-      if (r.Status === 'dirty') {
-        status = 'urgent';
-        note = 'Check-out — Απαιτείται καθαρισμός';
-      } else if (r.Status === 'cleaning') {
-        status = 'inprogress';
-        note = 'Καθαρισμός σε εξέλιξη';
-      } else if (r.Status === 'clean' || r.Status === 'free') {
-        status = 'done';
-      }
-      if (guests && guests.length > 0) {
-        note = guests.join(', ');
-        if (r.Status === 'occ') status = 'priority';
-      }
-      return {
-        id: String(r.RoomNumber),
-        num: r.RoomNumber,
-        type: r.RoomType || 'Standard',
-        status: status,
-        origStatus: r.Status,
-        guest: guests ? guests.join(', ') : null,
-        note: note
-      };
-    });
-
-    const newIds = new Set(maidRooms.map(r => r.id));
-    for (const id of Object.keys(roomStates)) {
-      if (!newIds.has(id)) delete roomStates[id];
-      else if (roomStates[id] === 'done') {
-        const room = maidRooms.find(r => r.id === id);
-        if (room && (room.status === 'done')) delete roomStates[id];
-      }
-    }
-    for (const id of Object.keys(roomStates)) {
-      if (roomStates[id] === 'inprogress') {
-        const room = maidRooms.find(r => r.id === id);
-        if (room && room.origStatus !== 'dirty' && room.origStatus !== 'cleaning') {
-          delete roomStates[id];
+    maidRooms = rooms
+      .filter(r => r.Status === 'dirty' || r.Status === 'cleaning' || r.Status === 'occ' || r.Status === 'free' || r.Status === 'clean')
+      .map(r => {
+        const guests = rrMap[r.RoomNumber];
+        let note = '';
+        if (r.Status === 'dirty') {
+          note = 'Check-out — Απαιτείται καθαρισμός';
+        } else if (r.Status === 'cleaning') {
+          note = 'Καθαρισμός σε εξέλιξη';
+        } else if (r.Status === 'free' || r.Status === 'clean') {
+          note = 'Έτοιμο προς χρήση';
         }
-      }
-    }
-
+        if (guests && guests.length > 0) {
+          note = guests.join(', ');
+        }
+        return {
+          id: String(r.RoomNumber),
+          num: r.RoomNumber,
+          type: r.RoomType || 'Standard',
+          status: r.Status,
+          state: mapDbStatusToUI(r.Status),
+          guest: guests ? guests.join(', ') : null,
+          note
+        };
+      });
+    await fetchMinibarAssignedRooms();
   } catch (e) {
     console.error('fetchMaidRooms error:', e);
   }
@@ -452,8 +477,10 @@ window.markDepartureCleaned = async function(roomNum) {
       Message: `Δωμάτιο ${roomNum} (${dep.roomType}) — Check-out καθαρίστηκε και είναι έτοιμο.`
     });
     if (notifErr) throw notifErr;
-    roomStates[roomNum] = 'done';
+    const depRoom = maidRooms.find(r => r.id === String(roomNum));
+    if (depRoom) completedRooms.push({ ...depRoom, state: 'done', status: 'clean', completedAt: new Date().toISOString() });
     departures = departures.filter(d => d.room != roomNum);
+    maidRooms = maidRooms.filter(r => r.id !== String(roomNum));
     showToast('room-toast', `Δωμάτιο ${roomNum} καθαρίστηκε — ειδοποιήθηκε η υποδοχή.`);
     addLog(`Check-out ${roomNum} (${dep.customerName}) — καθαρίστηκε`);
     recomputeCounters();
@@ -471,6 +498,7 @@ window.markDepartureCleaned = async function(roomNum) {
 function renderOverview() {
   renderOverviewNotifications();
   renderOverviewRoomList();
+  renderOverviewMinibar();
   renderOverviewLinen();
 }
 
@@ -492,16 +520,15 @@ function renderOverviewNotifications() {
 function renderOverviewRoomList() {
   const list = document.getElementById('ov-room-list');
   if (!list) return;
-  const urgent = maidRooms.filter(r => getEffectiveStatus(r.id) === 'urgent').slice(0, 5);
-  const priority = maidRooms.filter(r => getEffectiveStatus(r.id) === 'priority').slice(0, 5);
+  const urgent = maidRooms.filter(r => r.status === 'dirty').slice(0, 5);
+  const priority = maidRooms.filter(r => r.status === 'occ').slice(0, 5);
   const items = [...urgent, ...priority];
   if (items.length === 0) {
     list.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary)">Καμία εκκρεμότητα</div>';
     return;
   }
   list.innerHTML = items.map(r => {
-    const st = getEffectiveStatus(r.id);
-    const isUrg = st === 'urgent';
+    const isUrg = r.status === 'dirty';
     const label = isUrg ? 'Check-out' : 'Προτεραιότητα';
     return `<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
       <span style="font-weight:600;font-size:12px;min-width:50px">${r.num}</span>
@@ -514,102 +541,41 @@ function renderOverviewRoomList() {
   }).join('');
 }
 
+function renderOverviewMinibar() {
+  const el = document.getElementById('ov-minibar-list');
+  if (!el) return;
+  if (mbCount === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary);padding:4px 0">Καμία εκκρεμότητα mini-bar</div>';
+    return;
+  }
+  const items = pendingMbRecords.slice(0, 5);
+  el.innerHTML = items.map(r =>
+    `<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+      <span style="font-weight:600;font-size:12px;min-width:50px">${r.room}</span>
+      <span style="font-size:11px;color:var(--color-text-secondary);flex:1">${r.qty}× ${r.itemName}</span>
+      <span style="font-weight:500;font-size:11px">€${r.charge.toFixed(2)}</span>
+    </div>`
+  ).join('');
+}
+
 function renderOverviewLinen() {
   const el = document.getElementById('ov-linen');
   if (!el) return;
   el.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary);padding:4px 0">Παρακολούθηση ιματισμού στην καρτέλα Ιματισμός</div>';
 }
 
-const isLinenCategory = (cat, name) => ['linen', 'towel', 'robe', 'sheet', 'pillow', 'bedding', 'bath'].some(k => (cat || '').toLowerCase().includes(k) || (name || '').toLowerCase().includes(k));
+const isLinenCategory = (cat, name) => ['linen', 'towel', 'robe', 'sheet', 'pillow', 'bedding', 'bath', 'κρεβατιού', 'μπάνιου', 'πετσέτα', 'σεντόνι', 'μαξιλάρι', 'μπουρνούζι', 'τραπεζομάντηλο', 'ποδιά', 'πανί', 'στολή', 'δωμάτιο', 'κουζίνας', 'εστιατορίου', 'ειδικά'].some(k => (cat || '').toLowerCase().includes(k) || (name || '').toLowerCase().includes(k));
 
 /* ==============================================================
    ROOMS VIEW
    ============================================================== */
 function renderRooms(filter) {
-  const data = filter === 'all'
-    ? maidRooms.filter(r => getEffectiveStatus(r.id) !== 'done')
-    : maidRooms.filter(r => getEffectiveStatus(r.id) === filter);
-  const list = document.getElementById('room-list');
-  if (!list) return;
-
-  const depRoomNums = new Set(departures.map(d => d.room));
-
-  data.sort((a, b) => {
-    const sa = getEffectiveStatus(a.id);
-    const sb = getEffectiveStatus(b.id);
-    const isDepA = depRoomNums.has(a.num) && sa === 'urgent';
-    const isDepB = depRoomNums.has(b.num) && sb === 'urgent';
-    const orderA = sa === 'priority' ? 0 : isDepA ? 1 : sa === 'urgent' ? 2 : 3;
-    const orderB = sb === 'priority' ? 0 : isDepB ? 1 : sb === 'urgent' ? 2 : 3;
-    return orderA - orderB;
-  });
-
-  if (data.length === 0) {
-    list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-secondary)">Δεν υπάρχουν δωμάτια για αυτό το φίλτρο.</div>';
-    return;
-  }
-  list.innerHTML = data.map(r => {
-    const state = getEffectiveStatus(r.id);
-    const isDone = state === 'done';
-    const isUrgent = state === 'urgent';
-    const isPriority = state === 'priority';
-    const isInProgress = state === 'inprogress';
-    const isDep = depRoomNums.has(r.num);
-
-    if (isDep && getEffectiveStatus(r.id) !== 'done') {
-      const d = departures.find(x => x.room == r.num);
-      if (d) {
-        const mbHtml = d.mbTotal > 0
-          ? `<span class="pill p-b">€${d.mbTotal.toFixed(2)}</span>`
-          : '<span class="pill p-g" style="font-size:10px">—</span>';
-        return `<div class="room-card" id="rc-${r.id}">
-          <div>
-            <div class="room-num">${r.num}</div>
-            <div class="room-type">${r.type}</div>
-          </div>
-          <div class="room-info">
-            <div style="font-size:12px;font-weight:500">${d.customerName}</div>
-            <div class="room-guest">Αναχώρηση σήμερα</div>
-          </div>
-          <div class="room-actions">
-            ${mbHtml}
-            <span class="pill p-r">Εκκρεμεί</span>
-            <button class="btn btn-sm btn-teal" onclick="window.markDepartureCleaned('${d.room}')"><i class="ti ti-check" aria-hidden="true"></i> Καθαρίστηκε</button>
-          </div>
-        </div>`;
-      }
-    }
-
-    const pillClass = isDone ? 'p-g' : isUrgent ? 'p-r' : isPriority ? 'p-a' : isInProgress ? 'p-t' : 'p-b';
-    const pillText = isDone ? 'Ολοκλ.' : isUrgent ? 'Επείγον' : isPriority ? 'Προτεραιότητα' : isInProgress ? 'Σε εξέλιξη' : 'Εκκρεμεί';
-    const guestText = r.guest || (isUrgent ? 'Αναχώρηση' : '');
-    return `<div class="room-card ${isUrgent && !isDone ? 'urgent' : ''} ${isDone ? 'done' : ''}" id="rc-${r.id}">
-      <div>
-        <div class="room-num">${r.num}</div>
-        <div class="room-type">${r.type}</div>
-      </div>
-      <div class="room-info">
-        <div style="font-size:12px;font-weight:500">${guestText || 'Κανονικός καθαρισμός'}</div>
-        ${r.note ? `<div class="room-guest">${r.note}</div>` : ''}
-      </div>
-      <div class="room-actions">
-        <span class="pill ${pillClass}">${pillText}</span>
-        ${isDone && filter === 'done'
-          ? `<button class="btn btn-sm" onclick="window.undoRoomDone('${r.id}')"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Αναίρεση</button>`
-          : !isDone ? `
-          ${isInProgress
-            ? `<button class="btn btn-sm btn-dark" onclick="window.setRoomDone('${r.id}')"><i class="ti ti-check" aria-hidden="true"></i> Ολοκλήρωση</button>`
-            : isUrgent
-              ? `<button class="btn btn-sm btn-teal" onclick="window.setRoomInProgress('${r.id}')"><i class="ti ti-player-play" aria-hidden="true"></i> Καθαρισμός</button>`
-              : isPriority
-                ? `<button class="btn btn-sm btn-teal" onclick="window.setRoomInProgress('${r.id}')"><i class="ti ti-player-play" aria-hidden="true"></i> Έναρξη</button>`
-                : `<button class="btn btn-sm btn-teal" onclick="window.setRoomInProgress('${r.id}')"><i class="ti ti-player-play" aria-hidden="true"></i> Έναρξη</button>`
-          }
-          <button class="btn btn-sm" onclick="window.reportRoomIssue('${r.id}')"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Αναφορά</button>`
-          : '<span style="font-size:11px;color:var(--color-text-secondary)">Ολοκληρώθηκε</span>'}
-      </div>
-    </div>`;
-  }).join('');
+    const data = filter === 'completed' ? completedRooms : maidRooms;
+    renderRoomMap('room-list', data, {
+        mode: 'cards',
+        filter: filter === 'completed' ? 'all' : filter,
+        departures: departures
+    });
 }
 
 function updateFilterCounts() {
@@ -618,9 +584,11 @@ function updateFilterCounts() {
     const f = btn.dataset.filter;
     let count = 0;
     if (f === 'all') {
-      count = maidRooms.filter(r => getEffectiveStatus(r.id) !== 'done').length;
+      count = maidRooms.length;
+    } else if (f === 'completed') {
+      count = completedRooms.length;
     } else {
-      count = maidRooms.filter(r => getEffectiveStatus(r.id) === f).length;
+      count = maidRooms.filter(r => r.state === f).length;
     }
     const label = (btn.textContent || '').replace(/\(\d+\)$/, '').trim();
     btn.textContent = label + ' (' + count + ')';
@@ -636,22 +604,26 @@ window.filterRooms = function(f, el) {
 
 window.setRoomInProgress = async function(id) {
   const room = maidRooms.find(r => r.id === id);
-  const actionLabel = room && room.status === 'urgent' ? 'Καθαρισμός' : room && room.status === 'priority' ? 'Έναρξη' : 'Έναρξη';
+  const actionLabel = room && room.status === 'dirty' ? 'Καθαρισμός' : 'Έναρξη';
   try {
+    if (room && room.status === 'dirty') {
+      const { error } = await supabase.from('ROOM').update({ Status: 'cleaning' }).eq('RoomNumber', id);
+      if (error) throw error;
+      room.status = 'cleaning';
+      room.state = 'cleaning';
+      room.note = 'Καθαρισμός σε εξέλιξη';
+    }
     await supabase.from('NOTIFICATION').insert({
       TargetRole: 'receptionist',
       Type: 'room_in_progress',
       Message: `Δωμάτιο ${id}: ${actionLabel} σε εξέλιξη από καμαριέρα.`,
       IsRead: false
     });
-    if (room && room.origStatus === 'dirty') {
-      await supabase.from('ROOM').update({ Status: 'cleaning' }).eq('RoomNumber', id);
-    }
   } catch (err) {
     console.error('Σφάλμα καταγραφής έναρξης:', err.message);
+    showToast('room-toast', 'Σφάλμα: ' + err.message);
+    return;
   }
-
-  roomStates[id] = 'inprogress';
 
   try {
     showToast('room-toast', (room ? room.num : id) + ' — ' + actionLabel + ' σε εξέλιξη...');
@@ -674,7 +646,7 @@ window.setRoomDone = async function(id) {
   const confirmed = await window.showConfirm(`Το δωμάτιο ${room.num} είναι έτοιμο;`);
   if (!confirmed) return;
 
-  const targetStatus = room.origStatus === 'occ' ? 'occ' : 'clean';
+  const targetStatus = room.status === 'occ' ? 'occ' : 'clean';
 
   try {
     const { error } = await supabase
@@ -698,9 +670,11 @@ window.setRoomDone = async function(id) {
     return;
   }
 
-  roomStates[id] = 'done';
+  const completedRoom = { ...room, state: 'done', status: 'clean', completedAt: new Date().toISOString() };
+  completedRooms.push(completedRoom);
+  maidRooms = maidRooms.filter(r => r.id !== id);
 
-  const statusLabel = room.status === 'urgent' ? 'check-out' : room.status === 'priority' ? 'διαμονή' : 'καθαρισμός';
+  const statusLabel = room.status === 'dirty' ? 'check-out' : room.status === 'occ' ? 'διαμονή' : 'καθαρισμός';
   recomputeCounters();
   showToast('room-toast', room.num + ' — Έτοιμο! Ειδοποιήθηκε η υποδοχή.');
   addLog(room.num + ' — ' + statusLabel + ' ολοκληρώθηκε, ειδοποιήθηκε η υποδοχή');
@@ -708,66 +682,94 @@ window.setRoomDone = async function(id) {
   renderOverview();
 };
 
-window.reportRoomIssue = async function(id) {
+window.reportRoomIssue = function(id) {
   const room = maidRooms.find(r => r.id === id);
   if (!room) return;
-  const desc = prompt('Περιγράψτε το πρόβλημα για το δωμάτιο ' + room.num + ':');
-  if (!desc || !desc.trim()) return;
-  try {
-    const { error } = await supabase.from('NOTIFICATION').insert({
-      TargetRole: 'admin',
-      Type: 'room_issue',
-      Message: `Πρόβλημα δωματίου ${room.num} (${room.type}): ${desc.trim()}`,
-      IsRead: false
-    });
-    if (error) throw error;
-    showToast('room-toast', 'Αναφορά για ' + room.num + ' εστάλη στον διαχειριστή.');
-    addLog('Αναφορά προβλήματος ' + room.num + ': ' + desc.trim());
-  } catch (err) {
-    alert('Σφάλμα αποστολής αναφοράς: ' + err.message);
-  }
-};
-
-window.undoRoomDone = async function(id) {
-  const room = maidRooms.find(r => r.id === id);
-  if (!room) return;
-  const confirmed = await window.showConfirm('Επαναφορά δωματίου ' + room.num + ' σε εκκρεμότητα;');
-  if (!confirmed) return;
-
-  const revertStatus = room.origStatus === 'occ' ? 'occ' : 'dirty';
-
-  try {
-    const { error } = await supabase
-      .from('ROOM')
-      .update({ Status: revertStatus })
-      .eq('RoomNumber', id);
-    if (error) {
-      console.error('Σφάλμα επαναφοράς δωματίου:', error.message);
-      showToast('room-toast', 'Σφάλμα επαναφοράς κατάστασης δωματίου.');
-      return;
+  const overlay = document.getElementById('report-issue-overlay');
+  const numEl = document.getElementById('ri-room-num');
+  const descEl = document.getElementById('ri-desc');
+  if (!overlay || !numEl || !descEl) return;
+  numEl.textContent = room.num;
+  descEl.value = '';
+  overlay.style.display = 'flex';
+  const close = () => { overlay.style.display = 'none'; };
+  document.getElementById('ri-close').onclick = close;
+  document.getElementById('ri-cancel').onclick = close;
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  document.getElementById('ri-submit').onclick = async () => {
+    const desc = descEl.value.trim();
+    if (!desc) { alert('Περιγράψτε το πρόβλημα.'); return; }
+    try {
+      const { error } = await supabase.from('NOTIFICATION').insert({
+        TargetRole: 'admin', Type: 'room_issue',
+        Message: `Πρόβλημα δωματίου ${room.num} (${room.type}): ${desc}`,
+        IsRead: false
+      });
+      if (error) throw error;
+      showToast('room-toast', 'Αναφορά για ' + room.num + ' εστάλη στον διαχειριστή.');
+      addLog('Αναφορά προβλήματος ' + room.num + ': ' + desc);
+      close();
+    } catch (err) {
+      alert('Σφάλμα αποστολής αναφοράς: ' + err.message);
     }
-    await supabase.from('NOTIFICATION').insert({
-      TargetRole: 'receptionist',
-      Type: 'room_reverted',
-      Message: `Δωμάτιο ${room.num} (${room.type}) επαναφέρθηκε σε εκκρεμότητα από την καμαριέρα.`,
-      IsRead: false
-    });
-  } catch (err) {
-    console.error('Σφάλμα:', err.message);
-    showToast('room-toast', 'Σφάλμα επαναφοράς: ' + err.message);
-    return;
-  }
-  delete roomStates[id];
-  recomputeCounters();
-  showToast('room-toast', room.num + ' επαναφέρθηκε σε εκκρεμότητα.');
-  addLog(room.num + ' επαναφέρθηκε σε εκκρεμότητα');
-  renderRooms(currentFilter);
-  renderOverview();
+  };
 };
+
+
 
 /* ==============================================================
    MINI-BAR VIEW
    ============================================================== */
+let assignedMbRooms = [];
+
+async function fetchMinibarAssignedRooms() {
+  try {
+    assignedMbRooms = maidRooms
+      .filter(r => r.status === 'occ')
+      .map(r => ({
+        id: r.id,
+        num: r.num,
+        type: r.type,
+        guest: r.guest || 'Επισκέπτης',
+        note: r.note
+      }));
+  } catch (e) {
+    console.error('fetchMinibarAssignedRooms error:', e);
+    assignedMbRooms = [];
+  }
+}
+
+function renderMinibarAssignedRooms() {
+  const el = document.getElementById('mb-assigned-rooms');
+  if (!el) return;
+  if (assignedMbRooms.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary);padding:8px 0">Δεν υπάρχουν δωμάτια προς έλεγχο mini-bar.</div>';
+    return;
+  }
+  el.innerHTML = assignedMbRooms.map(r =>
+    `<div class="minibar-row" id="mar-${r.id}">
+      <div class="mb-room">${r.num}</div>
+      <div class="mb-items"><strong>${r.guest}</strong></div>
+      <div class="mb-total" style="font-size:11px;color:var(--color-text-secondary)">${r.type}</div>
+      <button class="btn btn-sm btn-teal" onclick="window.updateMinibarRoom('${r.id}')"><i class="ti ti-edit" aria-hidden="true"></i> Update</button>
+      <button class="btn btn-sm" onclick="window.ignoreMinibarRoom('${r.id}')" style="color:var(--color-text-secondary)"><i class="ti ti-x" aria-hidden="true"></i> Ignore</button>
+    </div>`
+  ).join('');
+}
+
+window.updateMinibarRoom = function(id) {
+  const room = assignedMbRooms.find(r => r.id === id);
+  if (!room) return;
+  document.getElementById('mb-room-inp').value = room.num;
+  document.getElementById('mb-items-inp').focus();
+  document.getElementById('v-minibar').scrollIntoView({ behavior: 'smooth', block: 'end' });
+};
+
+window.ignoreMinibarRoom = function(id) {
+  assignedMbRooms = assignedMbRooms.filter(r => r.id !== id);
+  renderMinibarAssignedRooms();
+};
+
 function renderPendingMb() {
   const list = document.getElementById('mb-list');
   if (!list) return;
@@ -1096,6 +1098,293 @@ window.submitReport = async function() {
     addLog('Αναφορά βάρδιας εστάλη στη διοίκηση' + (noteText ? ': ' + noteText : ''));
   } catch (err) {
     console.error('Σφάλμα αποστολής αναφοράς:', err.message);
+    alert('Σφάλμα: ' + err.message);
+  }
+};
+
+/* ==============================================================
+   LAUNDRY MANAGEMENT
+   ============================================================== */
+let laundryDispatches = [];
+let laundryReceives = [];
+let laundryDamages = [];
+let currentLaundrySub = 'dispatch';
+
+window.laundrySubNav = function(view) {
+  currentLaundrySub = view;
+  document.querySelectorAll('#v-laundry .btn-sm[data-laundry]').forEach(b => {
+    b.style.background = b.dataset.laundry === view ? 'var(--color-background-secondary)' : '';
+  });
+  document.querySelectorAll('#v-laundry .laundry-sub').forEach(el => {
+    el.style.display = el.id === 'ls-' + view ? '' : 'none';
+  });
+  if (view === 'dispatch') renderLaundryDispatchForm();
+  if (view === 'receive') renderLaundryReceiveForm();
+  if (view === 'history') renderLaundryHistory();
+  if (view === 'damage') renderLaundryDamages();
+};
+
+async function fetchLaundryDispatches() {
+  try {
+    const { data, error } = await supabase
+      .from('LAUNDRY_DISPATCH')
+      .select(`*, "INVENTORY_ITEM"("Name","Category")`)
+      .order('DispatchID', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    laundryDispatches = data || [];
+  } catch (e) {
+    console.error('fetchLaundryDispatches error:', e);
+    laundryDispatches = [];
+  }
+}
+
+async function fetchLaundryReceives() {
+  try {
+    const { data, error } = await supabase
+      .from('LAUNDRY_RECEIVE')
+      .select(`*, "LAUNDRY_DISPATCH"!inner("DispatchID","StaffName")`)
+      .order('ReceiveID', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    laundryReceives = data || [];
+  } catch (e) {
+    console.error('fetchLaundryReceives error:', e);
+    laundryReceives = [];
+  }
+}
+
+async function fetchLaundryDamages() {
+  try {
+    const { data, error } = await supabase
+      .from('LAUNDRY_DAMAGE')
+      .select(`*, "INVENTORY_ITEM"("Name")`)
+      .order('DamageID', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    laundryDamages = data || [];
+  } catch (e) {
+    console.error('fetchLaundryDamages error:', e);
+    laundryDamages = [];
+  }
+}
+
+function renderLaundryView() {
+  document.querySelector('#v-laundry .btn-sm[data-laundry="dispatch"]').style.background = 'var(--color-background-secondary)';
+  renderLaundryDispatchForm();
+  renderLaundryReceiveForm();
+  renderLaundryHistory();
+  renderLaundryDamages();
+  renderLaundryReceiveSelect();
+}
+
+function renderLaundryDispatchForm() {
+  const container = document.getElementById('laundry-dispatch-items');
+  const linen = inventoryItems.filter(i => isLinenCategory(i.Category, i.Name));
+  if (!container) return;
+  if (linen.length === 0) {
+    container.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--color-text-secondary)">Δεν βρέθηκαν είδη ιματισμού</div>';
+    return;
+  }
+  container.innerHTML = linen.map(item => `
+    <div class="minibar-row" style="padding:8px 0">
+      <div style="min-width:120px;font-size:12px"><strong>${item.Name}</strong><br><span style="font-size:10px;color:var(--color-text-secondary)">${item.Category} · Διαθ.: ${item.Quantity} ${item.Unit || 'τεμ.'}</span></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:10px;color:var(--color-text-secondary)">Ποσ.</span>
+        <input type="number" id="ld-qty-${item.ItemID}" class="fg-inp" style="width:60px" placeholder="0" min="0" max="${item.Quantity}" value="0">
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('btn-dispatch-laundry').onclick = window.dispatchLaundry;
+}
+
+function renderLaundryReceiveSelect() {
+  const sel = document.getElementById('laundry-receive-dispatch');
+  if (!sel) return;
+  const pending = laundryDispatches.filter(d => {
+    const rcv = laundryReceives.filter(r => r.DispatchID === d.DispatchID);
+    const totalRcv = rcv.reduce((s, r) => s + r.QuantitySent, 0);
+    return totalRcv < d.Quantity;
+  });
+  sel.innerHTML = pending.map(d => {
+    const name = d.INVENTORY_ITEM ? d.INVENTORY_ITEM.Name : 'Είδος #' + d.ItemID;
+    return `<option value="${d.DispatchID}">#${d.DispatchID} · ${name} · ${d.Quantity} τεμ. · ${d.DispatchDate}</option>`;
+  }).join('') || '<option>— Καμία εκκρεμής αποστολή —</option>';
+  sel.onchange = renderLaundryReceiveForm;
+}
+
+function renderLaundryReceiveForm() {
+  const sel = document.getElementById('laundry-receive-dispatch');
+  const container = document.getElementById('laundry-receive-items');
+  if (!sel || !container) return;
+  const dispatchId = parseInt(sel.value);
+  if (!dispatchId) {
+    container.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--color-text-secondary)">Επιλέξτε αποστολή</div>';
+    return;
+  }
+  const disp = laundryDispatches.find(d => d.DispatchID === dispatchId);
+  if (!disp) return;
+  const name = disp.INVENTORY_ITEM ? disp.INVENTORY_ITEM.Name : 'Είδος #' + disp.ItemID;
+  container.innerHTML = `
+    <div style="font-size:12px;padding:6px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+      <strong>${name}</strong> · Απεστάλησαν: ${disp.Quantity} τεμ. · ${disp.DispatchDate}
+    </div>
+    <div class="fg-row" style="margin-top:8px">
+      <div class="fg"><label>Παρελήφθησαν (καθαρά)</label><input type="number" id="lr-received" class="fg-inp" value="${disp.Quantity}" min="0" max="${disp.Quantity}"></div>
+      <div class="fg"><label>Κατεστραμμένα</label><input type="number" id="lr-damaged" class="fg-inp" value="0" min="0"></div>
+      <div class="fg"><label>Ελλείποντα</label><input type="number" id="lr-missing" class="fg-inp" value="0" min="0"></div>
+    </div>
+    <div class="fg"><label>Σημειώσεις</label><input type="text" id="lr-notes" class="fg-inp" placeholder="π.χ. 2 πετσέτες με λεκέ"></div>
+  `;
+  document.getElementById('btn-receive-laundry').onclick = window.receiveLaundry;
+}
+
+function renderLaundryHistory() {
+  const dispatchContainer = document.getElementById('laundry-dispatch-history');
+  if (dispatchContainer) {
+    if (laundryDispatches.length === 0) {
+      dispatchContainer.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--color-text-secondary)">Καμία αποστολή</div>';
+    } else {
+      dispatchContainer.innerHTML = `<table style="width:100%;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);background:var(--color-background-secondary)">
+          <th style="padding:5px;text-align:left">#</th><th style="padding:5px;text-align:left">Είδος</th><th style="padding:5px;text-align:center">Ποσ.</th><th style="padding:5px;text-align:left">Ημ/νία</th><th style="padding:5px;text-align:left">Αποστολέας</th>
+        </tr></thead><tbody>${laundryDispatches.slice(0, 20).map(d => {
+          const name = d.INVENTORY_ITEM ? d.INVENTORY_ITEM.Name : 'Είδος #' + d.ItemID;
+          return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary)">
+            <td style="padding:5px">${d.DispatchID}</td><td style="padding:5px">${name}</td>
+            <td style="padding:5px;text-align:center">${d.Quantity}</td>
+            <td style="padding:5px">${d.DispatchDate}</td><td style="padding:5px">${d.StaffName || '—'}</td>
+          </tr>`;
+        }).join('')}</tbody></table>`;
+      if (laundryDispatches.length > 20) dispatchContainer.innerHTML += `<div style="padding:4px;text-align:center;font-size:10px;color:var(--color-text-secondary)">... και ${laundryDispatches.length - 20} ακόμη</div>`;
+    }
+  }
+  const receiveContainer = document.getElementById('laundry-receive-history');
+  if (receiveContainer) {
+    if (laundryReceives.length === 0) {
+      receiveContainer.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--color-text-secondary)">Καμία παραλαβή</div>';
+    } else {
+      receiveContainer.innerHTML = `<table style="width:100%;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);background:var(--color-background-secondary)">
+          <th style="padding:5px;text-align:left">Αποστολή #</th><th style="padding:5px;text-align:center">Στάλθηκαν</th><th style="padding:5px;text-align:center">Παρελήφθησαν</th><th style="padding:5px;text-align:center">Ζημιές</th><th style="padding:5px;text-align:center">Ελλείψεις</th><th style="padding:5px;text-align:left">Ημ/νία</th>
+        </tr></thead><tbody>${laundryReceives.slice(0, 20).map(r => {
+          return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary)">
+            <td style="padding:5px">${r.DispatchID}</td><td style="padding:5px;text-align:center">${r.QuantitySent}</td>
+            <td style="padding:5px;text-align:center">${r.QuantityReceived}</td>
+            <td style="padding:5px;text-align:center">${r.QuantityDamaged > 0 ? `<span style="color:#D85A30">${r.QuantityDamaged}</span>` : r.QuantityDamaged}</td>
+            <td style="padding:5px;text-align:center">${r.QuantityMissing > 0 ? `<span style="color:#D85A30">${r.QuantityMissing}</span>` : r.QuantityMissing}</td>
+            <td style="padding:5px">${r.ReceiveDate}</td>
+          </tr>`;
+        }).join('')}</tbody></table>`;
+    }
+  }
+}
+
+function renderLaundryDamages() {
+  const container = document.getElementById('laundry-damage-list');
+  if (!container) return;
+  if (laundryDamages.length === 0) {
+    container.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--color-text-secondary)">Καμία καταγεγραμμένη ζημιά</div>';
+    return;
+  }
+  container.innerHTML = `<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);background:var(--color-background-secondary)">
+      <th style="padding:5px;text-align:left">Είδος</th><th style="padding:5px;text-align:center">Ποσ.</th><th style="padding:5px;text-align:left">Τύπος</th><th style="padding:5px;text-align:left">Περιγραφή</th><th style="padding:5px;text-align:left">Αναφέρθηκε από</th><th style="padding:5px;text-align:left">Ημ/νία</th>
+    </tr></thead><tbody>${laundryDamages.map(d => {
+      const name = d.INVENTORY_ITEM ? d.INVENTORY_ITEM.Name : 'Είδος #' + d.ItemID;
+      return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary)">
+        <td style="padding:5px">${name}</td><td style="padding:5px;text-align:center">${d.Quantity}</td>
+        <td style="padding:5px">${d.DamageType}</td><td style="padding:5px">${d.Description || '—'}</td>
+        <td style="padding:5px">${d.ReportedBy || '—'}</td><td style="padding:5px">${d.ReportDate || '—'}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+window.dispatchLaundry = async function() {
+  const linen = inventoryItems.filter(i => isLinenCategory(i.Category, i.Name));
+  const items = [];
+  for (const item of linen) {
+    const inp = document.getElementById('ld-qty-' + item.ItemID);
+    if (!inp) continue;
+    const qty = parseInt(inp.value, 10);
+    if (!qty || qty <= 0) continue;
+    items.push({ item, qty });
+  }
+  if (items.length === 0) { alert('Επιλέξτε τουλάχιστον ένα είδος με ποσότητα > 0.'); return; }
+  const confirmed = await window.showConfirm(`Αποστολή ${items.reduce((s,i) => s + i.qty, 0)} τεμαχίων στο πλυντήριο;`);
+  if (!confirmed) return;
+  try {
+    for (const { item, qty } of items) {
+      const { error: dispatchErr } = await supabase.from('LAUNDRY_DISPATCH').insert({
+        ItemID: item.ItemID, Quantity: qty, StaffName: hotelUser?.name || 'Καμαριέρα',
+        Notes: `Αποστολή ${item.Name}`
+      });
+      if (dispatchErr) throw dispatchErr;
+      const newQty = Math.max(0, item.Quantity - qty);
+      const { error: updErr } = await supabase.from('INVENTORY_ITEM').update({ Quantity: newQty }).eq('ItemID', item.ItemID);
+      if (updErr) throw updErr;
+    }
+    showToast('laundry-toast', `Αποστολή ${items.reduce((s,i) => s + i.qty, 0)} τεμαχίων ολοκληρώθηκε!`);
+    addLog(`Αποστολή ιματισμού: ${items.reduce((s,i) => s + i.qty, 0)} τεμάχια`);
+    await fetchInventory();
+    await fetchLaundryDispatches();
+    renderLaundryDispatchForm();
+    renderLaundryReceiveSelect();
+    renderLaundryHistory();
+  } catch (err) {
+    console.error('Σφάλμα αποστολής:', err.message);
+    alert('Σφάλμα: ' + err.message);
+  }
+};
+
+window.receiveLaundry = async function() {
+  const sel = document.getElementById('laundry-receive-dispatch');
+  if (!sel) return;
+  const dispatchId = parseInt(sel.value);
+  if (!dispatchId) { alert('Επιλέξτε αποστολή.'); return; }
+  const dispatched = parseInt(document.getElementById('lr-received')?.value || '0');
+  const damaged = parseInt(document.getElementById('lr-damaged')?.value || '0');
+  const missing = parseInt(document.getElementById('lr-missing')?.value || '0');
+  const notes = document.getElementById('lr-notes')?.value?.trim() || '';
+  const total = dispatched + damaged + missing;
+  const disp = laundryDispatches.find(d => d.DispatchID === dispatchId);
+  if (!disp) return;
+  if (total === 0) { alert('Καταχωρήστε τουλάχιστον μία ποσότητα.'); return; }
+  const confirmed = await window.showConfirm(`Παραλαβή: ${dispatched} καθαρά, ${damaged} κατεστραμμένα, ${missing} ελλείποντα;`);
+  if (!confirmed) return;
+  try {
+    const { error: rcvErr } = await supabase.from('LAUNDRY_RECEIVE').insert({
+      ItemID: disp.ItemID, DispatchID: dispatchId, QuantitySent: disp.Quantity,
+      QuantityReceived: dispatched, QuantityDamaged: damaged, QuantityMissing: missing,
+      StaffName: hotelUser?.name || 'Καμαριέρα', Notes: notes
+    });
+    if (rcvErr) throw rcvErr;
+    const { data: itemData, error: itemErr } = await supabase.from('INVENTORY_ITEM').select('Quantity').eq('ItemID', disp.ItemID).single();
+    if (itemErr) throw itemErr;
+    const currentQty = itemData?.Quantity || 0;
+    const { error: updErr } = await supabase.from('INVENTORY_ITEM').update({ Quantity: currentQty + dispatched }).eq('ItemID', disp.ItemID);
+    if (updErr) throw updErr;
+    if (damaged > 0 || missing > 0) {
+      const damageType = damaged > 0 ? (notes.toLowerCase().includes('τρύπ') ? 'Torn' : 'Stained') : 'Missing';
+      const { error: dmgErr } = await supabase.from('LAUNDRY_DAMAGE').insert({
+        ItemID: disp.ItemID, DispatchID: dispatchId, Quantity: damaged + missing,
+        DamageType: damageType, Description: notes || `${damaged} κατεστραμμένα, ${missing} ελλείποντα`,
+        ReportedBy: hotelUser?.name || 'Καμαριέρα', ActionTaken: damaged > 0 ? 'Απόσυρση' : 'Αναφορά ελλείμματος'
+      });
+      if (dmgErr) throw dmgErr;
+    }
+    showToast('laundry-toast', 'Παραλαβή καταχωρήθηκε με επιτυχία!');
+    addLog(`Παραλαβή #${dispatchId}: ${dispatched} καθαρά, ${damaged} ζημιές, ${missing} ελλείψεις`);
+    await fetchInventory();
+    await fetchLaundryDispatches();
+    await fetchLaundryReceives();
+    await fetchLaundryDamages();
+    renderLaundryReceiveSelect();
+    renderLaundryReceiveForm();
+    renderLaundryHistory();
+    renderLaundryDamages();
+  } catch (err) {
+    console.error('Σφάλμα παραλαβής:', err.message);
     alert('Σφάλμα: ' + err.message);
   }
 };
