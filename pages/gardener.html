@@ -87,28 +87,8 @@
 
   <div class="view" id="v-schedule-zones">
     <div class="toast" id="task-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Η εργασία σημειώθηκε ως ολοκληρωμένη!</div>
-    <div class="card">
+      <div class="card">
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-list-check" aria-hidden="true"></i>Λίστα Εργασιών Βάρδιας</div></div>
-      
-      <div class="minibar-row task-row">
-        <div class="mb-items"><strong style="color:var(--color-text-primary)">Έλεγχος αυτόματου ποτίσματος</strong> (Όλες οι ζώνες)</div>
-        <span class="pill p-g" style="pointer-events:none">Ολοκληρώθηκε</span>
-      </div>
-
-      <div class="minibar-row task-row">
-        <div class="mb-items"><strong style="color:var(--color-text-primary)">Κλάδεμα θάμνων</strong> (Είσοδος & Parking)</div>
-        <span class="pill p-a task-badge" onclick="cycleTask(this)" style="cursor:pointer">Σε εξέλιξη</span>
-      </div>
-
-      <div class="minibar-row task-row">
-        <div class="mb-items"><strong style="color:var(--color-text-primary)">Καθαρισμός μονοπατιών</strong> (Νότιος Κήπος)</div>
-        <span class="pill p-r task-badge" onclick="cycleTask(this)" style="cursor:pointer">Εκκρεμεί</span>
-      </div>
-
-      <div class="minibar-row task-row">
-        <div class="mb-items"><strong style="color:var(--color-text-primary)">Κούρεμα γκαζόν</strong> (Πίσω αυλή / Χώρος δεξιώσεων)</div>
-        <span class="pill p-r task-badge" onclick="cycleTask(this)" style="cursor:pointer">Εκκρεμεί</span>
-      </div>
     </div>
 
     <div class="card" style="margin-top:20px;">
@@ -175,10 +155,14 @@
   <div class="view" id="v-supplies">
     <div class="toast" id="supply-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i>Το αίτημα στάλθηκε στον Manager για έγκριση.</div>
     <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-box" aria-hidden="true"></i>Αίτημα Αναλώσιμων Κήπου</div></div>
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-box" aria-hidden="true"></i>Διαθέσιμα Υλικά Κήπου</div></div>
+      <div id="stock-display" style="padding:12px 0;font-size:14px">Φόρτωση...</div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-shopping-cart" aria-hidden="true"></i>Παραγγελία</div></div>
       <div class="fg-row">
-        <div class="fg"><label>Είδος Υλικού</label><input type="text" id="sup-item" placeholder="π.χ. Λίπασμα Τριανταφυλλιάς"></div>
-        <div class="fg"><label>Ποσότητα</label><input type="text" id="sup-qty" placeholder="π.χ. 3 τσουβάλια"></div>
+        <div class="fg"><label>Είδος Υλικού</label><select id="sup-item" style="width:100%;padding:8px 10px;border:1px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:13px;background:var(--color-background-primary);color:var(--color-text-primary);outline:none"><option value="">Φόρτωση...</option></select></div>
+        <div class="fg"><label>Ποσότητα</label><input type="number" id="sup-qty" min="0" style="width:100%;padding:8px 10px;border:1px solid var(--color-border-tertiary);border-radius:var(--color-border-tertiary);font-size:13px;background:var(--color-background-primary);color:var(--color-text-primary);outline:none" placeholder="0"></div>
       </div>
       <div class="fg"><label>Αιτιολογία (Προαιρετικό)</label>
         <textarea id="sup-reason" style="min-height:40px" placeholder="π.χ. Χρειάζεται άμεσα για τον Νότιο κήπο"></textarea>
@@ -216,6 +200,17 @@
 
   </div>
 </div>
+</div>
+
+<div id="material-modal" style="display:none;position:fixed;z-index:2000;inset:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center">
+  <div style="background:var(--color-background-primary);border-radius:var(--border-radius-md);padding:20px;width:90%;max-width:400px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.2)">
+    <div style="font-weight:600;font-size:14px;margin-bottom:12px">Υλικά που χρησιμοποιήθηκαν</div>
+    <div id="material-modal-body"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+      <button class="btn btn-sm" onclick="window.closeMaterialModal()">Παράβλεψη</button>
+      <button class="btn btn-dark btn-sm" onclick="window.confirmMaterialUsage()"><i class="ti ti-check"></i> Επιβεβαίωση</button>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="../js/supabase-config.js"></script>
