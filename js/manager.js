@@ -312,32 +312,59 @@ async function fetchPayroll() {
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
 
-  const { data: drivers } = await supabase
-    .from('EMPLOYEE')
-    .select('EmpID, FirstName, LastName, Salary')
-    .eq('Role', 'driver')
-    .eq('isActive', true);
+  const [{ data: drivers }, { data: trips }, { data: shifts }, { data: fuelReceipts }] = await Promise.all([
+    supabase
+      .from('EMPLOYEE')
+      .select('EmpID, FirstName, LastName, Salary')
+      .eq('Role', 'driver')
+      .eq('isActive', true),
+    supabase
+      .from('TRIP')
+      .select('DriverID, Cost')
+      .gte('Date', monthStart)
+      .lte('Date', monthEnd),
+    supabase
+      .from('SHIFT')
+      .select('EmpID, Hours')
+      .gte('Date', monthStart)
+      .lte('Date', monthEnd),
+    supabase
+      .from('RECEIPT')
+      .select('Amount')
+      .eq('Category', 'fuel')
+      .gte('PaymentDate', monthStart)
+      .lte('PaymentDate', monthEnd)
+  ]);
 
-  const { data: trips } = await supabase
-    .from('TRIP')
-    .select('DriverID, Cost')
-    .gte('Date', monthStart)
-    .lte('Date', monthEnd);
+  const totalRevenue = (trips || []).reduce((sum, t) => sum + (t.Cost || 0), 0);
+  const totalPayroll = (drivers || []).reduce((sum, d) => sum + (d.Salary || 0), 0);
+  const totalFuelExpenses = (fuelReceipts || []).reduce((sum, r) => sum + (r.Amount || 0), 0);
+  const totalExpenses = totalPayroll + totalFuelExpenses;
+  const netResult = totalRevenue - totalExpenses;
+  const avgRevenue = (trips && trips.length > 0) ? (totalRevenue / trips.length).toFixed(2) : '0.00';
 
-  const { data: shifts } = await supabase
-    .from('SHIFT')
-    .select('EmpID, Hours')
-    .gte('Date', monthStart)
-    .lte('Date', monthEnd);
-
-  const totalTripCost = (trips || []).reduce((sum, t) => sum + (t.Cost || 0), 0);
-  const avgCost = (trips && trips.length > 0) ? (totalTripCost / trips.length).toFixed(2) : '0.00';
+  document.getElementById('fp-income').textContent = totalRevenue ? '€' + totalRevenue.toFixed(2) : '€0.00';
+  document.getElementById('fp-costs').textContent = totalExpenses ? '€' + totalExpenses.toFixed(2) : '€0.00';
+  document.getElementById('fp-net').textContent = '€' + netResult.toFixed(2);
+  document.getElementById('fp-net').style.color = netResult >= 0 ? '#1D9E75' : '#D85A30';
+  document.getElementById('fp-payroll').textContent = totalPayroll ? '€' + totalPayroll.toFixed(2) : '€0.00';
 
   const costsList = document.getElementById('fleet-costs-list');
   if (costsList) {
-    let costHtml = '<div style="display:flex; justify-content:space-between; padding:4px 0"><span>Σύνολο Μεταφορών</span><strong>' + totalTripCost + '€</strong></div>';
-    costHtml += '<div style="display:flex; justify-content:space-between; padding:8px 0; border-top:1px solid #ccc; margin-top:5px"><span>Μέσο Κόστος Μεταφοράς/Διαδρομή:</span><strong>' + avgCost + '€</strong></div>';
-    costsList.innerHTML = costHtml;
+    if (!trips || trips.length === 0) {
+      costsList.innerHTML = '<div style="color:var(--color-text-secondary);text-align:center;padding:16px 0">Καμία δραστηριότητα αυτόν τον μήνα.</div>';
+    } else {
+      let costHtml = '<div style="font-weight:600;color:#1D9E75;padding:4px 0;border-bottom:1px solid var(--color-border-tertiary);margin-bottom:4px">Έσοδα</div>';
+      costHtml += '<div style="display:flex; justify-content:space-between; padding:4px 0"><span>Έσοδα από Διαδρομές</span><strong>' + totalRevenue.toFixed(2) + '€</strong></div>';
+      costHtml += '<div style="display:flex; justify-content:space-between; padding:4px 0"><span>Αριθμός Διαδρομών</span><strong>' + trips.length + '</strong></div>';
+      costHtml += '<div style="display:flex; justify-content:space-between; padding:4px 0"><span>Μέσο Έσοδο / Διαδρομή</span><strong>' + avgRevenue + '€</strong></div>';
+      costHtml += '<div style="font-weight:600;color:#D85A30;padding:8px 0 4px 0;border-bottom:1px solid var(--color-border-tertiary);margin-top:8px">Έξοδα</div>';
+      costHtml += '<div style="display:flex; justify-content:space-between; padding:4px 0"><span>Μισθοδοσία Οδηγών</span><strong>' + totalPayroll.toFixed(2) + '€</strong></div>';
+      costHtml += '<div style="display:flex; justify-content:space-between; padding:4px 0"><span>Καύσιμα & Λοιπά Έξοδα</span><strong>' + totalFuelExpenses.toFixed(2) + '€</strong></div>';
+      costHtml += '<div style="display:flex; justify-content:space-between; padding:8px 0; border-top:1px solid var(--color-border-tertiary); margin-top:5px;font-weight:700"><span>Σύνολο Εξόδων</span><strong>' + totalExpenses.toFixed(2) + '€</strong></div>';
+      costHtml += '<div style="display:flex; justify-content:space-between; padding:8px 0; border-top:2px solid var(--color-border-tertiary); margin-top:5px;font-weight:700;color:' + (netResult >= 0 ? '#1D9E75' : '#D85A30') + '"><span>Καθαρό Αποτέλεσμα</span><strong>' + netResult.toFixed(2) + '€</strong></div>';
+      costsList.innerHTML = costHtml;
+    }
   }
 
   const tbody = document.getElementById('driver-payroll-table');
@@ -351,19 +378,14 @@ async function fetchPayroll() {
     const totalHours = driverShifts.reduce((sum, s) => sum + (s.Hours || 0), 0);
     const tripCount = driverTrips.length;
 
-    let payable = d.Salary || 0;
-    if (tripCount > 0) {
-      payable += driverTrips.reduce((sum, t) => sum + (t.Cost || 0), 0) * 0.1;
-    }
-
     payRows += '<tr style="border-bottom:1px solid var(--color-border-tertiary)">'
       + '<td style="padding:6px; font-weight:500">' + name + '</td>'
-      + '<td style="padding:6px">' + totalHours + 'h + ' + tripCount + ' Μεταφορές</td>'
-      + '<td style="padding:6px; font-weight:bold; color:#1D9E75">' + payable.toFixed(2) + '€</td>'
+      + '<td style="padding:6px; color:#1D9E75; font-weight:600">€' + (d.Salary || 0).toFixed(2) + '</td>'
+      + '<td style="padding:6px; color:var(--color-text-secondary)">' + (totalHours > 0 || tripCount > 0 ? totalHours + 'h / ' + tripCount + ' διαδρομές' : 'Καμία δραστηριότητα') + '</td>'
       + '</tr>';
   });
 
-  tbody.innerHTML += payRows || '<tr><td style="padding:16px;color:var(--color-text-secondary)" colspan="3">Δεν υπάρχουν εγγεγραμμένοι οδηγοί.</td></tr>';
+  tbody.innerHTML = payRows || '<tr><td style="padding:16px;color:var(--color-text-secondary)" colspan="3">Δεν υπάρχουν εγγεγραμμένοι οδηγοί.</td></tr>';
 }
 
 /* ==============================================================
@@ -1161,7 +1183,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 800);
 
   document.querySelectorAll('.sb-item').forEach(item => {
-    item.addEventListener('click', () => window.navTo(item.dataset.v));
+    item.addEventListener('click', () => {
+      window.navTo(item.dataset.v);
+      if (item.dataset.v === 'payroll') setTimeout(fetchPayroll, 100);
+    });
   });
 
   const logoutBtn = document.getElementById('logout-btn');
