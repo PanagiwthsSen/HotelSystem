@@ -38,7 +38,9 @@ window.requestGeneralRestock = async function() {
 /* ==============================================================
    LOGOUT
    ============================================================== */
-window.logoutMinibar = function() {
+window.logoutMinibar = async function() {
+    const user = JSON.parse(localStorage.getItem('hotel_user'));
+    if (user) await supabase.from('EMPLOYEE').update({ IsLoggedIn: false }).eq('EmpID', user.id);
     localStorage.removeItem('hotel_user');
     showToast("Γίνεται αποσύνδεση... Καλή ξεκούραση.", "info");
     setTimeout(() => { window.location.href = "/pages/login.html"; }, 1500);
@@ -588,4 +590,16 @@ document.addEventListener('DOMContentLoaded', async function initPage() {
             console.warn('Auto-refresh error:', err);
         }
     }, 30000);
+
+    window.addEventListener('beforeunload', () => {
+        const user = JSON.parse(localStorage.getItem('hotel_user'));
+        if (user && user.id) {
+            fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/EMPLOYEE?EmpID=eq.' + user.id, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_KEY, 'Authorization': 'Bearer ' + import.meta.env.VITE_SUPABASE_KEY },
+                body: JSON.stringify({ IsLoggedIn: false }),
+                keepalive: true
+            });
+        }
+    });
 });

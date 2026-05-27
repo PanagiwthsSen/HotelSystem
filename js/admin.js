@@ -595,7 +595,7 @@ async function fetchStaff() {
 
         const { data, error } = await supabase
             .from('EMPLOYEE')
-            .select('EmpID, FirstName, LastName, Role, Salary, Leaves')
+            .select('EmpID, FirstName, LastName, Role, Salary, Leaves, IsLoggedIn')
             .eq('isActive', true)
             .order('Role', { ascending: true });
 
@@ -629,12 +629,14 @@ async function fetchStaff() {
                 leaves: emp.Leaves !== null ? `${emp.Leaves} ημ.` : '0 ημ.',
                 rawLeaves: emp.Leaves || 0,
                 salary: `€${emp.Salary || 0}`,
-                complaintCount: complaintCounts[emp.EmpID] || 0
+                complaintCount: complaintCounts[emp.EmpID] || 0,
+                isLoggedIn: emp.IsLoggedIn || false
             };
         });
 
-        if (document.getElementById('dash-staff-val')) document.getElementById('dash-staff-val').textContent = staffData.length;
-        if (document.getElementById('dash-staff-sub')) document.getElementById('dash-staff-sub').textContent = `${staffData.length} ενεργοί υπάλληλοι`;
+        const loggedInCount = staffData.filter(s => s.isLoggedIn).length;
+        if (document.getElementById('dash-staff-val')) document.getElementById('dash-staff-val').textContent = loggedInCount;
+        if (document.getElementById('dash-staff-sub')) document.getElementById('dash-staff-sub').textContent = `${loggedInCount} συνδεδεμένοι / ${staffData.length} ενεργοί`;
 
         _roleDeptMap = {};
         staffData.forEach(s => {
@@ -2690,14 +2692,11 @@ async function fetchExpenses() {
 /* ==============================================================
    ΛΕΙΤΟΥΡΓΙΑ ΑΠΟΣΥΝΔΕΣΗΣ (LOGOUT)
    ============================================================== */
-window.logout = function() {
-    // 1. Διαγραφή των δεδομένων του χρήστη από το localStorage
+window.logout = async function() {
+    const user = JSON.parse(localStorage.getItem('hotel_user'));
+    if (user) await supabase.from('EMPLOYEE').update({ IsLoggedIn: false }).eq('EmpID', user.id);
     localStorage.removeItem('hotel_user');
-    
-    // 2. Εμφάνιση ενός μηνύματος (προαιρετικά)
     alert("Αποσυνδεθήκατε επιτυχώς!");
-    
-    // 3. Ανακατεύθυνση στη σελίδα Login
     window.location.href = "/pages/login.html";
 }
 
@@ -3334,6 +3333,17 @@ appReady.then(ok => {
     HotelScheduler.registerTask('vehicleSync', fetchVehicles, 300000);
     HotelScheduler.start();
   }
+  window.addEventListener('beforeunload', () => {
+    const user = JSON.parse(localStorage.getItem('hotel_user'));
+    if (user && user.id) {
+      fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/EMPLOYEE?EmpID=eq.' + user.id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_KEY, 'Authorization': 'Bearer ' + import.meta.env.VITE_SUPABASE_KEY },
+        body: JSON.stringify({ IsLoggedIn: false }),
+        keepalive: true
+      });
+    }
+  });
 });
 
 window.updateSpecificRooms = async function() {

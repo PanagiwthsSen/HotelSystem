@@ -1,5 +1,5 @@
 import { supabase } from './supabase-config.js';
-import { calcDynamicPrice, fetchSpecialPricing, fetchOccupancyPercentage } from './services/api.js';
+import { calcDynamicPrice, fetchSpecialPricing, fetchOccupancyPercentage, fetchSeasonMultipliers } from './services/api.js';
 
 const ROOM_TYPE_INFO = {
     'Μονόκλινο': {
@@ -89,10 +89,12 @@ async function fetchAndRenderRooms() {
             .gte('CheckOutDate', checkin);
         if (resErr) throw resErr;
 
-        const specialPricing = await fetchSpecialPricing();
-
-        const occPct = await fetchOccupancyPercentage();
-        const lowMultiplier = occPct < 60 ? 0.85 : 1.0;
+        const [specialPricing, seasonMultipliers, occPct] = await Promise.all([
+            fetchSpecialPricing(),
+            fetchSeasonMultipliers(),
+            fetchOccupancyPercentage()
+        ]);
+        const lowMultiplier = occPct < 60 ? (parseFloat(seasonMultipliers.low) || 0.85) : 1.0;
 
         const bookedRooms = new Set();
         const typeBookedCount = {};
@@ -114,7 +116,8 @@ async function fetchAndRenderRooms() {
 
         let lowBannerHtml = '';
         if (lowMultiplier < 1) {
-            lowBannerHtml = '<div style="background:#FFF3CD;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#856404;display:flex;align-items:center;gap:8px"><i class="ti ti-alert-triangle" style="font-size:1.2rem"></i><div><strong>Έκπτωση Χαμηλής Πληρότητας:</strong> Ισχύει αυτόματη έκπτωση 15% σε όλες τις τιμές λόγω χαμηλής πληρότητας (&lt;60%).</div></div>';
+            const discPct = Math.round((1 - lowMultiplier) * 100);
+            lowBannerHtml = '<div style="background:#FFF3CD;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#856404;display:flex;align-items:center;gap:8px"><i class="ti ti-alert-triangle" style="font-size:1.2rem"></i><div><strong>Έκπτωση Χαμηλής Πληρότητας:</strong> Ισχύει αυτόματη έκπτωση ' + discPct + '% σε όλες τις τιμές λόγω χαμηλής πληρότητας (&lt;60%).</div></div>';
         }
 
         if (available.length === 0) {
@@ -165,7 +168,7 @@ async function fetchAndRenderRooms() {
             }
 
             const cheapest = roomsOfType.reduce((a, b) => a.BasePrice < b.BasePrice ? a : b);
-            const breakdown = calcDynamicPrice(cheapest.BasePrice, type, checkin, checkout, specialPricing, lowMultiplier);
+            const breakdown = calcDynamicPrice(cheapest.BasePrice, type, checkin, checkout, specialPricing, lowMultiplier, seasonMultipliers);
             const totalNights = breakdown.groups.reduce((s, g) => s + g.count, 0);
 
             const finalTotal = breakdown.total * roomsRequested;

@@ -8,7 +8,9 @@ window.navTo = function(id){
   document.getElementById('tb-title').textContent=vT[id]||id;
 };
 
-window.logout = function() {
+window.logout = async function() {
+  const user = JSON.parse(localStorage.getItem('hotel_user'));
+  if (user) await supabase.from('EMPLOYEE').update({ IsLoggedIn: false }).eq('EmpID', user.id);
   localStorage.removeItem('hotel_user');
   window.location.href = '/pages/login.html';
 };
@@ -90,13 +92,10 @@ async function fetchOverview() {
       .from('ROOM')
       .select('*', { count: 'exact', head: true });
 
-    const today = new Date().toISOString().split('T')[0];
     const { count: occupiedRooms } = await supabase
-      .from('RESERVATION')
+      .from('ROOM')
       .select('*', { count: 'exact', head: true })
-      .lte('CheckInDate', today)
-      .gte('CheckOutDate', today)
-      .neq('Status', 'cancelled');
+      .eq('Status', 'occ');
 
     const occPct = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
     occEl.textContent = occPct + '%';
@@ -140,16 +139,16 @@ async function fetchOverview() {
       if (availSub) availSub.textContent = 'Από τα ' + totalRooms + ' συνολικά';
     }
 
-    const { count: activeStaff } = await supabase
+    const { count: loggedInStaff } = await supabase
       .from('EMPLOYEE')
       .select('*', { count: 'exact', head: true })
-      .eq('isActive', true);
+      .eq('IsLoggedIn', true);
 
     const staffEl = document.getElementById('stat-staff');
     if (staffEl) {
-      staffEl.textContent = activeStaff;
+      staffEl.textContent = loggedInStaff;
       const staffSub = document.getElementById('stat-staff-sub');
-      if (staffSub) staffSub.textContent = 'Ενεργοί υπάλληλοι';
+      if (staffSub) staffSub.textContent = 'Συνδεδεμένοι τώρα';
     }
   }
 
@@ -720,13 +719,11 @@ async function fetchPricing() {
     grouped[t].count++;
     grouped[t].prices.push(Number(r.BasePrice) || 0);
   });
-  const typeMap = {
-    'double': 'Δίκλινα', 'queen': 'Φαρδύκλινα', 'single': 'Μονόκλινα', 'suite': 'Σουίτες',
-    'twin': 'Δίκλινα', 'king': 'Φαρδύκλινα', 'standard': 'Μονόκλινα'
-  };
-  const rows = ['double', 'queen', 'single', 'suite'].map(key => {
-    const g = grouped[key];
-    const grName = typeMap[key] || key;
+  const typeNames = ['Δίκλινα', 'Φαρδύκλινα', 'Μονόκλινα', 'Σουίτες'];
+  const typeLookup = { 'Δίκλινο': 'Δίκλινα', 'Δίκλινα': 'Δίκλινα', 'Φαρδύκλινο': 'Φαρδύκλινα', 'Φαρδύκλινα': 'Φαρδύκλινα', 'Μονόκλινο': 'Μονόκλινα', 'Μονόκλινα': 'Μονόκλινα', 'Σουίτα': 'Σουίτες', 'Σουίτες': 'Σουίτες' };
+  const rows = typeNames.map(grName => {
+    const dbType = Object.keys(typeLookup).find(k => typeLookup[k] === grName);
+    const g = grouped[dbType];
     if (!g) return '<tr style="border-bottom:1px solid var(--color-border-tertiary)"><td style="padding:8px;font-weight:500">' + grName + '</td><td style="padding:8px">0</td><td style="padding:8px">—</td><td style="padding:8px">—</td><td style="padding:8px;font-weight:bold">—</td></tr>';
     const baseMin = Math.min(...g.prices);
     const baseMax = Math.max(...g.prices);
@@ -891,6 +888,19 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchRents();
   fetchRestockNotifs();
   setInterval(fetchRestockNotifs, 30000);
+  setInterval(fetchPricing, 30000);
+
+  window.addEventListener('beforeunload', () => {
+    const user = JSON.parse(localStorage.getItem('hotel_user'));
+    if (user && user.id) {
+      fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/EMPLOYEE?EmpID=eq.' + user.id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_KEY, 'Authorization': 'Bearer ' + import.meta.env.VITE_SUPABASE_KEY },
+        body: JSON.stringify({ IsLoggedIn: false }),
+        keepalive: true
+      });
+    }
+  });
 });
 
 /* ==============================================================
