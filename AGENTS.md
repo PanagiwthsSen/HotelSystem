@@ -3,7 +3,9 @@
 ## Commands
 - `npm run dev` — Vite dev server (no config file, Vite defaults)
 - `npm run build` — Vite build
-- No tests, no lint, no typecheck
+- `npm run test:e2e` — Playwright headless E2E tests  
+- `npm run test:e2e:ui` — Playwright UI mode (interactive browser)  
+- No lint, no typecheck
 
 ## Stack
 - **Vanilla JS** (ES modules + inline `<script>`), **Vite 8**, **Supabase**

@@ -55,26 +55,13 @@ window.showConfirm = function(message) {
 };
 
 // Έλεγχος χωρητικότητας ανά τύπο δωματίου για δεδομένες ημερομηνίες
+// Χρησιμοποιεί τα shared utilities από το api.js για να μετράει
+// (α) συγκεκριμένα δωμάτια που είναι κλεισμένα μέσω RESERVATION_ROOM και
+// (β) κρατήσεις χωρίς αντιστοιχισμένο δωμάτιο (μόνο RoomType).
 window.checkRoomTypeCapacity = async function(roomType, checkIn, checkOut) {
   try {
-    const { data: totalData, error: totalErr } = await window.supabase
-      .from('ROOM')
-      .select('RoomNumber')
-      .eq('RoomType', roomType);
-    if (totalErr) throw totalErr;
-    const total = totalData ? totalData.length : 0;
-
-    const { data: bookedData, error: bookedErr } = await window.supabase
-      .from('RESERVATION')
-      .select('ReservationID')
-      .eq('RoomType', roomType)
-      .not('Status', 'in', '("Cancelled","CheckedOut")')
-      .lt('CheckInDate', checkOut)
-      .gt('CheckOutDate', checkIn);
-    if (bookedErr) throw bookedErr;
-    const booked = bookedData ? bookedData.length : 0;
-
-    return { total, booked, available: total - booked, isFull: booked >= total };
+    const { fetchRoomTypeAvailability } = await import('/js/services/api.js');
+    return await fetchRoomTypeAvailability(roomType, checkIn, checkOut);
   } catch (err) {
     console.error('Capacity check error:', err);
     return { total: 0, booked: 0, available: 0, isFull: false };

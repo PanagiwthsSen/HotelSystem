@@ -207,6 +207,54 @@ export async function buildCheckoutMap() {
     return map;
 }
 
+// ─── Room availability helpers (shared, DRY) ─────────────────
+
+export async function fetchOverlappingReservations(checkIn, checkOut) {
+    const { data, error } = await supabase
+        .from('RESERVATION')
+        .select('ReservationID, RoomType')
+        .lt('CheckInDate', checkOut)
+        .gt('CheckOutDate', checkIn)
+        .not('Status', 'in', '("Cancelled","CheckedOut")');
+    if (error) throw error;
+    return data || [];
+}
+
+export async function fetchBusyRoomNumbers(reservationIds) {
+    if (!reservationIds || reservationIds.length === 0) return [];
+    const { data, error } = await supabase
+        .from('RESERVATION_ROOM')
+        .select('ReservationID, RoomNumber')
+        .in('ReservationID', reservationIds);
+    if (error) throw error;
+    return data || [];
+}
+
+export async function fetchRoomTypeAvailability(roomType, checkIn, checkOut) {
+    const [totalRes, overlapping] = await Promise.all([
+        supabase.from('ROOM').select('RoomNumber').eq('RoomType', roomType),
+        fetchOverlappingReservations(checkIn, checkOut)
+    ]);
+    if (totalRes.error) throw totalRes.error;
+    const allRooms = totalRes.data || [];
+    const total = allRooms.length;
+
+    const ids = overlapping.map(r => r.ReservationID);
+    const busyRooms = await fetchBusyRoomNumbers(ids);
+    const busyRoomNums = new Set(busyRooms.map(r => r.RoomNumber));
+    const assignedResIds = new Set(busyRooms.map(r => r.ReservationID));
+
+    const occupiedRoomsOfType = allRooms.filter(r => busyRoomNums.has(r.RoomNumber)).length;
+    const unassignedCount = overlapping.filter(r =>
+        r.RoomType === roomType && !assignedResIds.has(r.ReservationID)
+    ).length;
+
+    const booked = occupiedRoomsOfType + unassignedCount;
+    const available = Math.max(0, total - booked);
+
+    return { total, booked, available, isFull: available <= 0 };
+}
+
 export async function fetchRooms() {
     const { data, error } = await supabase
         .from('ROOM')

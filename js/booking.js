@@ -29,6 +29,8 @@ let bookingData = {
   email: '',
   phone: '',
   country: 'GR',
+  rooms: 1,
+  pax: 1,
   reservationId: null
 };
 
@@ -48,6 +50,8 @@ function initApp() {
   
   bookingData.checkin = params.get('checkin') || defaultCheckin;
   bookingData.checkout = params.get('checkout') || defaultCheckout;
+  bookingData.rooms = parseInt(params.get('rooms')) || 1;
+  bookingData.pax = parseInt(params.get('pax')) || 1;
 
   if (bookingData.room !== 'Επιλεγμένο Δωμάτιο' && bookingData.room !== 'Οποιοδήποτε') {
     document.getElementById('form-title').textContent = 'Κράτηση: ' + bookingData.room;
@@ -95,6 +99,8 @@ function renderStep() {
         <div class="sum-row"><span>Τύπος</span><span>${bookingData.room}</span></div>
         <div class="sum-row"><span>Άφιξη</span><span>${fmtDate(bookingData.checkin)}</span></div>
         <div class="sum-row"><span>Αναχώρηση</span><span>${fmtDate(bookingData.checkout)}</span></div>
+        <div class="sum-row"><span>Δωμάτια</span><span>${bookingData.rooms}</span></div>
+        ${bookingData.pax > 0 ? `<div class="sum-row"><span>Άτομα</span><span>${bookingData.pax}</span></div>` : ''}
         ${bookingData.price > 0 ? `<div class="sum-row total"><span>Εκτιμώμενο σύνολο</span><span>€${total} (${nights} νύχτες)</span></div>` : ''}
       </div>
       <div class="mform-row">
@@ -156,6 +162,8 @@ function renderStep() {
           <div class="sum-row"><span>Επώνυμο</span><span>${bookingData.last}</span></div>
           <div class="sum-row"><span>Όνομα</span><span>${bookingData.first}</span></div>
           <div class="sum-row"><span>Τύπος Δωματίου</span><span>${bookingData.room}</span></div>
+          <div class="sum-row"><span>Δωμάτια</span><span>${bookingData.rooms}</span></div>
+          ${bookingData.pax > 0 ? `<div class="sum-row"><span>Άτομα</span><span>${bookingData.pax}</span></div>` : ''}
           <div class="sum-row"><span>Άφιξη</span><span>${fmtDate(bookingData.checkin)}</span></div>
           <div class="sum-row"><span>Αναχώρηση</span><span>${fmtDate(bookingData.checkout)}</span></div>
           <div class="sum-row"><span>Διανυκτερεύσεις</span><span>${nights}</span></div>
@@ -194,8 +202,11 @@ async function nextStep() {
     }
     try {
       const cap = await window.checkRoomTypeCapacity(bookingData.room, bookingData.checkin, bookingData.checkout);
-      if (cap.isFull) {
-        showToast('Λυπούμαστε, όλα τα δωμάτια τύπου ' + bookingData.room + ' είναι κλεισμένα για αυτές τις ημερομηνίες.', 'error');
+      if (cap.available < bookingData.rooms) {
+        const msg = cap.available <= 0
+          ? 'Λυπούμαστε, όλα τα δωμάτια τύπου ' + bookingData.room + ' είναι κλεισμένα για αυτές τις ημερομηνίες.'
+          : 'Λυπούμαστε, υπάρχουν μόνο ' + cap.available + ' διαθέσιμα δωμάτια τύπου ' + bookingData.room + ' για ' + bookingData.rooms + ' που ζητήσατε.';
+        showToast(msg, 'error');
         return;
       }
     } catch (e) {

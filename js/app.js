@@ -75,20 +75,6 @@ async function fetchAndRenderRooms() {
     list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-secondary);width:100%;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:2rem;display:block;margin-bottom:1rem;"></i>Φόρτωση διαθέσιμων δωματίων...</div>';
 
     try {
-        const { data: rooms, error: roomsErr } = await supabase
-            .from('ROOM')
-            .select('*')
-            .in('Status', ['free', 'clean']);
-        if (roomsErr) throw roomsErr;
-
-        const { data: reservations, error: resErr } = await supabase
-            .from('RESERVATION')
-            .select('ReservationID, RoomType, RESERVATION_ROOM (RoomNumber)')
-            .neq('Status', 'Cancelled')
-            .lte('CheckInDate', checkout)
-            .gte('CheckOutDate', checkin);
-        if (resErr) throw resErr;
-
         const [specialPricing, seasonMultipliers, occPct] = await Promise.all([
             fetchSpecialPricing(),
             fetchSeasonMultipliers(),
@@ -96,23 +82,24 @@ async function fetchAndRenderRooms() {
         ]);
         const lowMultiplier = occPct < 60 ? (parseFloat(seasonMultipliers.low) || 0.85) : 1.0;
 
-        const bookedRooms = new Set();
-        const typeBookedCount = {};
-        (reservations || []).forEach(r => {
-            const rr = r.RESERVATION_ROOM;
-            const rooms = Array.isArray(rr) ? rr : (rr ? [rr] : []);
-            if (rooms.length > 0) {
-                rooms.forEach(rm => { if (rm.RoomNumber) bookedRooms.add(rm.RoomNumber); });
-            } else if (r.RoomType) {
-                typeBookedCount[r.RoomType] = (typeBookedCount[r.RoomType] || 0) + 1;
-            }
-        });
+        const typeMap = { mono: 'Μονόκλινο', dik: 'Δίκλινο', far: 'Φαρδύκλινο', suite: 'Σουίτα' };
 
-        const available = rooms.filter(r => !bookedRooms.has(r.RoomNumber));
-        const availableCounts = {};
-        available.forEach(r => {
-            availableCounts[r.RoomType] = (availableCounts[r.RoomType] || 0) + 1;
-        });
+        const roomTypes = ['Μονόκλινο', 'Δίκλινο', 'Φαρδύκλινο', 'Σουίτα'];
+        const typeAvailability = {};
+        for (const type of roomTypes) {
+            if (typeFilter !== 'all' && type !== typeMap[typeFilter]) continue;
+            try {
+                typeAvailability[type] = await window.checkRoomTypeCapacity(type, checkin, checkout);
+            } catch (_) {
+                typeAvailability[type] = { total: 0, booked: 0, available: 0, isFull: true };
+            }
+        }
+
+        const { data: rooms, error: roomsErr } = await supabase
+            .from('ROOM')
+            .select('*')
+            .in('Status', ['free', 'clean']);
+        if (roomsErr) throw roomsErr;
 
         let lowBannerHtml = '';
         if (lowMultiplier < 1) {
@@ -120,20 +107,18 @@ async function fetchAndRenderRooms() {
             lowBannerHtml = '<div style="background:#FFF3CD;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#856404;display:flex;align-items:center;gap:8px"><i class="ti ti-alert-triangle" style="font-size:1.2rem"></i><div><strong>Έκπτωση Χαμηλής Πληρότητας:</strong> Ισχύει αυτόματη έκπτωση ' + discPct + '% σε όλες τις τιμές λόγω χαμηλής πληρότητας (&lt;60%).</div></div>';
         }
 
-        if (available.length === 0) {
+        if (rooms.length === 0) {
             list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-secondary);width:100%;">Δεν βρέθηκαν διαθέσιμα δωμάτια για τις επιλεγμένες ημερομηνίες.</div>';
             return;
         }
 
         const byType = {};
-        const typeMap = { mono: 'Μονόκλινο', dik: 'Δίκλινο', far: 'Φαρδύκλινο', suite: 'Σουίτα' };
-        available.forEach(r => {
+        rooms.forEach(r => {
             if (typeFilter !== 'all' && r.RoomType !== typeMap[typeFilter]) return;
             if (!byType[r.RoomType]) byType[r.RoomType] = [];
             byType[r.RoomType].push(r);
         });
 
-        const roomTypes = ['Μονόκλινο', 'Δίκλινο', 'Φαρδύκλινο', 'Σουίτα'];
         let html = '';
 
         roomTypes.forEach(type => {
@@ -143,9 +128,9 @@ async function fetchAndRenderRooms() {
             const info = ROOM_TYPE_INFO[type];
             if (!info) return;
 
-            const effectiveCount = (availableCounts[type] || 0) - (typeBookedCount[type] || 0);
+            const avail = typeAvailability[type] || { available: 0 };
 
-            if (!roomsOfType || effectiveCount < roomsRequested) {
+            if (!roomsOfType || avail.available < roomsRequested) {
                 html += `
                 <div class="room-card sold-out">
                     <div class="room-img">

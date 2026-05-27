@@ -1,6 +1,6 @@
 import { supabase } from './supabase-config.js';
 import { showToast, normalizeString, formatDate, updateLiveTime } from './utils/ui.js';
-import { isSoonCheckout, getStatusLabel, buildCheckoutMap, calcDynamicPrice, fetchSpecialPricing, fetchOccupancyPercentage, mapDbStatusToUI } from './services/api.js';
+import { isSoonCheckout, getStatusLabel, buildCheckoutMap, calcDynamicPrice, fetchSpecialPricing, fetchOccupancyPercentage, mapDbStatusToUI, fetchOverlappingReservations, fetchBusyRoomNumbers } from './services/api.js';
 import { renderRoomMap } from './components/RoomMap.js';
 
 /* ==============================================================
@@ -846,25 +846,10 @@ async function fetchAvailableRooms() {
     const roomType = rtypeEl.value;
 
     try {
-        const { data: overlapping, error: olErr } = await supabase
-            .from('RESERVATION')
-            .select('ReservationID')
-            .lt('CheckInDate', checkOut)
-            .gt('CheckOutDate', checkIn)
-            .not('Status', 'in', '("Cancelled","CheckedOut")');
-
-        if (olErr) throw olErr;
-
-        let busyRoomNumbers = [];
-        if (overlapping && overlapping.length > 0) {
-            const ids = overlapping.map(r => r.ReservationID);
-            const { data: busyRooms, error: brErr } = await supabase
-                .from('RESERVATION_ROOM')
-                .select('RoomNumber')
-                .in('ReservationID', ids);
-            if (brErr) throw brErr;
-            busyRoomNumbers = (busyRooms || []).map(r => r.RoomNumber);
-        }
+        const overlapping = await fetchOverlappingReservations(checkIn, checkOut);
+        const ids = overlapping.map(r => r.ReservationID);
+        const busyRoomRecords = await fetchBusyRoomNumbers(ids);
+        const busyRoomNumbers = busyRoomRecords.map(r => r.RoomNumber);
 
         const { data: allRooms, error: allErr } = await supabase
             .from('ROOM')
@@ -1493,30 +1478,11 @@ window.searchAvailableRooms = async function () {
     }
 
     try {
-        // Query 1: overlapping active reservation IDs (overlap formula)
-        const { data: overlapping, error: olErr } = await supabase
-            .from('RESERVATION')
-            .select('ReservationID')
-            .lt('CheckInDate', checkOut)
-            .gt('CheckOutDate', checkIn)
-            .not('Status', 'in', '("Cancelled","CheckedOut")');
+        const overlapping = await fetchOverlappingReservations(checkIn, checkOut);
+        const ids = overlapping.map(r => r.ReservationID);
+        const busyRoomRecords = await fetchBusyRoomNumbers(ids);
+        const busyRoomNumbers = busyRoomRecords.map(r => r.RoomNumber);
 
-        if (olErr) throw olErr;
-
-        // Collect busy room numbers
-        let busyRoomNumbers = [];
-        if (overlapping && overlapping.length > 0) {
-            const ids = overlapping.map(r => r.ReservationID);
-            const { data: busyRooms, error: brErr } = await supabase
-                .from('RESERVATION_ROOM')
-                .select('RoomNumber')
-                .in('ReservationID', ids);
-
-            if (brErr) throw brErr;
-            busyRoomNumbers = (busyRooms || []).map(r => r.RoomNumber);
-        }
-
-        // Query 2: all rooms NOT busy and with bookable status
         const { data: allRooms, error: allErr } = await supabase
             .from('ROOM')
             .select('*');
