@@ -1042,8 +1042,11 @@ async function fetchInventory() {
             return;
         }
 
+        const catLabels = { 'κηπος': 'Αποθήκη Κήπου', 'minibar': 'Αποθήκη Minibar' };
+
         tbody.innerHTML = data.map(item => {
             let statusHtml = '';
+            const catDisplay = catLabels[item.Category] || item.Category;
 
             if (item.Quantity === 0) {
                 statusHtml = '<span class="pill p-r">Εξαντλήθηκε</span>';
@@ -1056,8 +1059,8 @@ async function fetchInventory() {
             return `
                 <tr>
                     <td><strong>${item.Name}</strong></td>
-                    <td>${item.Category}</td>
-                    <td>${item.Quantity} τεμ. <br><small style="color:var(--text-muted)">(Όριο: ${item.MinThreshold})</small></td>
+                    <td>${catDisplay}</td>
+                    <td>${item.Quantity} τεμ.</td>
                     <td>${statusHtml}</td>
                     <td>
                         <button class="btn btn-sm" onclick="openInventoryModal(${item.ItemID})" title="Επεξεργασία">✏️</button>
@@ -1074,14 +1077,60 @@ async function fetchInventory() {
     }
 }
 
-// Προσομοίωση Παραγγελίας
+// Αποστολή παραγγελίας (ενημέρωση αποθέματος στη βάση)
 window.placeOrder = function(btn, itemName) {
-    btn.disabled = true;
-    btn.textContent = "Παραγγέλθηκε";
-    btn.classList.replace('btn-dark', 'btn');
-    const statusCell = btn.closest('tr').querySelector('td:nth-child(4)');
-    statusCell.innerHTML = '<span class="pill p-b">Αναμένεται</span>';
-    showToast(`Στάλθηκε αυτόματη παραγγελία στον προμηθευτή για: ${itemName}`, "success");
+    const existing = document.querySelector('.order-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'inv-overlay';
+    overlay.innerHTML = `
+        <div class="inv-modal">
+            <h3>Παραγγελία: ${itemName}</h3>
+            <div class="mform-group">
+                <label>Ποσότητα παραγγελίας *</label>
+                <input type="number" id="order-qty" min="1" value="10" autofocus>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" id="order-cancel">Ακύρωση</button>
+                <button class="btn btn-dark" id="order-confirm">Επιβεβαίωση</button>
+            </div>
+        </div>
+    `;
+
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    document.getElementById('order-qty').focus();
+
+    overlay.querySelector('#order-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#order-confirm').addEventListener('click', async () => {
+        const qtyInput = document.getElementById('order-qty');
+        const qty = parseInt(qtyInput.value);
+        if (isNaN(qty) || qty <= 0) { showToast('Μη έγκυρη ποσότητα.', 'warning'); return; }
+        overlay.remove();
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i>';
+        try {
+            const { data: item, error: fetchErr } = await supabase
+                .from('INVENTORY_ITEM')
+                .select('ItemID, Quantity')
+                .eq('Name', itemName)
+                .single();
+            if (!item || fetchErr) { showToast('Το προϊόν δεν βρέθηκε.', 'error'); btn.disabled = false; btn.innerHTML = 'Παραγγελία'; return; }
+            const newQty = item.Quantity + qty;
+            const { error } = await supabase
+                .from('INVENTORY_ITEM')
+                .update({ Quantity: newQty })
+                .eq('ItemID', item.ItemID);
+            if (error) throw error;
+            showToast(`Η παραγγελία για ${itemName} καταχωρήθηκε (${item.Quantity} → ${newQty}).`, 'success');
+            fetchInventory();
+        } catch (err) {
+            showToast('Σφάλμα: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.innerHTML = 'Παραγγελία';
+        }
+    });
 }
 
 // Άνοιγμα Modal Προσθήκης / Επεξεργασίας

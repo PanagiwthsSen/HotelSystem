@@ -273,7 +273,7 @@ export async function fetchArrivals(today) {
             RESERVATION_ROOM (RoomNumber)
         `)
         .eq('CheckInDate', today)
-        .not('Status', 'in', '("Cancelled","Deleted")');
+        .in('Status', ['Confirmed', 'CheckedIn']);
     if (error) throw error;
     return data || [];
 }
@@ -287,7 +287,7 @@ export async function fetchDepartures(today) {
             RESERVATION_ROOM (RoomNumber)
         `)
         .eq('CheckOutDate', today)
-        .not('Status', 'in', '("Cancelled","Deleted","CheckedIn","CheckedOut")');
+        .in('Status', ['Confirmed', 'CheckedOut']);
     if (error) throw error;
     return data || [];
 }
