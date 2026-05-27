@@ -282,5 +282,4 @@ export function renderRoomMap(containerId, rooms, options = {}) {
 
         container.appendChild(d);
     });
-    import { renderRoomMap } from './components/RoomMap.js';
 }
