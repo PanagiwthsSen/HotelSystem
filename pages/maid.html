@@ -35,7 +35,6 @@
       <div class="sb-group">Κύριο</div>
     <div class="sb-item active" data-v="overview"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Επισκόπηση</div>
     <div class="sb-item" data-v="rooms"><i class="ti ti-door" aria-hidden="true"></i>Δωμάτια Βάρδιας<span class="sb-badge" id="badge-rooms">0</span></div>
-    <div class="sb-item" data-v="minibar"><i class="ti ti-fridge" aria-hidden="true"></i>Mini-bar<span class="sb-badge" id="badge-mb">0</span></div>
     <div class="sb-group">Ιματισμός</div>
     <div class="sb-item" data-v="linen"><i class="ti ti-shirt" aria-hidden="true"></i>Αποστολή & Παραλαβή</div>
     <div class="sb-item" data-v="laundry"><i class="ti ti-wash-machine" aria-hidden="true"></i>Διαχείριση Ιματισμού</div>
@@ -63,7 +62,6 @@
     <div class="tb-r">
       <span class="badge b-teal">Ολοκλ. <span id="done-count">0</span>/<span id="total-count">0</span></span>
       <span class="badge b-gold">Εκκρεμή <span id="pend-count">0</span></span>
-      <span class="badge b-red">Mini-bar <span id="mb-count">0</span> εκκρ.</span>
     </div>
   </div>
 
@@ -85,10 +83,6 @@
         <div style="display:flex;flex-direction:column;gap:6px" id="ov-room-list"></div>
       </div>
       <div class="card">
-        <div class="card-hd"><div class="card-hd-l"><i class="ti ti-fridge" aria-hidden="true"></i>Mini-bar σήμερα</div><button class="btn btn-sm" onclick="window.navTo('minibar')">Λεπτομ. →</button></div>
-        <div id="ov-minibar-list" style="font-size:12px"></div>
-      </div>
-      <div class="card">
         <div class="card-hd"><div class="card-hd-l"><i class="ti ti-shirt" aria-hidden="true"></i>Ιματισμός σήμερα</div><button class="btn btn-sm" onclick="window.navTo('linen')">Λεπτομ. →</button></div>
         <div id="ov-linen" style="font-size:12px"></div>
       </div>
@@ -101,7 +95,6 @@
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('all',this)" data-filter="all">Όλα (0)</button>
-          <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('free',this)" data-filter="free">Διαθέσιμα (0)</button>
           <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('dirty',this)" data-filter="dirty">Επείγον (0)</button>
           <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('occ',this)" data-filter="occ">Προτεραιότ. (0)</button>
           <button class="btn btn-sm" style="font-size:11px" onclick="window.filterRooms('cleaning',this)" data-filter="cleaning">Σε εξέλιξη (0)</button>
@@ -111,35 +104,6 @@
     </div>
 
     <div class="room-list" id="room-list"></div>
-  </div>
-
-  <div class="view" id="v-minibar">
-    <div class="toast" id="mb-toast"><i class="ti ti-circle-check" aria-hidden="true" style="font-size:16px"></i><span>Mini-bar καταχωρήθηκε — υποδοχή ενημερώθηκε αυτόματα!</span></div>
-    <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-fridge" aria-hidden="true"></i>Δωμάτια Βάρδιας Mini-bar</div></div>
-      <div id="mb-assigned-rooms" style="font-size:12px;color:var(--color-text-secondary);padding:8px 0">Φόρτωση δωματίων...</div>
-    </div>
-
-    <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-list" aria-hidden="true"></i>Εκκρεμείς Χρεώσεις</div></div>
-      <div id="mb-list"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-hd"><div class="card-hd-l"><i class="ti ti-plus" aria-hidden="true"></i>Νέα καταχώρηση mini-bar</div></div>
-      <div class="fg-row">
-        <div class="fg"><label>Αρ. Δωματίου</label><input type="text" id="mb-room-inp" placeholder="π.χ. Δ-218"></div>
-        <div class="fg"><label>Πελάτης (αυτόματο)</label><input type="text" placeholder="Αναζήτηση..." readonly style="opacity:.6"></div>
-      </div>
-      <div class="fg"><label>Καταναλώσεις</label><input type="text" id="mb-items-inp" placeholder="π.χ. 2× νερό €2, 1× μπύρα €4"></div>
-      <div class="fg-row">
-        <div class="fg"><label>Σύνολο (€)</label><input type="number" id="mb-total-inp" placeholder="0.00" min="0" step="0.50"></div>
-        <div class="fg"><label>Κατάσταση δωματίου μετά</label>
-          <select id="mb-status-sel"><option>Προς καθαρισμό</option><option>Ήδη καθαρό</option></select>
-        </div>
-      </div>
-      <button class="btn btn-dark" onclick="window.submitNewMb()"><i class="ti ti-send" aria-hidden="true"></i> Αποστολή στην Υποδοχή</button>
-    </div>
   </div>
 
   <div class="view" id="v-linen">
@@ -253,7 +217,6 @@
       <div class="card-hd"><div class="card-hd-l"><i class="ti ti-notes" aria-hidden="true"></i>Αναφορά Βάρδιας — <span id="rpt-date"></span></div></div>
       <div class="g3" style="margin-bottom:12px">
         <div class="sc"><div class="sc-lbl">Δωμάτια ολοκλ.</div><div class="sc-val" id="rpt-done">3</div></div>
-        <div class="sc"><div class="sc-lbl">Mini-bar χρεώσεις</div><div class="sc-val" id="rpt-mb-charges">0</div></div>
         <div class="sc"><div class="sc-lbl">Ιματισμός στάλθηκε</div><div class="sc-val" id="rpt-linen-sent">0</div></div>
       </div>
       <div class="fg"><label>Προβλήματα / Σχόλια</label>

@@ -136,9 +136,9 @@ function renderCards(container, rooms, filter, options) {
     const depRoomNums = new Set(departures.map(d => d.room));
 
     data.sort((a, b) => {
-        const orderMap = { dirty: 1, occ: 0, cleaning: 2, free: 3, done: 4 };
-        const oa = depRoomNums.has(a.num) && a.state === 'dirty' ? 0 : orderMap[a.state] || 3;
-        const ob = depRoomNums.has(b.num) && b.state === 'dirty' ? 0 : orderMap[b.state] || 3;
+        const orderMap = { dirty: 0, occ: 1, cleaning: 2 };
+        const oa = depRoomNums.has(a.num) && a.state === 'dirty' ? 0 : orderMap[a.state] || 2;
+        const ob = depRoomNums.has(b.num) && b.state === 'dirty' ? 0 : orderMap[b.state] || 2;
         return oa - ob;
     });
 

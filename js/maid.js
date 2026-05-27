@@ -10,11 +10,10 @@ let hotelUser = null;
 let maidRooms = [];
 let inventoryItems = [];
 let notifications = [];
-let mbCount = 0;
 let currentFilter = 'all';
 let departures = [];
 let completedRooms = [];
-const vTitles = { overview: 'Επισκόπηση Βάρδιας', rooms: 'Δωμάτια Βάρδιας', minibar: 'Mini-bar', linen: 'Ιματισμός — Αποστολή & Παραλαβή', stock: 'Αποθεματικό', report: 'Αναφορά Βάρδιας', laundry: 'Διαχείριση Ιματισμού' };
+const vTitles = { overview: 'Επισκόπηση Βάρδιας', rooms: 'Δωμάτια Βάρδιας', linen: 'Ιματισμός — Αποστολή & Παραλαβή', stock: 'Αποθεματικό', report: 'Αναφορά Βάρδιας', laundry: 'Διαχείριση Ιματισμού' };
 
 /* ==============================================================
    INIT
@@ -53,14 +52,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     supabase.channel('maid-notifications')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'NOTIFICATION' }, async () => {
         await fetchMaidNotifications();
-        renderOverview();
-      }).subscribe();
-
-    supabase.channel('maid-mb')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'MINIBAR_CONSUMPTION' }, async () => {
-        await fetchPendingMb();
-        recomputeCounters();
-        if (document.getElementById('v-minibar')?.classList.contains('active')) { renderPendingMb(); renderMinibarAssignedRooms(); }
         renderOverview();
       }).subscribe();
 
@@ -126,7 +117,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setInterval(async () => {
     await fetchMaidRooms();
     await fetchMaidNotifications();
-    await fetchPendingMb();
     await fetchTodayDepartures();
     await fetchInventory();
     await fetchLaundryDispatches();
@@ -134,7 +124,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await fetchLaundryDamages();
     recomputeCounters();
     if (document.getElementById('v-rooms')?.classList.contains('active')) renderRooms(currentFilter);
-    if (document.getElementById('v-minibar')?.classList.contains('active')) renderPendingMb();
     if (document.getElementById('v-stock')?.classList.contains('active')) renderStock();
     if (document.getElementById('v-linen')?.classList.contains('active')) renderLinen();
     if (document.getElementById('v-laundry')?.classList.contains('active')) {
@@ -174,10 +163,6 @@ function recomputeCounters() {
     if (pendEl) pendEl.textContent = '0';
     const badgeRooms = document.getElementById('badge-rooms');
     if (badgeRooms) badgeRooms.textContent = '0';
-    const badgeMb = document.getElementById('badge-mb');
-    if (badgeMb) badgeMb.textContent = mbCount;
-    const mbEl = document.getElementById('mb-count');
-    if (mbEl) mbEl.textContent = mbCount;
     return;
   }
 
@@ -200,11 +185,6 @@ function recomputeCounters() {
   if (pendEl) pendEl.textContent = pendingCount;
   const badgeRooms = document.getElementById('badge-rooms');
   if (badgeRooms) badgeRooms.textContent = pendingCount;
-
-  const badgeMb = document.getElementById('badge-mb');
-  if (badgeMb) badgeMb.textContent = mbCount;
-  const mbEl = document.getElementById('mb-count');
-  if (mbEl) mbEl.textContent = mbCount;
 
   const ovTotal = document.getElementById('ov-total');
   if (ovTotal) ovTotal.textContent = maidRooms.length;
@@ -234,7 +214,6 @@ window.navTo = function(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'v-' + id));
   document.getElementById('tb-title').textContent = vTitles[id] || id;
   if (id === 'rooms') renderRooms(currentFilter);
-  if (id === 'minibar') { renderPendingMb(); renderMinibarAssignedRooms(); }
   if (id === 'stock') renderStock();
   if (id === 'linen') renderLinen();
   if (id === 'laundry') renderLaundryView();
@@ -263,7 +242,6 @@ async function loadAllData() {
       fetchMaidRooms(),
       fetchInventory(),
       fetchMaidNotifications(),
-      fetchPendingMb(),
       fetchTodayDepartures(),
       fetchLaundryDispatches(),
       fetchLaundryReceives(),
@@ -316,7 +294,7 @@ async function fetchMaidRooms() {
     }
 
     maidRooms = rooms
-      .filter(r => r.Status === 'dirty' || r.Status === 'cleaning' || r.Status === 'occ' || r.Status === 'free' || r.Status === 'clean')
+      .filter(r => r.Status === 'dirty' || r.Status === 'cleaning' || r.Status === 'occ')
       .map(r => {
         const guests = rrMap[r.RoomNumber];
         let note = '';
@@ -340,7 +318,6 @@ async function fetchMaidRooms() {
           note
         };
       });
-    await fetchMinibarAssignedRooms();
   } catch (e) {
     console.error('fetchMaidRooms error:', e);
   }
@@ -373,46 +350,7 @@ async function fetchMaidNotifications() {
   }
 }
 
-async function fetchPendingMb() {
-  try {
-    const now = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
-      .from('MINIBAR_CONSUMPTION')
-      .select('*, RESERVATION(CheckInDate, CheckOutDate, RESERVATION_ROOM(RoomNumber))')
-      .not('ReservationID', 'is', null);
-    if (error) throw error;
-    if (!data || data.length === 0) { mbCount = 0; pendingMbRecords = []; return; }
 
-    const resIds = [...new Set(data.filter(d => d.ReservationID && d.ReservationID !== 0).map(d => d.ReservationID))];
-    if (resIds.length === 0) { mbCount = 0; pendingMbRecords = []; return; }
-
-    const [rrRes, resRes] = await Promise.all([
-      supabase.from('RESERVATION_ROOM').select('ReservationID, RoomNumber').in('ReservationID', resIds),
-      supabase.from('RESERVATION').select('ReservationID, Status').in('ReservationID', resIds)
-    ]);
-
-    const rrMap = {};
-    (rrRes.data || []).forEach(rr => { if (!rrMap[rr.ReservationID]) rrMap[rr.ReservationID] = []; rrMap[rr.ReservationID].push(rr.RoomNumber); });
-    const activeIds = new Set((resRes.data || []).filter(r => r.Status !== 'Cancelled' && r.Status !== 'CheckedOut').map(r => r.ReservationID));
-
-    pendingMbRecords = data.filter(d => activeIds.has(d.ReservationID)).map(d => ({
-      id: 'mb-' + d.ConsumptionID,
-      consumptionId: d.ConsumptionID,
-      reservationId: d.ReservationID,
-      room: (rrMap[d.ReservationID] || ['—']).join(', '),
-      itemName: d.ItemID ? 'Είδος #' + d.ItemID : 'Γενική χρέωση',
-      qty: d.Quantity,
-      charge: d.Charge
-    }));
-    mbCount = pendingMbRecords.length;
-  } catch (e) {
-    console.error('fetchPendingMb error:', e);
-    mbCount = 0;
-    pendingMbRecords = [];
-  }
-}
-
-let pendingMbRecords = [];
 
 /* ==============================================================
    DEPARTURES (today's check-outs)
@@ -498,7 +436,6 @@ window.markDepartureCleaned = async function(roomNum) {
 function renderOverview() {
   renderOverviewNotifications();
   renderOverviewRoomList();
-  renderOverviewMinibar();
   renderOverviewLinen();
 }
 
@@ -539,23 +476,6 @@ function renderOverviewRoomList() {
       </button>
     </div>`;
   }).join('');
-}
-
-function renderOverviewMinibar() {
-  const el = document.getElementById('ov-minibar-list');
-  if (!el) return;
-  if (mbCount === 0) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary);padding:4px 0">Καμία εκκρεμότητα mini-bar</div>';
-    return;
-  }
-  const items = pendingMbRecords.slice(0, 5);
-  el.innerHTML = items.map(r =>
-    `<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
-      <span style="font-weight:600;font-size:12px;min-width:50px">${r.room}</span>
-      <span style="font-size:11px;color:var(--color-text-secondary);flex:1">${r.qty}× ${r.itemName}</span>
-      <span style="font-weight:500;font-size:11px">€${r.charge.toFixed(2)}</span>
-    </div>`
-  ).join('');
 }
 
 function renderOverviewLinen() {
@@ -606,19 +526,21 @@ window.setRoomInProgress = async function(id) {
   const room = maidRooms.find(r => r.id === id);
   const actionLabel = room && room.status === 'dirty' ? 'Καθαρισμός' : 'Έναρξη';
   try {
-    if (room && room.status === 'dirty') {
+    if (room && (room.status === 'dirty' || room.status === 'occ')) {
       const { error } = await supabase.from('ROOM').update({ Status: 'cleaning' }).eq('RoomNumber', id);
       if (error) throw error;
+      room._origStatus = room.status;
       room.status = 'cleaning';
       room.state = 'cleaning';
       room.note = 'Καθαρισμός σε εξέλιξη';
     }
-    await supabase.from('NOTIFICATION').insert({
+    const { error: notifErr } = await supabase.from('NOTIFICATION').insert({
       TargetRole: 'receptionist',
       Type: 'room_in_progress',
       Message: `Δωμάτιο ${id}: ${actionLabel} σε εξέλιξη από καμαριέρα.`,
       IsRead: false
     });
+    if (notifErr) throw notifErr;
   } catch (err) {
     console.error('Σφάλμα καταγραφής έναρξης:', err.message);
     showToast('room-toast', 'Σφάλμα: ' + err.message);
@@ -646,7 +568,7 @@ window.setRoomDone = async function(id) {
   const confirmed = await window.showConfirm(`Το δωμάτιο ${room.num} είναι έτοιμο;`);
   if (!confirmed) return;
 
-  const targetStatus = room.status === 'occ' ? 'occ' : 'clean';
+  const targetStatus = room._origStatus === 'occ' ? 'occ' : 'clean';
 
   try {
     const { error } = await supabase
@@ -658,12 +580,13 @@ window.setRoomDone = async function(id) {
       showToast('room-toast', 'Σφάλμα ενημέρωσης κατάστασης δωματίου.');
       return;
     }
-    await supabase.from('NOTIFICATION').insert({
+    const { error: notifErr } = await supabase.from('NOTIFICATION').insert({
       TargetRole: 'receptionist',
       Type: 'room_ready',
       Message: `Δωμάτιο ${room.num} (${room.type}) καθαρίστηκε και είναι έτοιμο.`,
       IsRead: false
     });
+    if (notifErr) throw notifErr;
   } catch (err) {
     console.error('Σφάλμα:', err.message);
     showToast('room-toast', 'Σφάλμα ενημέρωσης: ' + err.message);
@@ -674,7 +597,7 @@ window.setRoomDone = async function(id) {
   completedRooms.push(completedRoom);
   maidRooms = maidRooms.filter(r => r.id !== id);
 
-  const statusLabel = room.status === 'dirty' ? 'check-out' : room.status === 'occ' ? 'διαμονή' : 'καθαρισμός';
+  const statusLabel = room._origStatus === 'dirty' ? 'check-out' : room._origStatus === 'occ' ? 'διαμονή' : 'καθαρισμός';
   recomputeCounters();
   showToast('room-toast', room.num + ' — Έτοιμο! Ειδοποιήθηκε η υποδοχή.');
   addLog(room.num + ' — ' + statusLabel + ' ολοκληρώθηκε, ειδοποιήθηκε η υποδοχή');
@@ -717,186 +640,7 @@ window.reportRoomIssue = function(id) {
 
 
 
-/* ==============================================================
-   MINI-BAR VIEW
-   ============================================================== */
-let assignedMbRooms = [];
 
-async function fetchMinibarAssignedRooms() {
-  try {
-    assignedMbRooms = maidRooms
-      .filter(r => r.status === 'occ')
-      .map(r => ({
-        id: r.id,
-        num: r.num,
-        type: r.type,
-        guest: r.guest || 'Επισκέπτης',
-        note: r.note
-      }));
-  } catch (e) {
-    console.error('fetchMinibarAssignedRooms error:', e);
-    assignedMbRooms = [];
-  }
-}
-
-function renderMinibarAssignedRooms() {
-  const el = document.getElementById('mb-assigned-rooms');
-  if (!el) return;
-  if (assignedMbRooms.length === 0) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--color-text-secondary);padding:8px 0">Δεν υπάρχουν δωμάτια προς έλεγχο mini-bar.</div>';
-    return;
-  }
-  el.innerHTML = assignedMbRooms.map(r =>
-    `<div class="minibar-row" id="mar-${r.id}">
-      <div class="mb-room">${r.num}</div>
-      <div class="mb-items"><strong>${r.guest}</strong></div>
-      <div class="mb-total" style="font-size:11px;color:var(--color-text-secondary)">${r.type}</div>
-      <button class="btn btn-sm btn-teal" onclick="window.updateMinibarRoom('${r.id}')"><i class="ti ti-edit" aria-hidden="true"></i> Update</button>
-      <button class="btn btn-sm" onclick="window.ignoreMinibarRoom('${r.id}')" style="color:var(--color-text-secondary)"><i class="ti ti-x" aria-hidden="true"></i> Ignore</button>
-    </div>`
-  ).join('');
-}
-
-window.updateMinibarRoom = function(id) {
-  const room = assignedMbRooms.find(r => r.id === id);
-  if (!room) return;
-  document.getElementById('mb-room-inp').value = room.num;
-  document.getElementById('mb-items-inp').focus();
-  document.getElementById('v-minibar').scrollIntoView({ behavior: 'smooth', block: 'end' });
-};
-
-window.ignoreMinibarRoom = function(id) {
-  assignedMbRooms = assignedMbRooms.filter(r => r.id !== id);
-  renderMinibarAssignedRooms();
-};
-
-function renderPendingMb() {
-  const list = document.getElementById('mb-list');
-  if (!list) return;
-
-  if (pendingMbRecords.length === 0) {
-    list.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--color-text-secondary);font-size:12px">Δεν υπάρχουν εκκρεμείς χρεώσεις mini-bar.</div>';
-    return;
-  }
-
-  list.innerHTML = pendingMbRecords.map(r =>
-    `<div class="minibar-row" id="${r.id}">
-      <div class="mb-room">${r.room}</div>
-      <div class="mb-items">${r.qty}× ${r.itemName}</div>
-      <div class="mb-total">€${r.charge.toFixed(2)}</div>
-      <span class="pill p-r" style="margin-left:4px">Εκκρ.</span>
-      <button class="btn btn-sm btn-teal" onclick="window.chargeMb('${r.id}', ${r.consumptionId})">Καταχώρηση</button>
-    </div>`
-  ).join('');
-}
-
-window.chargeMb = async function(rowId, consumptionId) {
-  const row = document.getElementById(rowId);
-  if (!row) return;
-  const record = pendingMbRecords.find(r => r.consumptionId === consumptionId);
-  if (!record) return;
-
-  try {
-    if (record.reservationId && record.reservationId !== 0) {
-      const { error: recErr } = await supabase.from('RECEIPT').insert({
-        ReservationID: record.reservationId,
-        PaymentDate: new Date().toISOString(),
-        Amount: record.charge,
-        Category: 'minibar'
-      });
-      if (recErr) throw recErr;
-    }
-    await supabase.from('MINIBAR_CONSUMPTION').delete().eq('ConsumptionID', consumptionId);
-  } catch (err) {
-    console.error('Σφάλμα καταχώρησης χρέωσης:', err.message);
-    showToast('room-toast', 'Σφάλμα καταχώρησης χρέωσης minibar.');
-    return;
-  }
-
-  row.querySelector('.pill').className = 'pill p-g';
-  row.querySelector('.pill').textContent = 'OK';
-  const btn = row.querySelector('.btn-teal');
-  if (btn) { btn.disabled = true; btn.style.opacity = '.4'; }
-
-  mbCount = Math.max(0, mbCount - 1);
-  pendingMbRecords = pendingMbRecords.filter(r => r.consumptionId !== consumptionId);
-  recomputeCounters();
-
-  addLog('Mini-bar χρέωση #' + consumptionId + ' — €' + record.charge.toFixed(2) + ' καταχωρήθηκε');
-};
-
-window.submitNewMb = async function() {
-  const roomNum = document.getElementById('mb-room-inp').value.trim();
-  const itemsText = document.getElementById('mb-items-inp').value.trim();
-  const total = parseFloat(document.getElementById('mb-total-inp').value);
-
-  if (!roomNum) { alert('Εισάγετε αριθμό δωματίου.'); return; }
-  if (!total || total <= 0) { alert('Εισάγετε έγκυρο σύνολο χρέωσης.'); return; }
-
-  try {
-    const { data: rrData, error: rrErr } = await supabase
-      .from('RESERVATION_ROOM')
-      .select('ReservationID')
-      .eq('RoomNumber', roomNum);
-
-    if (rrErr) throw rrErr;
-
-    let reservationId = null;
-    if (rrData && rrData.length > 0) {
-      const ids = rrData.map(r => r.ReservationID);
-      const { data: resData } = await supabase
-        .from('RESERVATION')
-        .select('ReservationID')
-        .in('ReservationID', ids)
-        .neq('Status', 'Cancelled')
-        .neq('Status', 'CheckedOut')
-        .limit(1);
-      if (resData && resData.length > 0) reservationId = resData[0].ReservationID;
-    }
-
-    let itemId = null;
-    const itemMatch = inventoryItems.find(i => itemsText.toLowerCase().includes(i.Name.toLowerCase()));
-    if (itemMatch) itemId = itemMatch.ItemID;
-
-    if (!itemId && inventoryItems.length > 0) {
-      itemId = inventoryItems[0].ItemID;
-    }
-
-    const insertData = {
-      ReservationID: reservationId || 0,
-      ItemID: itemId || 0,
-      Quantity: 1,
-      Charge: total
-    };
-
-    if (!reservationId) {
-      addLog('Προσοχή: Δεν βρέθηκε ενεργή κράτηση για το δωμάτιο ' + roomNum + ' — η χρέωση καταχωρήθηκε με ReservationID=0');
-    }
-
-    const { error: insertErr } = await supabase
-      .from('MINIBAR_CONSUMPTION')
-      .insert([insertData]);
-
-    if (insertErr) throw insertErr;
-
-    const statusSel = document.getElementById('mb-status-sel');
-    if (statusSel && statusSel.value === 'Προς καθαρισμό') {
-      const { error: dirtyErr } = await supabase.from('ROOM').update({ Status: 'dirty' }).eq('RoomNumber', roomNum);
-      if (dirtyErr) console.error('Σφάλμα ενημέρωσης δωματίου σε dirty:', dirtyErr.message);
-    }
-
-    showToast('mb-toast');
-    document.getElementById('mb-room-inp').value = '';
-    document.getElementById('mb-items-inp').value = '';
-    document.getElementById('mb-total-inp').value = '';
-    addLog('Νέα χρέωση mini-bar ' + roomNum + ' — €' + total.toFixed(2));
-    await fetchPendingMb();
-    renderPendingMb();
-    recomputeCounters();
-  } catch (err) {
-    alert('Σφάλμα υποβολής: ' + err.message);
-  }
-};
 
 /* ==============================================================
    STOCK VIEW
@@ -1057,15 +801,6 @@ window.submitLinen = async function() {
 async function computeReportStats() {
   try {
     const today = new Date().toISOString().split('T')[0];
-    const { count: mbCount, error: mbErr } = await supabase
-      .from('RECEIPT')
-      .select('*', { count: 'exact', head: true })
-      .eq('Category', 'minibar')
-      .gte('PaymentDate', today);
-    if (!mbErr) {
-      const mbEl = document.getElementById('rpt-mb-charges');
-      if (mbEl) mbEl.textContent = mbCount || 0;
-    }
     const { count: linenCount, error: lnErr } = await supabase
       .from('NOTIFICATION')
       .select('*', { count: 'exact', head: true })
