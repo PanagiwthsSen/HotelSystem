@@ -418,14 +418,11 @@ function renderDepartures(departures) {
 /* ==============================================================
    ΛΕΙΤΟΥΡΓΙΑ ΑΠΟΣΥΝΔΕΣΗΣ (LOGOUT)
    ============================================================== */
-function logout() {
-    // 1. Διαγραφή των δεδομένων του χρήστη από το localStorage
+async function logout() {
+    const user = JSON.parse(localStorage.getItem('hotel_user'));
+    if (user) await supabase.from('EMPLOYEE').update({ IsLoggedIn: false }).eq('EmpID', user.id);
     localStorage.removeItem('hotel_user');
-    
-    // 2. Εμφάνιση ενός μηνύματος (προαιρετικά)
     alert("Αποσυνδεθήκατε επιτυχώς!");
-    
-    // 3. Ανακατεύθυνση στη σελίδα Login
     window.location.href = "/pages/login.html";
 }
 
@@ -2575,6 +2572,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Refresh prices from DB every 60 seconds (picks up admin changes)
     setInterval(fetchRoomPrices, 60000);
+
+    window.addEventListener('beforeunload', () => {
+        const user = JSON.parse(localStorage.getItem('hotel_user'));
+        if (user && user.id) {
+            fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/EMPLOYEE?EmpID=eq.' + user.id, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_KEY, 'Authorization': 'Bearer ' + import.meta.env.VITE_SUPABASE_KEY },
+                body: JSON.stringify({ IsLoggedIn: false }),
+                keepalive: true
+            });
+        }
+    });
 });
 
 setInterval(updateLiveTime, 60000);

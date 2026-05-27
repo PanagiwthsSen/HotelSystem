@@ -54,9 +54,27 @@ export function getSeasonForDate(date) {
     return null;
 }
 
-export function getMultiplier(date) {
+export function getMultiplier(date, overrides = {}) {
     const key = getSeasonForDate(date);
+    if (key && overrides[key] != null) return parseFloat(overrides[key]);
     return key ? SEASONS[key].defaultMultiplier : 1.0;
+}
+
+export async function fetchSeasonMultipliers() {
+    try {
+        const { data } = await supabase
+            .from('NOTIFICATION')
+            .select('Message')
+            .eq('Type', 'pricing_config')
+            .eq('TargetRole', 'both')
+            .order('CreatedAt', { ascending: false })
+            .limit(1);
+        if (data && data[0]) {
+            const m = JSON.parse(data[0].Message);
+            return { summer: m.summer, xmas: m.xmas, easter: m.easter, low: m.low };
+        }
+    } catch (_) {}
+    return {};
 }
 
 export function getSeasonLabel(date) {
@@ -91,7 +109,7 @@ export async function fetchOccupancyPercentage() {
     } catch (_) { return 0; }
 }
 
-export function calcDynamicPrice(basePrice, roomType, checkIn, checkOut, specialPricing, lowMultiplier) {
+export function calcDynamicPrice(basePrice, roomType, checkIn, checkOut, specialPricing, lowMultiplier, seasonMultipliers = {}) {
     if (!checkIn || !checkOut) return { groups: [], total: 0 };
     const start = new Date(checkIn + 'T12:00:00');
     const end = new Date(checkOut + 'T12:00:00');
@@ -116,7 +134,7 @@ export function calcDynamicPrice(basePrice, roomType, checkIn, checkOut, special
         }
 
         if (label !== 'Ειδική Τιμή') {
-            price = Math.round(basePrice * getMultiplier(d));
+            price = Math.round(basePrice * getMultiplier(d, seasonMultipliers));
         }
         if (lowMultiplier && lowMultiplier < 1) {
             price = Math.round(price * lowMultiplier);

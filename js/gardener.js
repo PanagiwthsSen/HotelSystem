@@ -43,6 +43,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     sortTaskRows();
     await refreshAll();
     setInterval(refreshAll, 30000);
+
+    window.addEventListener('beforeunload', () => {
+        const user = JSON.parse(localStorage.getItem('hotel_user'));
+        if (user && user.id) {
+            fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/EMPLOYEE?EmpID=eq.' + user.id, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_KEY, 'Authorization': 'Bearer ' + import.meta.env.VITE_SUPABASE_KEY },
+                body: JSON.stringify({ IsLoggedIn: false }),
+                keepalive: true
+            });
+        }
+    });
 });
 
 async function refreshAll() {
@@ -507,7 +519,9 @@ async function fetchSupplyRequests() {
     }).join('');
 }
 
-window.logout = function() {
+window.logout = async function() {
+    const user = JSON.parse(localStorage.getItem('hotel_user'));
+    if (user) await supabase.from('EMPLOYEE').update({ IsLoggedIn: false }).eq('EmpID', user.id);
     localStorage.removeItem('hotel_user');
     window.location.href = "/pages/login.html";
 };

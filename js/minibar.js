@@ -1,7 +1,21 @@
 import { supabase } from './supabase-config.js';
 import { showToast, updateLiveTime } from './utils/ui.js';
 
-window.requestGeneralRestock = async function() {
+let inventoryItems = {};
+let checkedToday = new Set();
+let todayChargesTotal = 0;
+let historyData = [];
+let consumptionCount = 0;
+
+async function loadItemMap() {
+    const { data } = await supabase.from('INVENTORY_ITEM').select('*');
+    inventoryItems = {};
+    (data || []).forEach(item => {
+        inventoryItems[item.Name] = item;
+    });
+}
+
+window.requestRestockAll = async function () {
     const { data: allItems } = await supabase
         .from('INVENTORY_ITEM')
         .select('*');
@@ -15,30 +29,71 @@ window.requestGeneralRestock = async function() {
         return;
     }
 
-    let count = 0;
-    for (const item of items) {
-        const type = item.Quantity === 0 ? 'out_of_stock' : 'restock';
-        const msg = item.Quantity === 0
-            ? `Το ${item.Name} έχει ΕΞΑΝΤΛΗΘΕΙ πλήρως`
-            : `Το ${item.Name} έχει πέσει κάτω από το ελάχιστο όριο (${item.Quantity}/${item.MinThreshold})`;
+    const summary = items.map(i => `${i.Name} (${i.Quantity}/${i.MinThreshold})`).join(', ');
+    const ids = items.map(i => i.ItemID).join(',');
+    const msg = `Αίτημα παραγγελίας αποθέματος από minibar: ${summary} || ${ids}`;
 
-        await supabase.from('NOTIFICATION').insert({
-            TargetRole: 'both',
-            Type: type,
-            Message: msg,
-            ItemID: item.ItemID,
-            IsRead: false
-        });
-        count++;
+    await supabase.from('NOTIFICATION').insert({
+        TargetRole: 'external_manager',
+        Type: 'restock_request',
+        Message: msg,
+        IsRead: false
+    });
+
+    showToast(`Στάλθηκε αίτημα παραγγελίας αποθέματος (${items.length} προϊόντα) στον εξωτερικό διαχειριστή.`, 'success');
+};
+
+/* ==============================================================
+   ΛΗΨΗ ΑΠΑΝΤΗΣΕΩΝ (από εξωτερικό διαχειριστή)
+   ============================================================== */
+async function fetchMinibarNotifs() {
+    const container = document.getElementById('minibar-responses');
+    if (!container) return;
+
+    const { data } = await supabase
+        .from('NOTIFICATION')
+        .select('*')
+        .eq('TargetRole', 'minibar')
+        .eq('IsRead', false)
+        .order('CreatedAt', { ascending: false });
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '';
+        return;
     }
 
-    showToast(`Στάλθηκαν ${count} ειδοποιήσεις ανεφοδιασμού`, 'success');
+    container.innerHTML = data.map(n => {
+        const time = n.CreatedAt
+            ? new Date(n.CreatedAt).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })
+            : '';
+
+        const isAccepted = n.Type === 'restock_accepted';
+        const icon = isAccepted ? 'ti ti-check-circle' : 'ti ti-x-circle';
+        const label = isAccepted ? 'Αίτημα Εγκρίθηκε:' : 'Αίτημα Απορρίφθηκε:';
+        const cls = isAccepted ? 'ns ns-g' : 'ns ns-e';
+
+        return `
+            <div class="${cls}" onclick="window.dismissMinibarNotif(${n.NotificationID}, this)" style="cursor:pointer">
+                <i class="${icon}"></i>
+                <div><strong>${label}</strong> ${n.Message}</div>
+                <span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary)">${time}</span>
+            </div>
+        `;
+    }).join('');
 }
+
+window.dismissMinibarNotif = async function (id, el) {
+    await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 300);
+};
 
 /* ==============================================================
    LOGOUT
    ============================================================== */
-window.logoutMinibar = function() {
+window.logoutMinibar = async function() {
+    const user = JSON.parse(localStorage.getItem('hotel_user'));
+    if (user) await supabase.from('EMPLOYEE').update({ IsLoggedIn: false }).eq('EmpID', user.id);
     localStorage.removeItem('hotel_user');
     showToast("Γίνεται αποσύνδεση... Καλή ξεκούραση.", "info");
     setTimeout(() => { window.location.href = "/pages/login.html"; }, 1500);
@@ -485,18 +540,16 @@ window.submitConsumption = async function() {
 
             if (newQty === 0) {
                 supabase.from('NOTIFICATION').insert({
-                    TargetRole: 'both',
-                    Type: 'out_of_stock',
-                    Message: `Το ${item.name} έχει ΕΞΑΝΤΛΗΘΕΙ πλήρως`,
-                    ItemID: item.itemId,
+                    TargetRole: 'external_manager',
+                    Type: 'restock_request',
+                    Message: `Αίτημα παραγγελίας αποθέματος από minibar: ${item.name} || ${item.itemId}`,
                     IsRead: false
                 }).then();
             } else if (newQty <= invItem.data.MinThreshold) {
                 supabase.from('NOTIFICATION').insert({
-                    TargetRole: 'both',
-                    Type: 'restock',
-                    Message: `Το ${item.name} έχει πέσει κάτω από το ελάχιστο όριο (${newQty}/${invItem.data.MinThreshold})`,
-                    ItemID: item.itemId,
+                    TargetRole: 'external_manager',
+                    Type: 'restock_request',
+                    Message: `Αίτημα παραγγελίας αποθέματος από minibar: ${item.name} || ${item.itemId}`,
                     IsRead: false
                 }).then();
             }
@@ -525,7 +578,8 @@ async function refreshAll() {
         loadStock(),
         loadHistory(),
         loadRecentLogs(),
-        loadConsumptionItems()
+        loadConsumptionItems(),
+        fetchMinibarNotifs()
     ]);
 }
 
@@ -539,11 +593,11 @@ window.requestRestock = async function(btn) {
         const item = inventoryItems[itemName];
         if (item) {
             try {
+                const msg = `Αίτημα παραγγελίας αποθέματος από minibar: ${itemName} || ${item.ItemID}`;
                 await supabase.from('NOTIFICATION').insert({
-                    TargetRole: 'both',
-                    Type: 'restock',
-                    Message: `Αίτημα ανεφοδιασμού: ${itemName}`,
-                    ItemID: item.ItemID,
+                    TargetRole: 'external_manager',
+                    Type: 'restock_request',
+                    Message: msg,
                     IsRead: false
                 });
             } catch (err) {
@@ -556,7 +610,7 @@ window.requestRestock = async function(btn) {
     btn.classList.replace('btn-warn', 'btn');
     const statusCell = btn.parentElement.previousElementSibling;
     statusCell.innerHTML = '<span class="pill p-b">Σε αναμονή</span>';
-    showToast("Το αίτημα ανεφοδιασμού στάλθηκε στον διαχειριστή και τον διευθυντή.", "info");
+    showToast("Το αίτημα στάλθηκε στον εξωτερικό διαχειριστή.", "info");
 };
 
 /* ==============================================================
@@ -571,7 +625,8 @@ document.addEventListener('DOMContentLoaded', async function initPage() {
             loadStock(),
             loadHistory(),
             loadRecentLogs(),
-            loadConsumptionItems()
+            loadConsumptionItems(),
+            fetchMinibarNotifs()
         ]);
     } catch (err) {
         showToast('Σφάλμα φόρτωσης δεδομένων: ' + (err.message || err), 'error');
@@ -582,10 +637,23 @@ document.addEventListener('DOMContentLoaded', async function initPage() {
             await Promise.all([
                 loadDashboard(),
                 loadStock(),
-                loadRecentLogs()
+                loadRecentLogs(),
+                fetchMinibarNotifs()
             ]);
         } catch (err) {
             console.warn('Auto-refresh error:', err);
         }
     }, 30000);
+
+    window.addEventListener('beforeunload', () => {
+        const user = JSON.parse(localStorage.getItem('hotel_user'));
+        if (user && user.id) {
+            fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/EMPLOYEE?EmpID=eq.' + user.id, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_KEY, 'Authorization': 'Bearer ' + import.meta.env.VITE_SUPABASE_KEY },
+                body: JSON.stringify({ IsLoggedIn: false }),
+                keepalive: true
+            });
+        }
+    });
 });
