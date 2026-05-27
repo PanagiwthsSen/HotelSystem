@@ -11,6 +11,7 @@ let notifications = [];
 let roomStates = {};
 let mbCount = 0;
 let currentFilter = 'all';
+let departures = [];
 const vTitles = { overview: 'Επισκόπηση Βάρδιας', rooms: 'Δωμάτια Βάρδιας', minibar: 'Mini-bar', linen: 'Ιματισμός — Αποστολή & Παραλαβή', stock: 'Αποθεματικό', report: 'Αναφορά Βάρδιας' };
 
 /* ==============================================================
@@ -41,6 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await fetchMaidRooms();
     await fetchMaidNotifications();
     await fetchPendingMb();
+    await fetchTodayDepartures();
     recomputeCounters();
     if (document.getElementById('v-rooms')?.classList.contains('active')) {
       renderRooms(currentFilter);
@@ -160,7 +162,8 @@ async function loadAllData() {
       fetchMaidRooms(),
       fetchInventory(),
       fetchMaidNotifications(),
-      fetchPendingMb()
+      fetchPendingMb(),
+      fetchTodayDepartures()
     ]);
   } catch (e) {
     console.error('Σφάλμα φόρτωσης δεδομένων:', e);
@@ -331,6 +334,82 @@ async function fetchPendingMb() {
 let pendingMbRecords = [];
 
 /* ==============================================================
+   DEPARTURES (today's check-outs)
+   ============================================================== */
+async function fetchTodayDepartures() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { data: depList, error } = await supabase
+      .from('RESERVATION')
+      .select(`ReservationID, Status, RoomType, TotalCost, CUSTOMER(FirstName, LastName)`)
+      .eq('CheckOutDate', today)
+      .not('Status', 'in', '("Cancelled","CheckedOut")');
+    if (error) throw error;
+    if (!depList || depList.length === 0) { departures = []; return; }
+
+    const ids = depList.map(d => d.ReservationID);
+    const { data: rrData, error: rrErr } = await supabase
+      .from('RESERVATION_ROOM')
+      .select('ReservationID, RoomNumber')
+      .in('ReservationID', ids);
+    if (rrErr) throw rrErr;
+
+    const roomByRes = {};
+    (rrData || []).forEach(rr => { roomByRes[rr.ReservationID] = rr.RoomNumber; });
+
+    const depIds = depList.map(d => d.ReservationID);
+    const { data: mbData, error: mbErr } = await supabase
+      .from('MINIBAR_CONSUMPTION')
+      .select('ReservationID, Charge')
+      .in('ReservationID', depIds);
+    if (mbErr) throw mbErr;
+
+    const mbTotalByRes = {};
+    (mbData || []).forEach(m => {
+      mbTotalByRes[m.ReservationID] = (mbTotalByRes[m.ReservationID] || 0) + parseFloat(m.Charge || 0);
+    });
+
+    departures = depList.map(d => {
+      const c = d.CUSTOMER || {};
+      const name = [c.FirstName, c.LastName].filter(Boolean).join(' ').trim() || 'Επισκέπτης';
+      const room = roomByRes[d.ReservationID] || '—';
+      const roomType = d.RoomType || '—';
+      const mbTotal = mbTotalByRes[d.ReservationID] || 0;
+      return { reservationId: d.ReservationID, customerName: name, room, roomType, mbTotal };
+    });
+  } catch (e) {
+    console.error('fetchTodayDepartures error:', e);
+    departures = [];
+  }
+}
+
+window.markDepartureCleaned = async function(roomNum) {
+  const dep = departures.find(d => d.room == roomNum);
+  if (!dep) return;
+  const confirmed = await window.showConfirm(`Επιβεβαίωση καθαρισμού δωματίου ${roomNum} (${dep.customerName});`);
+  if (!confirmed) return;
+  try {
+    const { error: roomErr } = await supabase.from('ROOM').update({ Status: 'clean' }).eq('RoomNumber', roomNum);
+    if (roomErr) throw roomErr;
+    const { error: notifErr } = await supabase.from('NOTIFICATION').insert({
+      TargetRole: 'receptionist', Type: 'room_ready', IsRead: false,
+      Message: `Δωμάτιο ${roomNum} (${dep.roomType}) — Check-out καθαρίστηκε και είναι έτοιμο.`
+    });
+    if (notifErr) throw notifErr;
+    roomStates[roomNum] = 'done';
+    departures = departures.filter(d => d.room != roomNum);
+    showToast('room-toast', `Δωμάτιο ${roomNum} καθαρίστηκε — ειδοποιήθηκε η υποδοχή.`);
+    addLog(`Check-out ${roomNum} (${dep.customerName}) — καθαρίστηκε`);
+    recomputeCounters();
+    renderRooms(currentFilter);
+    renderOverview();
+  } catch (err) {
+    console.error('Σφάλμα:', err.message);
+    showToast('room-toast', 'Σφάλμα: ' + err.message);
+  }
+};
+
+/* ==============================================================
    OVERVIEW
    ============================================================== */
 function renderOverview() {
@@ -396,6 +475,19 @@ function renderRooms(filter) {
     : maidRooms.filter(r => getEffectiveStatus(r.id) === filter);
   const list = document.getElementById('room-list');
   if (!list) return;
+
+  const depRoomNums = new Set(departures.map(d => d.room));
+
+  data.sort((a, b) => {
+    const sa = getEffectiveStatus(a.id);
+    const sb = getEffectiveStatus(b.id);
+    const isDepA = depRoomNums.has(a.num) && sa === 'urgent';
+    const isDepB = depRoomNums.has(b.num) && sb === 'urgent';
+    const orderA = sa === 'priority' ? 0 : isDepA ? 1 : sa === 'urgent' ? 2 : 3;
+    const orderB = sb === 'priority' ? 0 : isDepB ? 1 : sb === 'urgent' ? 2 : 3;
+    return orderA - orderB;
+  });
+
   if (data.length === 0) {
     list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-secondary)">Δεν υπάρχουν δωμάτια για αυτό το φίλτρο.</div>';
     return;
@@ -406,6 +498,32 @@ function renderRooms(filter) {
     const isUrgent = state === 'urgent';
     const isPriority = state === 'priority';
     const isInProgress = state === 'inprogress';
+    const isDep = depRoomNums.has(r.num);
+
+    if (isDep && getEffectiveStatus(r.id) !== 'done') {
+      const d = departures.find(x => x.room == r.num);
+      if (d) {
+        const mbHtml = d.mbTotal > 0
+          ? `<span class="pill p-b">€${d.mbTotal.toFixed(2)}</span>`
+          : '<span class="pill p-g" style="font-size:10px">—</span>';
+        return `<div class="room-card" id="rc-${r.id}">
+          <div>
+            <div class="room-num">${r.num}</div>
+            <div class="room-type">${r.type}</div>
+          </div>
+          <div class="room-info">
+            <div style="font-size:12px;font-weight:500">${d.customerName}</div>
+            <div class="room-guest">Αναχώρηση σήμερα</div>
+          </div>
+          <div class="room-actions">
+            ${mbHtml}
+            <span class="pill p-r">Εκκρεμεί</span>
+            <button class="btn btn-sm btn-teal" onclick="window.markDepartureCleaned('${d.room}')"><i class="ti ti-check" aria-hidden="true"></i> Καθαρίστηκε</button>
+          </div>
+        </div>`;
+      }
+    }
+
     const pillClass = isDone ? 'p-g' : isUrgent ? 'p-r' : isPriority ? 'p-a' : isInProgress ? 'p-t' : 'p-b';
     const pillText = isDone ? 'Ολοκλ.' : isUrgent ? 'Επείγον' : isPriority ? 'Προτεραιότητα' : isInProgress ? 'Σε εξέλιξη' : 'Εκκρεμεί';
     const guestText = r.guest || (isUrgent ? 'Αναχώρηση' : '');
@@ -428,7 +546,7 @@ function renderRooms(filter) {
             : isUrgent
               ? `<button class="btn btn-sm btn-teal" onclick="window.setRoomInProgress('${r.id}')"><i class="ti ti-player-play" aria-hidden="true"></i> Καθαρισμός</button>`
               : isPriority
-                ? `<button class="btn btn-sm btn-teal" onclick="window.setRoomInProgress('${r.id}')"><i class="ti ti-player-play" aria-hidden="true"></i> Εξυπηρέτηση</button>`
+                ? `<button class="btn btn-sm btn-teal" onclick="window.setRoomInProgress('${r.id}')"><i class="ti ti-player-play" aria-hidden="true"></i> Έναρξη</button>`
                 : `<button class="btn btn-sm btn-teal" onclick="window.setRoomInProgress('${r.id}')"><i class="ti ti-player-play" aria-hidden="true"></i> Έναρξη</button>`
           }
           <button class="btn btn-sm" onclick="window.reportRoomIssue('${r.id}')"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Αναφορά</button>`
@@ -462,7 +580,7 @@ window.filterRooms = function(f, el) {
 
 window.setRoomInProgress = async function(id) {
   const room = maidRooms.find(r => r.id === id);
-  const actionLabel = room && room.status === 'urgent' ? 'Καθαρισμός' : room && room.status === 'priority' ? 'Εξυπηρέτηση' : 'Έναρξη';
+  const actionLabel = room && room.status === 'urgent' ? 'Καθαρισμός' : room && room.status === 'priority' ? 'Έναρξη' : 'Έναρξη';
   try {
     await supabase.from('NOTIFICATION').insert({
       TargetRole: 'receptionist',
@@ -540,12 +658,13 @@ window.reportRoomIssue = async function(id) {
   const desc = prompt('Περιγράψτε το πρόβλημα για το δωμάτιο ' + room.num + ':');
   if (!desc || !desc.trim()) return;
   try {
-    await supabase.from('NOTIFICATION').insert({
+    const { error } = await supabase.from('NOTIFICATION').insert({
       TargetRole: 'admin',
       Type: 'room_issue',
       Message: `Πρόβλημα δωματίου ${room.num} (${room.type}): ${desc.trim()}`,
       IsRead: false
     });
+    if (error) throw error;
     showToast('room-toast', 'Αναφορά για ' + room.num + ' εστάλη στον διαχειριστή.');
     addLog('Αναφορά προβλήματος ' + room.num + ': ' + desc.trim());
   } catch (err) {
@@ -704,7 +823,8 @@ window.submitNewMb = async function() {
 
     const statusSel = document.getElementById('mb-status-sel');
     if (statusSel && statusSel.value === 'Προς καθαρισμό') {
-      await supabase.from('ROOM').update({ Status: 'dirty' }).eq('RoomNumber', roomNum);
+      const { error: dirtyErr } = await supabase.from('ROOM').update({ Status: 'dirty' }).eq('RoomNumber', roomNum);
+      if (dirtyErr) console.error('Σφάλμα ενημέρωσης δωματίου σε dirty:', dirtyErr.message);
     }
 
     showToast('mb-toast');
@@ -746,12 +866,13 @@ function renderStock() {
 
 window.reportLowStock = async function(itemId, itemName) {
   try {
-    await supabase.from('NOTIFICATION').insert({
+    const { error } = await supabase.from('NOTIFICATION').insert({
       TargetRole: 'admin',
       Type: 'low_stock',
       Message: `Ελλιπές απόθεμα: ${itemName} (ID: ${itemId}) — Απαιτείται παραγγελία.`,
       IsRead: false
     });
+    if (error) throw error;
     showToast('rep-toast', 'Αναφορά για ' + itemName + ' εστάλη στον διαχειριστή.');
   } catch (err) {
     alert('Σφάλμα: ' + err.message);
@@ -821,11 +942,13 @@ window.receiveLinen = async function(itemId, itemName) {
     if (!item) return;
     const qty = parseInt(prompt('Ποσότητα προς παραλαβή:', '10'), 10);
     if (!qty || qty <= 0) return;
-    await supabase.from('INVENTORY_ITEM').update({ Quantity: item.Quantity + qty }).eq('ItemID', itemId);
-    await supabase.from('NOTIFICATION').insert({
+    const { error: updErr } = await supabase.from('INVENTORY_ITEM').update({ Quantity: item.Quantity + qty }).eq('ItemID', itemId);
+    if (updErr) throw updErr;
+    const { error: notifErr } = await supabase.from('NOTIFICATION').insert({
       TargetRole: 'admin', Type: 'linen_received', IsRead: false,
       Message: `Παραλαβή ιματισμού: ${qty} τεμάχια ${itemName}.`
     });
+    if (notifErr) throw notifErr;
     addLog(`Παραλαβή ${itemName}: ${qty} τεμάχια`);
     await fetchInventory();
     renderLinenReceiveTable();
@@ -848,7 +971,8 @@ window.submitLinen = async function() {
     totalItems++;
     totalSent += qty;
     try {
-      await supabase.from('INVENTORY_ITEM').update({ Quantity: Math.max(0, item.Quantity - qty) }).eq('ItemID', item.ItemID);
+      const { error: updErr } = await supabase.from('INVENTORY_ITEM').update({ Quantity: Math.max(0, item.Quantity - qty) }).eq('ItemID', item.ItemID);
+      if (updErr) throw updErr;
     } catch (err) {
       console.error('Σφάλμα ενημέρωσης αποθέματος:', err.message);
     }
@@ -856,10 +980,11 @@ window.submitLinen = async function() {
 
   if (totalItems > 0) {
     try {
-      await supabase.from('NOTIFICATION').insert({
+      const { error: notifErr } = await supabase.from('NOTIFICATION').insert({
         TargetRole: 'admin', Type: 'linen_sent', IsRead: false,
         Message: `Αποστολή ιματισμού: ${totalSent} τεμάχια (${totalItems} είδη) στάλθηκαν στο καθαριστήριο.`
       });
+      if (notifErr) throw notifErr;
     } catch (err) { console.error(err); }
     addLog(`Ιματισμός: ${totalSent} τεμάχια στάλθηκαν στο καθαριστήριο`);
   }
@@ -907,9 +1032,10 @@ window.submitReport = async function() {
   const doneVal = doneEl ? doneEl.textContent : '0';
   const msg = `Αναφορά βάρδιας — Ολοκληρωμένα δωμάτια: ${doneVal}.${noteText ? ' Σημειώσεις: ' + noteText : ''}`;
   try {
-    await supabase.from('NOTIFICATION').insert({
+    const { error } = await supabase.from('NOTIFICATION').insert({
       TargetRole: 'admin', Type: 'shift_report', Message: msg, IsRead: false
     });
+    if (error) throw error;
     showToast('rep-toast');
     addLog('Αναφορά βάρδιας εστάλη στη διοίκηση' + (noteText ? ': ' + noteText : ''));
   } catch (err) {
