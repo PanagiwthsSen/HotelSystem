@@ -744,8 +744,17 @@ window.acceptRestockRequest = async function (id) {
     const idsStr = parts[1];
     const displayMsg = parts[0] || '';
 
+    // Load garden items to exclude from restock & notification
+    const { data: gardenDb } = await supabase
+        .from('INVENTORY_ITEM')
+        .select('ItemID, Name')
+        .eq('Category', 'κηπος');
+    const gardenIdSet = new Set((gardenDb || []).map(i => i.ItemID));
+    const gardenNameSet = new Set((gardenDb || []).map(i => i.Name.toLowerCase()));
+
     if (idsStr) {
-      const itemIds = idsStr.split(',').map(Number).filter(Boolean);
+      const allItemIds = idsStr.split(',').map(Number).filter(Boolean);
+      const itemIds = allItemIds.filter(id => !gardenIdSet.has(id));
       for (const itemId of itemIds) {
         const { data: item } = await supabase
           .from('INVENTORY_ITEM')
@@ -763,15 +772,23 @@ window.acceptRestockRequest = async function (id) {
       }
     }
 
-    const itemNames = displayMsg.replace(/^Αίτημα παραγγελίας αποθέματος από minibar:\s*/, '');
-
-    await supabase.from('NOTIFICATION').insert({
-      TargetRole: 'minibar',
-      Type: 'restock_accepted',
-      Message: 'Επιτυχής ανεφοδιασμός: ' + itemNames + ' — Το απόθεμα ανανεώθηκε.',
-      IsRead: false,
-      CreatedAt: new Date().toISOString()
+    const rawNames = displayMsg.replace(/^Αίτημα παραγγελίας αποθέματος από minibar:\s*/, '');
+    const nameParts = rawNames.split(', ').filter(Boolean);
+    const filteredParts = nameParts.filter(part => {
+        const name = part.split(' (')[0].toLowerCase().trim();
+        return !gardenNameSet.has(name);
     });
+
+    if (filteredParts.length > 0) {
+        const itemNames = filteredParts.join(', ');
+        await supabase.from('NOTIFICATION').insert({
+          TargetRole: 'minibar',
+          Type: 'restock_accepted',
+          Message: 'Επιτυχής ανεφοδιασμός: ' + itemNames + ' — Το απόθεμα ανανεώθηκε.',
+          IsRead: false,
+          CreatedAt: new Date().toISOString()
+        });
+    }
 
     await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
 
@@ -798,15 +815,30 @@ window.denyRestockRequest = async function (id, btn) {
     const parts = notif ? notif.Message.split(' || ') : [];
     const displayMsg = parts[0] || '';
 
-    const itemNames = displayMsg.replace(/^Αίτημα παραγγελίας αποθέματος από minibar:\s*/, '');
+    const rawNames = displayMsg.replace(/^Αίτημα παραγγελίας αποθέματος από minibar:\s*/, '');
 
-    await supabase.from('NOTIFICATION').insert({
-      TargetRole: 'minibar',
-      Type: 'restock_denied',
-      Message: 'Το αίτημα παραγγελίας αποθέματος απορρίφθηκε: ' + itemNames,
-      IsRead: false,
-      CreatedAt: new Date().toISOString()
+    // Filter out garden items from the response
+    const { data: gardenDb } = await supabase
+        .from('INVENTORY_ITEM')
+        .select('Name')
+        .eq('Category', 'κηπος');
+    const gardenNameSet = new Set((gardenDb || []).map(i => i.Name.toLowerCase()));
+    const nameParts = rawNames.split(', ').filter(Boolean);
+    const filteredParts = nameParts.filter(part => {
+        const name = part.split(' (')[0].toLowerCase().trim();
+        return !gardenNameSet.has(name);
     });
+
+    if (filteredParts.length > 0) {
+        const itemNames = filteredParts.join(', ');
+        await supabase.from('NOTIFICATION').insert({
+          TargetRole: 'minibar',
+          Type: 'restock_denied',
+          Message: 'Το αίτημα παραγγελίας αποθέματος απορρίφθηκε: ' + itemNames,
+          IsRead: false,
+          CreatedAt: new Date().toISOString()
+        });
+    }
 
     await supabase.from('NOTIFICATION').update({ IsRead: true }).eq('NotificationID', id);
 

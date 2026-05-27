@@ -859,7 +859,7 @@ async function fetchAvailableRooms() {
         if (allErr) throw allErr;
 
         const isCheckInToday = new Date(checkIn) <= new Date(new Date().toDateString());
-        const allowedStatuses = isCheckInToday ? ['free', 'clean'] : ['free', 'clean', 'dirty', 'soon'];
+        const allowedStatuses = isCheckInToday ? ['free'] : ['free', 'dirty', 'soon'];
         const available = (allRooms || []).filter(r =>
             !busyRoomNumbers.includes(r.RoomNumber) &&
             allowedStatuses.includes(r.Status)
@@ -1490,7 +1490,7 @@ window.searchAvailableRooms = async function () {
         if (allErr) throw allErr;
 
         const isCheckInToday2 = new Date(checkIn) <= new Date(new Date().toDateString());
-        const allowedStatuses2 = isCheckInToday2 ? ['free', 'clean'] : ['free', 'clean', 'dirty', 'soon'];
+        const allowedStatuses2 = isCheckInToday2 ? ['free'] : ['free', 'dirty', 'soon'];
         const available = (allRooms || []).filter(r =>
             !busyRoomNumbers.includes(r.RoomNumber) &&
             allowedStatuses2.includes(r.Status)
@@ -1973,7 +1973,7 @@ window.openEditReservationModal = async function (reservationId) {
 
         const roomOptionsHtml = rooms.map(room => {
             const isCurrent = room.RoomNumber === currentRoomNumber;
-            const isFree = room.Status === 'free' || room.Status === 'clean';
+            const isFree = room.Status === 'free';
             const availableLabel = isFree ? '' : ' (κατειλημμένο)';
             const disabled = !isFree && !isCurrent;
             return `<option value="${room.RoomNumber}" 

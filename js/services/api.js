@@ -164,7 +164,8 @@ export function isSoonCheckout(checkOutDate) {
 }
 
 export function getStatusLabel(state) {
-    if (state === 'free' || state === 'clean') return 'Έτοιμο για νέο πελάτη';
+    if (state === 'free') return 'Έτοιμο για νέο πελάτη';
+    if (state === 'clean') return 'Καθαρίστηκε — Εκκρεμεί έλεγχος mini-bar';
     if (state === 'dirty') return 'Άδειο (χωρίς καθαριότητα)';
     if (state === 'cleaning') return 'Σε καθαρισμό';
     if (state === 'soon') return 'Προσεχώς άδειο';
@@ -178,7 +179,7 @@ export function mapDbStatusToUI(dbStatus) {
         case 'free': return 'free';
         case 'dirty': return 'dirty';
         case 'cleaning': return 'cleaning';
-        case 'clean': return 'free';
+        case 'clean': return 'clean';
         default: return 'free';
     }
 }
@@ -273,7 +274,7 @@ export async function fetchArrivals(today) {
             RESERVATION_ROOM (RoomNumber)
         `)
         .eq('CheckInDate', today)
-        .not('Status', 'in', '("Cancelled","Deleted")');
+        .in('Status', ['Confirmed', 'CheckedIn']);
     if (error) throw error;
     return data || [];
 }
@@ -287,7 +288,7 @@ export async function fetchDepartures(today) {
             RESERVATION_ROOM (RoomNumber)
         `)
         .eq('CheckOutDate', today)
-        .not('Status', 'in', '("Cancelled","Deleted","CheckedIn","CheckedOut")');
+        .in('Status', ['Confirmed', 'CheckedOut']);
     if (error) throw error;
     return data || [];
 }

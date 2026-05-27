@@ -327,7 +327,8 @@ async function fetchInventory() {
   try {
     const { data, error } = await supabase
       .from('INVENTORY_ITEM')
-      .select('*');
+      .select('*')
+      .neq('Category', 'κηπος');
     if (error) throw error;
     inventoryItems = data || [];
   } catch (e) {
