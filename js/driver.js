@@ -35,6 +35,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     await loadDriverData();
 
+    // Real-time subscriptions (live updates)
+    supabase.channel('driver-trips')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'TRIP' }, async () => {
+        await refreshTrips();
+      }).subscribe();
+
+    supabase.channel('driver-notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'NOTIFICATION' }, async (payload) => {
+        if (payload.new && ['driver', 'both'].includes(payload.new.TargetRole)) {
+          showToast(payload.new.Message || 'Νέα ειδοποίηση');
+        }
+      }).subscribe();
+
+    // Fallback polling every 2 minutes
+    setInterval(refreshTrips, 120000);
+
     window.addEventListener('beforeunload', () => {
         const user = JSON.parse(localStorage.getItem('hotel_user'));
         if (user && user.id) {
@@ -141,7 +157,6 @@ async function loadDriverData() {
 }
 
 setInterval(updateLiveTime, 60000);
-setInterval(refreshTrips, 30000);
 
 async function refreshTrips() {
     if (!currentUser) return;

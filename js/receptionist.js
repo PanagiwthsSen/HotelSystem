@@ -2527,6 +2527,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Auto-refresh departures every 20 seconds (for mini-bar updates)
     setInterval(refreshDeparturesData, 20000);
 
+    // Real-time subscriptions (live updates)
+    supabase.channel('receptionist-rooms')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ROOM' }, async () => {
+        await fetchRoomsAndRender();
+      }).subscribe();
+
+    supabase.channel('receptionist-notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'NOTIFICATION' }, async (payload) => {
+        if (payload.new && ['receptionist', 'both'].includes(payload.new.TargetRole)) {
+          showToast(payload.new.Message || 'Νέα ειδοποίηση');
+        }
+      }).subscribe();
+
+    // Fallback polling every 2 minutes in case WebSocket disconnects
+    setInterval(async () => {
+      await fetchRoomsAndRender();
+      await fetchTodayReservations();
+      await refreshDeparturesData();
+    }, 120000);
+
     // Set default dates: today & today + 3 days
     const today = new Date();
     const plus3 = new Date(today);

@@ -4,27 +4,34 @@ import { isSoonCheckout, getStatusLabel, buildCheckoutMap, fetchRooms as apiFetc
 import { renderRoomMap } from './components/RoomMap.js';
 
 // Έλεγχος πρόσβασης: επαληθεύει τον ρόλο από τη βάση πριν φορτωθεί οτιδήποτε
-const appReady = (async () => {
-  const userData = localStorage.getItem('hotel_user');
-  if (!userData) { window.location.href = "/pages/login.html"; return false; }
+// Timeout 5s so the page still loads if Supabase is slow/unreachable
+const appReady = Promise.race([
+  (async () => {
+    const userData = localStorage.getItem('hotel_user');
+    if (!userData) { window.location.href = "/pages/login.html"; return false; }
 
-  const user = JSON.parse(userData);
-  const { data, error } = await supabase
-    .from('EMPLOYEE')
-    .select('Role, isActive')
-    .eq('EmpID', user.id)
-    .maybeSingle();
+    const user = JSON.parse(userData);
+    const { data, error } = await supabase
+      .from('EMPLOYEE')
+      .select('Role, isActive')
+      .eq('EmpID', user.id)
+      .maybeSingle();
 
-  const role = data?.Role?.toLowerCase().trim() || '';
-  const allowed = !error && data?.isActive && (role === 'admin' || role === 'manager');
+    const role = data?.Role?.toLowerCase().trim() || '';
+    const allowed = !error && data?.isActive && (role === 'admin' || role === 'manager');
 
-  if (!allowed) {
-    alert("Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη σελίδα!");
-    window.location.href = "/pages/login.html";
-    return false;
-  }
-  return true;
-})();
+    if (!allowed) {
+      alert("Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη σελίδα!");
+      window.location.href = "/pages/login.html";
+      return false;
+    }
+    return true;
+  })(),
+  new Promise(resolve => setTimeout(() => {
+    console.warn("appReady timeout — loading without role verification");
+    resolve(true);
+  }, 5000))
+]);
 /* ==============================================================
    ROOM STATUS HELPERS
    ============================================================== */
@@ -3328,11 +3335,36 @@ appReady.then(ok => {
   initRevenueDates();
   initLogKmSave();
   loadBackupHistory();
-  if (window.HotelScheduler) {
-    HotelScheduler.registerTask('roomSync', fetchRooms, 300000);
-    HotelScheduler.registerTask('vehicleSync', fetchVehicles, 300000);
-    HotelScheduler.start();
-  }
+
+  // Real-time subscriptions (live updates)
+  supabase.channel('admin-rooms')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ROOM' }, async () => {
+      fetchRooms();
+      if (document.getElementById('arrivals-body')) fetchDashboardBookings();
+    }).subscribe();
+
+  supabase.channel('admin-notifications')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'NOTIFICATION' }, async () => {
+      if (document.getElementById('notif-history')) loadNotifHistory();
+    }).subscribe();
+
+  supabase.channel('admin-reservations')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'RESERVATION' }, async () => {
+      if (document.getElementById('arrivals-body')) fetchDashboardBookings();
+      if (document.getElementById('reservations-body')) fetchReservations();
+      cleanupDeletedReservations();
+    }).subscribe();
+
+  supabase.channel('admin-inventory')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'INVENTORY_ITEM' }, async () => {
+      if (document.getElementById('inventory-body')) fetchInventory();
+    }).subscribe();
+
+  // Fallback polling every 2 minutes
+  setInterval(() => {
+    fetchRooms();
+    if (document.getElementById('inventory-body')) fetchInventory();
+  }, 120000);
   window.addEventListener('beforeunload', () => {
     const user = JSON.parse(localStorage.getItem('hotel_user'));
     if (user && user.id) {

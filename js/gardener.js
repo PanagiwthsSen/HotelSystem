@@ -42,7 +42,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     sortTaskRows();
     await refreshAll();
-    setInterval(refreshAll, 30000);
+
+    // Real-time subscriptions (live updates)
+    supabase.channel('gardener-notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'NOTIFICATION' }, async (payload) => {
+        if (payload.new && ['gardener', 'both'].includes(payload.new.TargetRole)) {
+          await refreshAll();
+        }
+      }).subscribe();
+
+    // Fallback polling every 2 minutes in case WebSocket disconnects
+    setInterval(refreshAll, 120000);
 
     window.addEventListener('beforeunload', () => {
         const user = JSON.parse(localStorage.getItem('hotel_user'));

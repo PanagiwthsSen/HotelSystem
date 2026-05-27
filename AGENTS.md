@@ -116,6 +116,21 @@
 - **Minibar page**: Connected to Supabase (RESERVATION, RESERVATION_ROOM, INVENTORY_ITEM, NOTIFICATION)
 - **Manager page**: Connected to Supabase (EMPLOYEE, TRIP, VEHICLE, SHIFT, INVENTORY_ITEM, NOTIFICATION)
 - **Gardener page**: Uses hardcoded HTML data (no Supabase queries)
+- **Cross-role tests** (`tests/cross-role.spec.ts`): 3 tests using `browser.newContext()` for separate localStorage sessions per role:
+  1. Maid cleans → NOTIFICATION for receptionist (verifies TargetRole via response body) — **passes** with direct API setup
+  2. Receptionist check-out → dirty room visible to maid (verifies ROOM Status + maid view) — **passes** with direct API setup
+  3. Minibar restock → external manager notification (verifies NOTIFICATION POST 201 + manager page renders it) — **passes** with real data
+  All 3 tests use `try/finally` + pre-cleanup for reliable teardown. Use `pickRoomNum()` (timestamp suffix, range 9200-9999) to avoid collisions.
+  Supabase REST helpers: `sbPost`, `sbPatch`, `sbDelete`, `sbGet` (anon key, no RLS issues).
+- **Test 2 fix**: Root cause was `#v-departures:has-text("${roomNum}") button:has-text("Check-out")`.first() — `:has-text()` matched the entire `#v-departures` div (room number existed somewhere inside), so `.first()` returned the **first** check-out button in the table (room 101), not the target room. Fixed by scoping to the specific row: `#v-departures tbody tr`.filter({ hasText: roomNum }).locator('button:has-text("Check-out")').
+- **Check-out flow detail**: `doCheckout()` in receptionist.js uses `showReceiptModal()` (custom receipt overlay with `#receipt-confirm`), NOT `showConfirm()`. It does NOT POST to RECEIPT table — only PATCHEs RESERVATION (→ CheckedOut) and ROOM (→ dirty), then generates a PDF client-side.
+- **dotenv** (`npm install -D dotenv`) loaded in `playwright.config.ts` so `process.env.VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` are available in test helpers.
+- **Count**: 29 tests total — 27 pass, 2 skip, 0 fail.
+- **Admin.js syntax fix**: Extra `}` from removed `if (HotelScheduler)` block at line 3368 caused Vite HTTP 500. Removed it — admin page now loads properly, `save prices` test passes, `internal-manager payroll` test passes (uses admin page).
+- **Minibar consumption fix**: `waitForFunction` predicate used `sel.options.length` on `<datalist>` (no `.options` property) — changed to `sel.querySelectorAll('option').length`. Also disabled `.qty` inputs: `page.locator('.qty:not([disabled])').first()` skips disabled items (e.g., stocked-out products). Restock test: PATCH first inventory item to Quantity=0 before `requestRestockAll()` call to ensure low-stock items exist.
+- **Cross-role test 3 fix**: Same low-stock issue — set first inventory item to Quantity=0 via `page.evaluate` before triggering restock.
+- **Admin tests fix (3 → 3 pass)**: Selector `#inv-table` → `#inventory-table` (wrong ID). Create item test: scoped `button:has-text("Προσθήκη")` to `#v-restaurant` (6 matches). Added `#confirm-yes` click after `#inv-save` (save handler shows `showConfirm()` before POST).
+- **Results after all fixes**: **29/29 pass, 0 skip, 0 fail.**
 
 ## Workflow
 - If implementation is requested while in plan mode, I will present a plan and ask you to confirm (by replying "yes" or "switch to build mode") before executing.

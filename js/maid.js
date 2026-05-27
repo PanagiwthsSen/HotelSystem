@@ -12,6 +12,7 @@ let roomStates = {};
 let mbCount = 0;
 let currentFilter = 'all';
 let departures = [];
+const maidCompleted = new Set();
 const vTitles = { overview: 'Επισκόπηση Βάρδιας', rooms: 'Δωμάτια Βάρδιας', minibar: 'Mini-bar', linen: 'Ιματισμός — Αποστολή & Παραλαβή', stock: 'Αποθεματικό', report: 'Αναφορά Βάρδιας' };
 
 /* ==============================================================
@@ -163,16 +164,17 @@ function recomputeCounters() {
   if (mbEl) mbEl.textContent = mbCount;
 
   const ovTotal = document.getElementById('ov-total');
-  if (ovTotal) ovTotal.textContent = maidRooms.length;
+  if (ovTotal) ovTotal.textContent = urgentCount;
   const ovDone = document.getElementById('ov-done');
-  if (ovDone) ovDone.textContent = doneCount;
+  if (ovDone) ovDone.textContent = maidCompleted.size;
   const ovInProg = document.getElementById('ov-inprogress');
   if (ovInProg) ovInProg.textContent = inProgressCount;
   const ovUrgent = document.getElementById('ov-urgent');
   if (ovUrgent) ovUrgent.textContent = urgentCount;
   const ovPct = document.getElementById('ov-progress-pct');
   const ovFill = document.querySelector('.prog-fill');
-  const pct = maidRooms.length > 0 ? Math.round(doneCount / maidRooms.length * 100) : 0;
+  const totalWork = maidCompleted.size + urgentCount;
+  const pct = totalWork > 0 ? Math.round(maidCompleted.size / totalWork * 100) : 0;
   if (ovPct) ovPct.textContent = pct;
   if (ovFill) ovFill.style.width = pct + '%';
 
@@ -699,6 +701,7 @@ window.setRoomDone = async function(id) {
   }
 
   roomStates[id] = 'done';
+  if (room.origStatus === 'dirty') maidCompleted.add(id);
 
   const statusLabel = room.status === 'urgent' ? 'check-out' : room.status === 'priority' ? 'διαμονή' : 'καθαρισμός';
   recomputeCounters();

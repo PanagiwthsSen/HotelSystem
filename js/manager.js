@@ -1204,8 +1204,36 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchHR();
   fetchRents();
   fetchRestockNotifs();
-  setInterval(fetchRestockNotifs, 30000);
-  setInterval(fetchPricing, 30000);
+
+  // Real-time subscriptions (live updates)
+  supabase.channel('manager-rooms')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ROOM' }, async () => {
+      fetchOverview();
+      fetchRents();
+      fetchPricing();
+    }).subscribe();
+
+  supabase.channel('manager-notifications')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'NOTIFICATION' }, async () => {
+      fetchRestockNotifs();
+    }).subscribe();
+
+  supabase.channel('manager-inventory')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'INVENTORY_ITEM' }, async () => {
+      if (document.getElementById('v-inventory')?.classList.contains('active')) fetchInventory();
+    }).subscribe();
+
+  supabase.channel('manager-trips')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'TRIP' }, async () => {
+      fetchDriverSchedule();
+      fetchTripLogs();
+    }).subscribe();
+
+  // Fallback polling every 2 minutes in case WebSocket disconnects
+  setInterval(async () => {
+    fetchRestockNotifs();
+    fetchPricing();
+  }, 120000);
 
   window.addEventListener('beforeunload', () => {
     const user = JSON.parse(localStorage.getItem('hotel_user'));

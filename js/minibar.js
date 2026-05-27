@@ -263,6 +263,7 @@ async function loadRoomSelect() {
         .eq('Status', 'CheckedIn');
 
     const list = document.getElementById('room-list');
+    if (!list) return;
     list.innerHTML = '';
     Object.keys(roomData).forEach(k => delete roomData[k]);
 
@@ -632,18 +633,32 @@ document.addEventListener('DOMContentLoaded', async function initPage() {
         showToast('Σφάλμα φόρτωσης δεδομένων: ' + (err.message || err), 'error');
     }
 
-    setInterval(async () => {
-        try {
-            await Promise.all([
-                loadDashboard(),
-                loadStock(),
-                loadRecentLogs(),
-                fetchMinibarNotifs()
-            ]);
-        } catch (err) {
-            console.warn('Auto-refresh error:', err);
+    // Real-time subscriptions (live updates)
+    supabase.channel('minibar-inventory')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'INVENTORY_ITEM' }, async () => {
+        await loadStock();
+      }).subscribe();
+
+    supabase.channel('minibar-notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'NOTIFICATION' }, async (payload) => {
+        if (payload.new && ['minibar', 'both'].includes(payload.new.TargetRole)) {
+          await fetchMinibarNotifs();
         }
-    }, 30000);
+      }).subscribe();
+
+    supabase.channel('minibar-consumption')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'MINIBAR_CONSUMPTION' }, async () => {
+        await loadRecentLogs();
+        await loadDashboard();
+      }).subscribe();
+
+    // Fallback polling every 2 minutes in case WebSocket disconnects
+    setInterval(async () => {
+      await loadDashboard();
+      await loadStock();
+      await loadRecentLogs();
+      await fetchMinibarNotifs();
+    }, 120000);
 
     window.addEventListener('beforeunload', () => {
         const user = JSON.parse(localStorage.getItem('hotel_user'));
