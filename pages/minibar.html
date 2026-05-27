@@ -65,6 +65,8 @@
 
     <div id="urgent-notifications"></div>
 
+    <div id="minibar-responses"></div>
+
     <div class="g2">
       <div class="card">
         <div class="card-hd"><div class="card-hd-l"><i class="ti ti-list-check" aria-hidden="true"></i>Λίστα Προτεραιότητας Ελέγχων</div></div>
@@ -89,8 +91,11 @@
       <div class="form-grid" style="margin-top:15px; background: var(--color-background-secondary); padding: 20px; border-radius: 8px;">
         <div class="fg" style="grid-column: 1 / -1;">
             <label>Αριθμός Δωματίου *</label>
-            <input id="mb-room" list="room-list" autocomplete="off" placeholder="Πληκτρολογήστε αριθμό δωματίου..." style="font-size:14px;padding:10px;">
-            <datalist id="room-list"></datalist>
+            <div style="position:relative">
+                <i class="ti ti-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:16px;pointer-events:none"></i>
+                <input id="mb-room" list="room-list" autocomplete="off" placeholder="π.χ. 101" style="padding-left:36px;font-size:15px;padding:11px 12px 11px 36px;border:1px solid var(--color-border-secondary);border-radius:var(--border-radius-md);width:100%;font-family:inherit;background:var(--color-background-primary);color:var(--color-text-primary)">
+                <datalist id="room-list"></datalist>
+            </div>
         </div>
 
         <div style="grid-column: 1 / -1;">
@@ -113,7 +118,7 @@
 
         <div style="display:flex; gap:10px;">
             <button class="btn btn-sm btn-dark" onclick="exportToExcel('minibar-table', 'GrandKavala_Minibar_Inventory')"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Απογραφή (Excel)</button>
-            <button class="btn btn-sm btn-dark" onclick="requestGeneralRestock()"><i class="ti ti-truck-loading" aria-hidden="true"></i> Γενικός Ανεφοδιασμός</button>
+            <button class="btn btn-sm btn-dark" onclick="requestRestockAll()"><i class="ti ti-shopping-cart" aria-hidden="true"></i> Παραγγελία Αποθέματος</button>
         </div>
       </div>
 
