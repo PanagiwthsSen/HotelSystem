@@ -38,22 +38,66 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateLiveTime();
   setInterval(updateLiveTime, 60000);
 
+  /* Real-time subscriptions (live updates) */
+  function subscribeToChanges() {
+    supabase.channel('maid-rooms')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ROOM' }, async () => {
+        await fetchMaidRooms();
+        recomputeCounters();
+        if (document.getElementById('v-rooms')?.classList.contains('active')) renderRooms(currentFilter);
+        renderOverview();
+      }).subscribe();
+
+    supabase.channel('maid-notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'NOTIFICATION' }, async () => {
+        await fetchMaidNotifications();
+        renderOverview();
+      }).subscribe();
+
+    supabase.channel('maid-mb')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'MINIBAR_CONSUMPTION' }, async () => {
+        await fetchPendingMb();
+        recomputeCounters();
+        if (document.getElementById('v-minibar')?.classList.contains('active')) renderPendingMb();
+        renderOverview();
+      }).subscribe();
+
+    supabase.channel('maid-reservations')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'RESERVATION' }, async () => {
+        await fetchTodayDepartures();
+        recomputeCounters();
+        if (document.getElementById('v-rooms')?.classList.contains('active')) renderRooms(currentFilter);
+        renderOverview();
+      }).subscribe();
+
+    supabase.channel('maid-inventory')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'INVENTORY_ITEM' }, async () => {
+        await fetchInventory();
+        recomputeCounters();
+        if (document.getElementById('v-stock')?.classList.contains('active')) renderStock();
+        if (document.getElementById('v-linen')?.classList.contains('active')) renderLinen();
+        renderOverview();
+      }).subscribe();
+  }
+  subscribeToChanges();
+
+  /* Fallback polling every 2 minutes in case WebSocket disconnects */
   setInterval(async () => {
     await fetchMaidRooms();
     await fetchMaidNotifications();
     await fetchPendingMb();
     await fetchTodayDepartures();
+    await fetchInventory();
     recomputeCounters();
-    if (document.getElementById('v-rooms')?.classList.contains('active')) {
-      renderRooms(currentFilter);
-    }
-    if (document.getElementById('v-minibar')?.classList.contains('active')) {
-      renderPendingMb();
-    }
+    if (document.getElementById('v-rooms')?.classList.contains('active')) renderRooms(currentFilter);
+    if (document.getElementById('v-minibar')?.classList.contains('active')) renderPendingMb();
+    if (document.getElementById('v-stock')?.classList.contains('active')) renderStock();
+    if (document.getElementById('v-linen')?.classList.contains('active')) renderLinen();
     renderOverview();
-  }, 30000);
+  }, 120000);
 
   window.addEventListener('beforeunload', () => {
+    supabase.removeAllChannels();
     const user = JSON.parse(localStorage.getItem('hotel_user'));
     if (user && user.id) {
       fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/EMPLOYEE?EmpID=eq.' + user.id, {
