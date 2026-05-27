@@ -746,6 +746,36 @@ async function fetchPricing() {
   if (zCol) zCol.textContent = 'Τελική με -' + zPct + '%';
 }
 
+let _hrEmployees = [];
+
+async function checkAndIncrementLeaves() {
+  const now = new Date();
+  const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const { data: markers } = await supabase
+    .from('NOTIFICATION')
+    .select('Message')
+    .eq('Type', 'leave_increment')
+    .eq('TargetRole', 'system')
+    .order('CreatedAt', { ascending: false })
+    .limit(1);
+  const lastMonth = markers && markers[0] ? markers[0].Message : null;
+  if (lastMonth === currentMonth) return;
+  const { data: activeEmps } = await supabase
+    .from('EMPLOYEE')
+    .select('EmpID, Leaves')
+    .eq('isActive', true);
+  if (activeEmps) {
+    for (const emp of activeEmps) {
+      const newVal = (emp.Leaves || 0) + 2;
+      await supabase.from('EMPLOYEE').update({ Leaves: newVal, LastPaymentDate: null }).eq('EmpID', emp.EmpID);
+    }
+  }
+  await supabase.from('NOTIFICATION').insert({
+    TargetRole: 'system', Type: 'leave_increment', Message: currentMonth, IsRead: true, CreatedAt: now.toISOString()
+  });
+  if (document.getElementById('hr-table-body')) fetchHR();
+}
+
 async function fetchHR() {
   const tbody = document.getElementById('hr-table-body');
   if (!tbody) return;
@@ -754,6 +784,7 @@ async function fetchHR() {
     .select('FirstName, LastName, Role, Leaves, LastPaymentDate, isActive, EmpID')
     .order('LastName');
   if (!employees) return;
+  _hrEmployees = employees;
   const { data: shifts } = await supabase
     .from('SHIFT')
     .select('EmpID, Hours, Date');
@@ -762,13 +793,26 @@ async function fetchHR() {
     if (!shiftMap[s.EmpID]) shiftMap[s.EmpID] = [];
     shiftMap[s.EmpID].push(s);
   });
+  const roleDefaultHours = { receptionist: 8, maid: 8, minibar: 8, driver: 8, gardener: 8 };
   const rows = employees.map(e => {
     const name = (e.FirstName || '') + ' ' + (e.LastName || '');
     const empShifts = shiftMap[e.EmpID] || [];
     const latestShift = empShifts.sort((a, b) => new Date(b.Date) - new Date(a.Date))[0];
-    const shiftStr = latestShift ? latestShift.Hours + ' ώρες' : (e.isActive ? '—' : '<span class="pill p-a">Σε Άδεια</span>');
+    const roleKey = e.Role ? e.Role.toLowerCase().trim() : '';
+    let shiftStr;
+    if (latestShift) {
+      shiftStr = latestShift.Hours + ' ώρες';
+    } else if (!e.isActive) {
+      shiftStr = '<span class="pill p-a">Σε Άδεια</span>';
+    } else if (roleDefaultHours[roleKey]) {
+      shiftStr = roleDefaultHours[roleKey] + ' ώρες (default)';
+    } else {
+      shiftStr = '—';
+    }
     const leaves = e.Leaves != null ? e.Leaves + ' ημ. Υπόλοιπο' : '—';
-    const paid = e.LastPaymentDate ? '<span style="font-weight:bold;color:#1D9E75">Εκκαθαρίστηκε</span>' : '<span style="font-weight:bold;color:#D85A30">Εκκρεμεί</span>';
+    const paid = e.LastPaymentDate
+      ? '<span style="font-weight:bold;color:#1D9E75">Εκκαθαρίστηκε</span>'
+      : '<span style="font-weight:bold;color:#D85A30;cursor:pointer" onclick="window.markAsPaid(' + e.EmpID + ')">Εκκρεμεί</span>';
     return '<tr style="border-bottom:1px solid var(--color-border-tertiary)">'
       + '<td style="padding:8px;font-weight:500">' + (name.trim() || e.EmpID) + '</td>'
       + '<td style="padding:8px">' + (e.Role || '—') + '</td>'
@@ -777,7 +821,85 @@ async function fetchHR() {
       + '<td style="padding:8px">' + paid + '</td></tr>';
   }).join('');
   tbody.innerHTML = rows || '<tr><td style="padding:8px;color:var(--color-text-tertiary)" colspan="5">Δεν υπάρχουν υπάλληλοι</td></tr>';
+  const leaveSel = document.getElementById('leave-emp');
+  if (leaveSel) populateLeaveDropdown();
 }
+
+function populateLeaveDropdown() {
+  const sel = document.getElementById('leave-emp');
+  if (!sel) return;
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">— Επιλέξτε —</option>';
+  _hrEmployees.forEach(e => {
+    const name = (e.FirstName || '') + ' ' + (e.LastName || '');
+    sel.innerHTML += '<option value="' + e.EmpID + '">' + (name.trim() || e.EmpID) + ' (' + (e.Role || '') + ')</option>';
+  });
+  if (currentVal && sel.querySelector('option[value="' + currentVal + '"]')) sel.value = currentVal;
+}
+
+window.addLeaveDays = async function() {
+  const sel = document.getElementById('leave-emp');
+  const daysInput = document.getElementById('leave-days');
+  if (!sel || !daysInput) return;
+  const empId = parseInt(sel.value);
+  if (!empId) { showToast('Επιλέξτε υπάλληλο.', 'warning'); return; }
+  const days = parseInt(daysInput.value);
+  if (!days || days < 1) { showToast('Εισάγετε έγκυρο αριθμό ημερών.', 'warning'); return; }
+
+  const emp = _hrEmployees.find(e => e.EmpID === empId);
+  if (!emp) return;
+  const current = emp.Leaves || 0;
+  const newVal = current + days;
+
+  if (!await window.showConfirm('Προσθήκη ' + days + ' ημερών άδειας στον/στην ' + (emp.FirstName || emp.EmpID) + '; (' + current + ' → ' + newVal + ' ημ.)')) return;
+
+  try {
+    const { error } = await supabase.from('EMPLOYEE').update({ Leaves: newVal }).eq('EmpID', empId);
+    if (error) throw error;
+    showToast('Προστέθηκαν ' + days + ' ημέρες άδειας.', 'success');
+    fetchHR();
+  } catch (err) {
+    showToast('Αποτυχία ενημέρωσης.', 'error');
+  }
+};
+
+window.removeLeaveDays = async function() {
+  const sel = document.getElementById('leave-emp');
+  const daysInput = document.getElementById('leave-days');
+  if (!sel || !daysInput) return;
+  const empId = parseInt(sel.value);
+  if (!empId) { showToast('Επιλέξτε υπάλληλο.', 'warning'); return; }
+  const days = parseInt(daysInput.value);
+  if (!days || days < 1) { showToast('Εισάγετε έγκυρο αριθμό ημερών.', 'warning'); return; }
+
+  const emp = _hrEmployees.find(e => e.EmpID === empId);
+  if (!emp) return;
+  const current = emp.Leaves || 0;
+  const newVal = Math.max(0, current - days);
+
+  if (!await window.showConfirm('Αφαίρεση ' + days + ' ημερών άδειας από τον/την ' + (emp.FirstName || emp.EmpID) + '; (' + current + ' → ' + newVal + ' ημ.)')) return;
+
+  try {
+    const { error } = await supabase.from('EMPLOYEE').update({ Leaves: newVal }).eq('EmpID', empId);
+    if (error) throw error;
+    showToast('Αφαιρέθηκαν ' + days + ' ημέρες άδειας.', 'success');
+    fetchHR();
+  } catch (err) {
+    showToast('Αποτυχία ενημέρωσης.', 'error');
+  }
+};
+
+window.markAsPaid = async function(empId) {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { error } = await supabase.from('EMPLOYEE').update({ LastPaymentDate: today }).eq('EmpID', empId);
+    if (error) throw error;
+    showToast('Η μισθοδοσία εκκαθαρίστηκε.', 'success');
+    fetchHR();
+  } catch (err) {
+    showToast('Αποτυχία ενημέρωσης.', 'error');
+  }
+};
 
 async function fetchRents() {
   const list = document.getElementById('rents-list');
@@ -791,41 +913,75 @@ async function fetchRents() {
   }
   const { data: payments } = await supabase
     .from('LEASE_PAYMENT')
-    .select('ShopID, Amount, IsDelayed, PaymentID');
+    .select('ShopID, Amount, IsDelayed, PaymentID, PaymentDate');
   const paymentMap = {};
   (payments || []).forEach(p => {
     if (!paymentMap[p.ShopID]) paymentMap[p.ShopID] = [];
     paymentMap[p.ShopID].push(p);
   });
-  let hasDelayed = false;
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const dayOfMonth = now.getDate();
+  const daysOverdue = Math.max(0, dayOfMonth - 1);
+  let unpaidCount = 0;
+  let over15Count = 0;
   const cards = shops.map(s => {
     const shopPayments = paymentMap[s.ShopID] || [];
-    const hasDelayedPayment = shopPayments.some(p => p.IsDelayed);
-    if (hasDelayedPayment) hasDelayed = true;
+    const paidThisMonth = shopPayments.some(p => {
+      if (!p.PaymentDate) return false;
+      const d = new Date(p.PaymentDate);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+    let state, pillClass, showLawyer, pillLabel;
+    if (paidThisMonth) {
+      state = 'Πληρώθηκε';
+      pillClass = 'p-g';
+      showLawyer = false;
+      pillLabel = 'ΟΚ';
+    } else {
+      unpaidCount++;
+      if (daysOverdue <= 9) {
+        state = 'Εκκρεμεί';
+        pillClass = 'p-y';
+        showLawyer = false;
+        pillLabel = 'Εκκρεμεί';
+      } else if (daysOverdue <= 14) {
+        state = 'Καθυστέρηση πληρωμής';
+        pillClass = 'p-r';
+        showLawyer = false;
+        pillLabel = 'Καθυστέρηση';
+      } else {
+        state = 'Καθυστέρηση πληρωμής';
+        pillClass = 'p-r';
+        showLawyer = true;
+        over15Count++;
+        pillLabel = 'Καθυστέρηση';
+      }
+    }
     const lastPay = shopPayments.sort((a, b) => b.PaymentID - a.PaymentID)[0];
-    const status = hasDelayedPayment ? 'Καθυστέρηση πληρωμής' : (lastPay ? 'Πληρώθηκε' : 'Αναμονή');
-    const urgency = hasDelayedPayment ? 'urgent' : '';
-    const pilClass = hasDelayedPayment ? 'p-r' : 'p-g';
+    const amountDisplay = (lastPay && lastPay.Amount) ? lastPay.Amount + '€' : s.MonthlyRent + '€';
     const name = (s.ShopName || 'Κατάστημα ' + s.ShopID) + (s.TenantName ? ' (' + s.TenantName + ')' : '');
+    const urgency = showLawyer ? 'urgent' : '';
     return '<div class="room-card' + (urgency ? ' ' + urgency : '') + '">'
       + '<div class="room-info"><div style="font-weight:600;font-size:14px">' + name + '</div>'
-      + '<div class="room-type">Ενοίκιο: ' + status + (lastPay ? ' (' + (lastPay.Amount || '—') + '€)' : '') + '</div>'
-      + (hasDelayedPayment ? '<div class="room-guest" style="color:#791F1F">Καθυστέρηση πληρωμής ενοικίου</div>' : '')
+      + '<div class="room-type">Ενοίκιο: ' + state + ' (' + amountDisplay + ')</div>'
+      + (showLawyer ? '<div class="room-guest" style="color:#791F1F">Καθυστέρηση πληρωμής ενοικίου</div>' : '')
       + '</div>'
-      + '<span class="pill ' + pilClass + '">' + (hasDelayedPayment ? 'Καθυστέρηση' : 'ΟΚ') + '</span>'
-      + (hasDelayedPayment ? '<button class="btn btn-dark" onclick="resolveDelayedPayment(' + s.ShopID + ')">Ειδοποίηση Δικηγόρου</button>' : '')
+      + '<span class="pill ' + pillClass + '" style="cursor:' + (paidThisMonth ? 'default' : 'pointer') + '" onclick="' + (paidThisMonth ? '' : 'markShopPaid(' + s.ShopID + ',' + s.MonthlyRent + ')') + '">' + pillLabel + '</span>'
+      + (showLawyer ? '<button class="btn btn-dark" onclick="notifyLawyer(' + s.ShopID + ')">Ειδοποίηση Δικηγόρου</button>' : '')
       + '</div>';
   }).join('');
   list.innerHTML = cards;
   const delCountEl = document.querySelector('.sb-item[data-v="rents"] .sb-badge');
   if (delCountEl) {
-    delCountEl.textContent = hasDelayed ? '1' : '0';
-    delCountEl.style.display = hasDelayed ? '' : 'none';
+    delCountEl.textContent = unpaidCount;
+    delCountEl.style.display = unpaidCount > 0 ? '' : 'none';
   }
   const legalNotice = document.getElementById('legal-notice');
   const legalText = document.getElementById('legal-notice-text');
   if (legalNotice && legalText) {
-    if (hasDelayed) {
+    if (over15Count > 0) {
       legalNotice.style.display = '';
       legalText.textContent = 'Καθυστέρηση πληρωμής από Μισθωτή Καταστήματος. Απαιτείται ειδοποίηση δικηγόρου.';
     } else {
@@ -834,18 +990,48 @@ async function fetchRents() {
   }
 }
 
-window.resolveDelayedPayment = async function(shopId) {
+window.markShopPaid = async function(shopId, amount) {
   if (!supabase) return;
+  const confirmed = await window.showConfirm('Καταχώρηση πληρωμής ενοικίου ' + amount + '€;');
+  if (!confirmed) return;
   try {
+    const today = new Date().toISOString().split('T')[0];
     await supabase
       .from('LEASE_PAYMENT')
-      .update({ IsDelayed: false })
+      .insert({
+        ShopID: shopId,
+        Amount: amount,
+        IsDelayed: false,
+        PaymentDate: today
+      });
+    showToast('Η πληρωμή καταχωρήθηκε επιτυχώς');
+    fetchRents();
+  } catch (err) {
+    showToast('Σφάλμα: ' + err.message, 'error');
+  }
+};
+
+window.notifyLawyer = async function(shopId) {
+  if (!supabase) return;
+  try {
+    const { data: shop } = await supabase
+      .from('RENTED_SHOP')
+      .select('ShopName, TenantName')
       .eq('ShopID', shopId)
-      .eq('IsDelayed', true);
+      .single();
+    const shopName = (shop?.ShopName || 'Κατάστημα ' + shopId) + (shop?.TenantName ? ' (' + shop?.TenantName + ')' : '');
+    await supabase
+      .from('NOTIFICATION')
+      .insert({
+        TargetRole: 'admin',
+        Type: 'legal_notice',
+        Message: 'Εξώδικο για καθυστέρηση ενοικίου: ' + shopName,
+        IsRead: false
+      });
     showToast('legal-toast');
     fetchRents();
   } catch (err) {
-    showToast('Σφάλμα ενημέρωσης: ' + err.message, 'error');
+    showToast('Σφάλμα: ' + err.message, 'error');
   }
 };
 
@@ -884,6 +1070,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchTripFormData();
   fetchTripLogs();
   fetchPricing();
+  checkAndIncrementLeaves();
   fetchHR();
   fetchRents();
   fetchRestockNotifs();
