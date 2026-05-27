@@ -602,16 +602,14 @@ async function fetchRestockNotifs() {
   if (!container) return;
   if (!supabase) return;
 
-  const user = JSON.parse(localStorage.getItem('hotel_user'));
-  const role = user ? user.Role : '';
-
   let query = supabase
     .from('NOTIFICATION')
     .select('*')
     .eq('IsRead', false)
     .order('CreatedAt', { ascending: false });
 
-  if (role === 'external_manager') {
+  const isExternal = window.location.pathname.includes('external_manager');
+  if (isExternal) {
     query = query.in('TargetRole', ['external_manager', 'both']);
   } else {
     query = query.in('TargetRole', ['manager', 'both', 'internal_manager']);
