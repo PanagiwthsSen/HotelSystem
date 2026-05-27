@@ -175,7 +175,7 @@ function recomputeCounters() {
   const doneCount = completedRooms.length;
   const urgentCount = counts.dirty || 0;
   const inProgressCount = counts.cleaning || 0;
-  const pendingCount = (counts.dirty || 0) + (counts.cleaning || 0) + (counts.occ || 0);
+  const pendingCount = (counts.dirty || 0) + (counts.cleaning || 0);
 
   const totalEl = document.getElementById('total-count');
   if (totalEl) totalEl.textContent = pendingCount;
@@ -263,6 +263,9 @@ async function fetchMaidRooms() {
     const rooms = await fetchRooms();
     if (!rooms || rooms.length === 0) { maidRooms = []; return; }
 
+    // ΝΕΟ: Ενημερώνουμε το dropdown με τα δωμάτια που μπορούν να καθαριστούν εκτάκτως
+    populateExtraRooms(rooms);
+
     const { data: resRooms, error: rrErr } = await supabase
       .from('RESERVATION_ROOM')
       .select('ReservationID, RoomNumber');
@@ -298,6 +301,8 @@ async function fetchMaidRooms() {
       .map(r => {
         const guests = rrMap[r.RoomNumber];
         let note = '';
+        
+        // Αφαιρέθηκε το κείμενο "Check-out — Απαιτείται καθαρισμός"
         if (r.Status === 'dirty') {
           note = '';
         } else if (r.Status === 'cleaning') {
@@ -305,6 +310,7 @@ async function fetchMaidRooms() {
         } else if (r.Status === 'free' || r.Status === 'clean') {
           note = 'Έτοιμο προς χρήση';
         }
+        
         if (guests && guests.length > 0) {
           note = guests.join(', ');
         }
@@ -327,8 +333,7 @@ async function fetchInventory() {
   try {
     const { data, error } = await supabase
       .from('INVENTORY_ITEM')
-      .select('*')
-      .neq('Category', 'κηπος');
+      .select('*');
     if (error) throw error;
     inventoryItems = data || [];
   } catch (e) {
@@ -356,6 +361,7 @@ async function fetchMaidNotifications() {
    ============================================================== */
 async function fetchTodayDepartures() {
   try {
+    // Διόρθωση ώρας για να μην δείχνει την προηγούμενη μέρα τα μεσάνυχτα
     const now = new Date();
     const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
 
@@ -633,6 +639,60 @@ window.reportRoomIssue = function(id) {
     }
   };
 };
+
+/* ==============================================================
+   EXTRA ROOM CLEANING (Έκτακτος καθαρισμός)
+   ============================================================== */
+function populateExtraRooms(allRooms) {
+  const select = document.getElementById('extra-room-select');
+  if (!select) return;
+
+  // Φιλτράρουμε τα δωμάτια που ΔΕΝ είναι ήδη στη λίστα της καμαριέρας
+  const availableExtras = allRooms.filter(r => r.Status !== 'dirty' && r.Status !== 'cleaning');
+
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">Επιλέξτε άλλο δωμάτιο...</option>' +
+    availableExtras.map(r => `<option value="${r.RoomNumber}">${r.RoomNumber} (${mapDbStatusToUI(r.Status)})</option>`).join('');
+
+  // Αν ήταν κάτι επιλεγμένο, το ξαναεπιλέγουμε (αν υπάρχει ακόμα)
+  if (currentVal && availableExtras.some(r => String(r.RoomNumber) === String(currentVal))) {
+    select.value = currentVal;
+  }
+}
+
+window.forceCleanRoom = async function() {
+  const select = document.getElementById('extra-room-select');
+  if (!select || !select.value) {
+    alert('Παρακαλώ επιλέξτε ένα δωμάτιο από τη λίστα.');
+    return;
+  }
+
+  const roomNum = select.value;
+  const confirmed = await window.showConfirm(`Θέλετε να ξεκινήσετε έκτακτο καθαρισμό στο δωμάτιο ${roomNum};`);
+  if (!confirmed) return;
+
+  try {
+    // Θέτουμε το δωμάτιο κατευθείαν σε "cleaning"
+    const { error } = await supabase.from('ROOM').update({ Status: 'cleaning' }).eq('RoomNumber', roomNum);
+    if (error) throw error;
+
+    const { error: notifErr } = await supabase.from('NOTIFICATION').insert({
+      TargetRole: 'receptionist',
+      Type: 'room_in_progress',
+      Message: `Δωμάτιο ${roomNum}: Έκτακτος καθαρισμός σε εξέλιξη από καμαριέρα.`,
+      IsRead: false
+    });
+    if (notifErr) throw notifErr;
+
+    showToast('room-toast', `Το δωμάτιο ${roomNum} προστέθηκε στη βάρδια σας!`);
+    select.value = ''; // Μηδενισμός του dropdown
+
+  } catch (err) {
+    console.error('Σφάλμα έκτακτου καθαρισμού:', err.message);
+    showToast('room-toast', 'Σφάλμα: ' + err.message);
+  }
+};
+
 
 /* ==============================================================
    STOCK VIEW

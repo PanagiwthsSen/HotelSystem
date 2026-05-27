@@ -1,4 +1,4 @@
-import { supabase } from './supabase-config.js';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
 document.addEventListener('DOMContentLoaded', () => {
     const loader = document.getElementById('app-loader');
