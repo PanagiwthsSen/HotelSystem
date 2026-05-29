@@ -1,8 +1,8 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "almond",
-  "name": "docs",
-  "description": "Step-by-step guides for every product—platform setup, analytics, and integrations in one place.",
+  "name": "Grand Kavala Hotel",
+  "description": "Role-based documentation for the Grand Kavala Hotel management system.",
   "colors": {
     "primary": "#166E3F",
     "light": "#26BD6C",
@@ -47,37 +47,52 @@
     "directory": "card",
     "groups": [
       {
-        "group": "Platform",
-        "icon": "layers",
-        "expanded": true,
+        "group": "Getting Started",
+        "icon": "rocket",
         "pages": [
-          "platform/quickstart",
-          "platform/key-concepts",
-          "platform/configuration/settings",
-          "platform/configuration/user-management",
-          "platform/administration/roles-permissions"
+          "docs/index"
         ]
       },
       {
-        "group": "Analytics",
-        "icon": "chart-bar",
-        "expanded": true,
+        "group": "🛎️ Reception",
+        "icon": "log-in",
         "pages": [
-          "analytics/quickstart",
-          "analytics/connect-data",
-          "analytics/dashboards/create-dashboard",
-          "analytics/reports/scheduled-reports"
+          "docs/reception/checkin",
+          "docs/reception/checkout"
         ]
       },
       {
-        "group": "Integrations",
-        "icon": "plug",
-        "expanded": true,
+        "group": "🧹 Housekeeping",
+        "icon": "sparkles",
         "pages": [
-          "integrations/quickstart",
-          "integrations/authentication",
-          "integrations/connectors/crm",
-          "integrations/webhooks/configure"
+          "docs/housekeeping/cleaning-linen",
+          "docs/housekeeping/minibar-consumption"
+        ]
+      },
+      {
+        "group": "🚗 Services",
+        "icon": "car",
+        "pages": [
+          "docs/services/driver-trips-fuel",
+          "docs/services/gardener-tasks"
+        ]
+      },
+      {
+        "group": "📊 Managers",
+        "icon": "layout-dashboard",
+        "pages": [
+          "docs/managers/internal-manager",
+          "docs/managers/external-manager",
+          "docs/managers/payroll-leave"
+        ]
+      },
+      {
+        "group": "⚙️ Admin",
+        "icon": "settings",
+        "pages": [
+          "docs/admin/inventory-pricing",
+          "docs/admin/revenue-rentals",
+          "docs/admin/users-backups"
         ]
       }
     ]
