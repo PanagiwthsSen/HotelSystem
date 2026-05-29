@@ -1,7 +1,47 @@
 ---
 title: Check-In
-description: Process guest arrivals, assign rooms, and manage reservations.
+description: Process guest arrivals, assign rooms, and complete the check-in procedure.
 icon: log-in
 ---
 
 # Check-In
+
+The **Check-in** page displays all guests arriving today. From here you can assign a room and mark them as checked in.
+
+## How to Check In a Guest
+
+1. From the sidebar, click **Αφίξεις (Check-in)**. A table shows all reservations with **Check-in date** equal to today.
+
+2. Find the guest. The table shows their name, booking type (Ιδιώτης / Γκρουπ), room type, room number, and current status.
+
+3. Click the **Check-in** button in the guest's row. A modal window titled **Εκχώρηση Δωματίου** opens.
+
+4. Choose a room:
+   - If the reservation already has a **pre-assigned room** from the booking step, it is shown and cannot be changed.
+   - Otherwise, select a room from the dropdown. The list shows only **available (free)** rooms that match the reservation's room type.
+
+5. Click **Επιβεβαίωση**. A confirmation dialog asks you to confirm the check-in.
+
+6. Once confirmed:
+   - The reservation status changes to **CheckedIn**.
+   - The room is marked as **occupied** on the room map.
+   - The badge changes to **Ολοκλ.** and the button becomes **C/I OK** (disabled).
+
+<Note>
+  The arrivals table and the room map update automatically. You do not need to refresh the page.
+</Note>
+
+<Warning>
+  You must select a room before confirming check-in. If no room is chosen, the system will show an error and prevent proceeding.
+</Warning>
+
+## What Happens in the Background
+
+- The `RESERVATION` record is updated to status `CheckedIn`.
+- A link between the reservation and the room is created in `RESERVATION_ROOM`.
+- The `ROOM` record is updated to status `occ` (occupied).
+- The dashboard counters (occupancy, arrivals, free rooms) adjust immediately.
+
+## Cancelling a Check-In
+
+Check-in cannot be undone directly. To reverse it, edit the reservation via **Όλες οι Κρατήσεις** and change the status back to **Confirmed**, then update the room status manually.

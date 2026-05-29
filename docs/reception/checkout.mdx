@@ -1,7 +1,58 @@
 ---
 title: Check-Out
-description: Process guest departures, settle bills, and release rooms.
+description: Process guest departures, review charges, and issue a receipt.
 icon: log-out
 ---
 
 # Check-Out
+
+The **Check-out** page lists all guests departing today. It includes room charges and any mini-bar consumption, and generates a PDF receipt on completion.
+
+## How to Check Out a Guest
+
+1. From the sidebar, click **Αναχωρήσεις (Check-out)**. A table shows all reservations with **Check-out date** equal to today.
+
+2. Review the guest's details:
+   - **Customer name**
+   - **Room number**
+   - **Mini-bar** — a pill badge shows `OK` (no charges) or the amount and item details.
+   - **Υπόλοιπο** — the total balance: room cost plus mini-bar charges.
+
+3. Click the **Check-out** button. A receipt modal titled **Απόδειξη Εξόδου** appears.
+
+4. Review the receipt. It contains:
+   - Guest name, room number, check-in / check-out dates, and number of nights.
+   - Payment method (cash, card, or bank transfer).
+   - A breakdown of charges:
+     - **Διαμονή** — the room cost.
+     - **Mini-bar** — itemised list with quantities and amounts (if any).
+   - The **Σύνολο** total.
+
+5. Click **Επιβεβαίωση & PDF** to finalise. The system:
+   - Marks the reservation as **CheckedOut**.
+   - Marks the room as **dirty** (ready for housekeeping).
+   - Downloads a **PDF receipt** automatically.
+
+6. The badge changes to **Ολοκλ.** and the button becomes **C/O OK** (disabled).
+
+<Note>
+  If the PDF library fails, a plain-text (`.txt`) receipt is downloaded as a fallback. You can also manually export the receipt by clicking **Απόδειξη (PDF)** in the page header.
+</Note>
+
+<Warning>
+  Check-out is **final**. Once confirmed, the reservation cannot be re-opened. The room is immediately queued for cleaning and will appear as **dirty** on the room map.
+</Warning>
+
+## Mini-Bar Charges
+
+- Any mini-bar consumption recorded for the reservation is automatically included in the total.
+- Each item is listed by name with its quantity and charge.
+- The receipt shows a subtotal for mini-bar charges and a combined total with the room cost.
+- Mini-bar charges are refreshed automatically every 20 seconds, so recent additions appear without manual reloading.
+
+## What Happens in the Background
+
+- The `RESERVATION` record is updated to status `CheckedOut`.
+- The `ROOM` record is updated to status `dirty` (needs cleaning).
+- A receipt PDF (or `.txt` fallback) is generated and downloaded.
+- The dashboard counters (occupancy, departures, free rooms) update immediately.
