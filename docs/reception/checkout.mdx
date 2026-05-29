@@ -1,58 +1,59 @@
 ---
 title: Check-Out
-description: Process guest departures, review charges, and issue a receipt.
+description: Διαδικασία αναχώρησης επισκεπτών, έλεγχος χρεώσεων και έκδοση απόδειξης.
 icon: log-out
 ---
 
 # Check-Out
 
-The **Check-out** page lists all guests departing today. It includes room charges and any mini-bar consumption, and generates a PDF receipt on completion.
+Η οθόνη **Check-out** εμφανίζει όλους τους επισκέπτες που αναχωρούν σήμερα. Περιλαμβάνει χρεώσεις δωματίου και mini-bar και δημιουργεί απόδειξη PDF με την ολοκλήρωση.
 
-## How to Check Out a Guest
+## Βήματα για Check-out
 
-1. From the sidebar, click **Αναχωρήσεις (Check-out)**. A table shows all reservations with **Check-out date** equal to today.
+1. Από την πλαϊνή μπάρα, κάντε κλικ στο **Αναχωρήσεις (Check-out)**. Θα εμφανιστεί ένας πίνακας με όλες τις κρατήσεις που έχουν ημερομηνία αναχώρησης σήμερα.
 
-2. Review the guest's details:
-   - **Customer name**
-   - **Room number**
-   - **Mini-bar** — a pill badge shows `OK` (no charges) or the amount and item details.
-   - **Υπόλοιπο** — the total balance: room cost plus mini-bar charges.
+2. Ελέγξτε τα στοιχεία του επισκέπτη:
+   - **Ονοματεπώνυμο**
+   - **Αριθμός δωματίου**
+   - **Mini-bar** — μια ένδειξη δείχνει `OK` (χωρίς χρεώσεις) ή το ποσό και τις λεπτομέρειες των ειδών.
+   - **Υπόλοιπο** — το συνολικό υπόλοιπο: κόστος δωματίου συν χρεώσεις mini-bar.
 
-3. Click the **Check-out** button. A receipt modal titled **Απόδειξη Εξόδου** appears.
+3. Πατήστε το κουμπί **Check-out** στη γραμμή του επισκέπτη. Θα ανοίξει ένα παράθυρο με τίτλο **Απόδειξη Εξόδου**.
 
-4. Review the receipt. It contains:
-   - Guest name, room number, check-in / check-out dates, and number of nights.
-   - Payment method (cash, card, or bank transfer).
-   - A breakdown of charges:
-     - **Διαμονή** — the room cost.
-     - **Mini-bar** — itemised list with quantities and amounts (if any).
-   - The **Σύνολο** total.
+4. Ελέγξτε την απόδειξη. Περιλαμβάνει:
+   - Όνομα επισκέπτη, αριθμό δωματίου, ημερομηνίες άφιξης και αναχώρησης, και αριθμό διανυκτερεύσεων.
+   - Τρόπο πληρωμής (μετρητά, κάρτα ή τραπεζικό έμβασμα).
+   - Αναλυτική χρέωση:
+     - **Διαμονή** — το κόστος δωματίου.
+     - **Mini-bar** — αναλυτική λίστα με ποσότητες και ποσά (αν υπάρχουν).
+   - Το **Σύνολο**.
+   - Στοιχεία του ξενοδοχείου και ευχαριστήριο μήνυμα.
 
-5. Click **Επιβεβαίωση & PDF** to finalise. The system:
-   - Marks the reservation as **CheckedOut**.
-   - Marks the room as **dirty** (ready for housekeeping).
-   - Downloads a **PDF receipt** automatically.
+5. Πατήστε **Επιβεβαίωση & PDF** για ολοκλήρωση. Το σύστημα:
+   - Αλλάζει την κράτηση σε **CheckedOut**.
+   - Σημειώνει το δωμάτιο ως **άδειο (χωρίς καθαριότητα)** για την καθαριότητα.
+     - Κατεβάζει αυτόματα **απόδειξη PDF**.
 
-6. The badge changes to **Ολοκλ.** and the button becomes **C/O OK** (disabled).
+6. Η ένδειξη αλλάζει σε **Ολοκλ.** και το κουμπί γίνεται **C/O OK** (απενεργοποιημένο).
 
 <Note>
-  If the PDF library fails, a plain-text (`.txt`) receipt is downloaded as a fallback. You can also manually export the receipt by clicking **Απόδειξη (PDF)** in the page header.
+  Αν η βιβλιοθήκη PDF αποτύχει, γίνεται λήψη της απόδειξης σε μορφή απλού κειμένου (`.txt`). Μπορείτε επίσης να εξάγετε χειροκίνητα την απόδειξη πατώντας **Απόδειξη (PDF)** στην κεφαλίδα της σελίδας.
 </Note>
 
 <Warning>
-  Check-out is **final**. Once confirmed, the reservation cannot be re-opened. The room is immediately queued for cleaning and will appear as **dirty** on the room map.
+  Το check-out είναι **οριστικό**. Μόλις επιβεβαιωθεί, η κράτηση δεν μπορεί να ανοίξει ξανά. Το δωμάτιο μπαίνει άμεσα στην ουρά καθαρισμού και θα εμφανιστεί ως **άδειο (χωρίς καθαριότητα)** στον χάρτη δωματίων.
 </Warning>
 
-## Mini-Bar Charges
+## Χρεώσεις Mini-Bar
 
-- Any mini-bar consumption recorded for the reservation is automatically included in the total.
-- Each item is listed by name with its quantity and charge.
-- The receipt shows a subtotal for mini-bar charges and a combined total with the room cost.
-- Mini-bar charges are refreshed automatically every 20 seconds, so recent additions appear without manual reloading.
+- Οποιαδήποτε κατανάλωση mini-bar έχει καταγραφεί για την κράτηση συμπεριλαμβάνεται αυτόματα στο σύνολο.
+- Κάθε είδος εμφανίζεται με όνομα, ποσότητα και χρέωση.
+- Η απόδειξη δείχνει υποσύνολο για mini-bar και συνδυασμένο σύνολο με το κόστος δωματίου.
+- Οι χρεώσεις mini-bar ανανεώνονται αυτόματα κάθε 20 δευτερόλεπτα, ώστε οι πρόσφατες προσθήκες να εμφανίζονται χωρίς χειροκίνητη ανανέωση.
 
-## What Happens in the Background
+## Τι Συμβαίνει στο Παρασκήνιο
 
-- The `RESERVATION` record is updated to status `CheckedOut`.
-- The `ROOM` record is updated to status `dirty` (needs cleaning).
-- A receipt PDF (or `.txt` fallback) is generated and downloaded.
-- The dashboard counters (occupancy, departures, free rooms) update immediately.
+- Η εγγραφή `RESERVATION` ενημερώνεται σε κατάσταση `CheckedOut`.
+- Η εγγραφή `ROOM` ενημερώνεται σε κατάσταση `dirty` (χρειάζεται καθαρισμό).
+- Δημιουργείται και γίνεται λήψη απόδειξης PDF (ή `.txt` εναλλακτικά).
+- Οι μετρητές του ταμπλό (πληρότητα, αναχωρήσεις, ελεύθερα δωμάτια) ενημερώνονται άμεσα.

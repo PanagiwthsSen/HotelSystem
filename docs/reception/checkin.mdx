@@ -1,47 +1,47 @@
 ---
 title: Check-In
-description: Process guest arrivals, assign rooms, and complete the check-in procedure.
+description: Διαδικασία άφιξης επισκεπτών, ανάθεση δωματίου και ολοκλήρωση check-in.
 icon: log-in
 ---
 
 # Check-In
 
-The **Check-in** page displays all guests arriving today. From here you can assign a room and mark them as checked in.
+Η οθόνη **Check-in** εμφανίζει όλους τους επισκέπτες που φτάνουν σήμερα. Από εδώ μπορείτε να αναθέσετε δωμάτιο και να ολοκληρώσετε τη διαδικασία άφιξης.
 
-## How to Check In a Guest
+## Βήματα για Check-in
 
-1. From the sidebar, click **Αφίξεις (Check-in)**. A table shows all reservations with **Check-in date** equal to today.
+1. Από την πλαϊνή μπάρα, κάντε κλικ στο **Αφίξεις (Check-in)**. Θα εμφανιστεί ένας πίνακας με όλες τις κρατήσεις που έχουν ημερομηνία άφιξης σήμερα.
 
-2. Find the guest. The table shows their name, booking type (Ιδιώτης / Γκρουπ), room type, room number, and current status.
+2. Βρείτε τον επισκέπτη. Ο πίνακας δείχνει το όνομα, τον τύπο κράτησης (Ιδιώτης / Γκρουπ), τον τύπο δωματίου, τον αριθμό δωματίου και την τρέχουσα κατάσταση.
 
-3. Click the **Check-in** button in the guest's row. A modal window titled **Εκχώρηση Δωματίου** opens.
+3. Πατήστε το κουμπί **Check-in** στη γραμμή του επισκέπτη. Θα ανοίξει ένα παράθυρο με τίτλο **Εκχώρηση Δωματίου**.
 
-4. Choose a room:
-   - If the reservation already has a **pre-assigned room** from the booking step, it is shown and cannot be changed.
-   - Otherwise, select a room from the dropdown. The list shows only **available (free)** rooms that match the reservation's room type.
+4. Επιλέξτε δωμάτιο:
+   - Αν η κράτηση έχει ήδη **προκαθορισμένο δωμάτιο** από τη δημιουργία της, αυτό εμφανίζεται και δεν μπορεί να αλλάξει.
+   - Διαφορετικά, επιλέξτε ένα δωμάτιο από την αναπτυσσόμενη λίστα. Εμφανίζονται μόνο τα **διαθέσιμα (ελεύθερα)** δωμάτια που ταιριάζουν με τον τύπο δωματίου της κράτησης.
 
-5. Click **Επιβεβαίωση**. A confirmation dialog asks you to confirm the check-in.
+5. Πατήστε **Επιβεβαίωση**. Θα εμφανιστεί ένα παράθυρο επιβεβαίωσης για να ολοκληρωθεί το check-in.
 
-6. Once confirmed:
-   - The reservation status changes to **CheckedIn**.
-   - The room is marked as **occupied** on the room map.
-   - The badge changes to **Ολοκλ.** and the button becomes **C/I OK** (disabled).
+6. Μόλις επιβεβαιωθεί:
+   - Η κατάσταση της κράτησης αλλάζει σε **CheckedIn**.
+   - Το δωμάτιο εμφανίζεται ως **κατειλημμένο** στον χάρτη δωματίων.
+   - Η ένδειξη αλλάζει σε **Ολοκλ.** και το κουμπί γίνεται **C/I OK** (απενεργοποιημένο).
 
 <Note>
-  The arrivals table and the room map update automatically. You do not need to refresh the page.
+  Ο πίνακας αφίξεων και ο χάρτης δωματίων ενημερώνονται αυτόματα. Δεν χρειάζεται να ανανεώσετε τη σελίδα.
 </Note>
 
 <Warning>
-  You must select a room before confirming check-in. If no room is chosen, the system will show an error and prevent proceeding.
+  Πρέπει να επιλέξετε δωμάτιο πριν επιβεβαιώσετε το check-in. Αν δεν επιλεγεί δωμάτιο, το σύστημα θα εμφανίσει σφάλμα και δεν θα σας αφήσει να προχωρήσετε.
 </Warning>
 
-## What Happens in the Background
+## Τι Συμβαίνει στο Παρασκήνιο
 
-- The `RESERVATION` record is updated to status `CheckedIn`.
-- A link between the reservation and the room is created in `RESERVATION_ROOM`.
-- The `ROOM` record is updated to status `occ` (occupied).
-- The dashboard counters (occupancy, arrivals, free rooms) adjust immediately.
+- Η εγγραφή `RESERVATION` ενημερώνεται σε κατάσταση `CheckedIn`.
+- Δημιουργείται σύνδεση μεταξύ της κράτησης και του δωματίου στον πίνακα `RESERVATION_ROOM`.
+- Η εγγραφή `ROOM` ενημερώνεται σε κατάσταση `occ` (κατειλημμένο).
+- Οι μετρητές του ταμπλό (πληρότητα, αφίξεις, ελεύθερα δωμάτια) προσαρμόζονται άμεσα.
 
-## Cancelling a Check-In
+## Ακύρωση Check-in
 
-Check-in cannot be undone directly. To reverse it, edit the reservation via **Όλες οι Κρατήσεις** and change the status back to **Confirmed**, then update the room status manually.
+Το check-in δεν μπορεί να ακυρωθεί άμεσα. Για να το αντιστρέψετε, επεξεργαστείτε την κράτηση μέσω **Όλες οι Κρατήσεις**, αλλάξτε την κατάσταση πίσω σε **Confirmed** και ενημερώστε χειροκίνητα την κατάσταση του δωματίου.
