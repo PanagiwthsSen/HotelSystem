@@ -1786,7 +1786,7 @@ async function fetchTrips() {
 
         tbody.innerHTML = data.map(t => {
             const veh = vehMap[t.VehicleID] || {};
-            const vehicleName = `${veh.Type || ''} ${veh.LicensePlate || veh.PlateNumber || ''}`.trim() || '—';
+            const vehicleName = `${veh.Type || ''} ${veh.PlateNumber || ''}`.trim() || '—';
             const driver = empMap[t.DriverID] || {};
             const driverName = `${driver.FirstName || ''} ${driver.LastName || ''}`.trim() || '—';
             const customer = custMap[t.CustomerID] || {};
@@ -1926,7 +1926,7 @@ window.openVehicleModal = async function(vehicleId) {
             } else {
                 const { data: newVeh, error: vehErr } = await supabase
                     .from('VEHICLE')
-                    .insert([{ Type: type, PlateNumber: plate, Status: 'available', LicensePlate: plate, CurrentKm: currentKm }])
+                    .insert([{ Type: type, PlateNumber: plate, Status: 'available', CurrentKm: currentKm }])
                     .select()
                     .single();
                 if (vehErr) throw vehErr;
