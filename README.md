@@ -433,7 +433,8 @@ Push to main
 | `nikos_bar` | `1234` | Minibar |
 | `kostas_rec` | `1234` | Ρεσεψιονίστας |
 | `ioan_manag` | `1234` | Εσωτερικός Διαχειριστής |
+| `giannis` | `1234` | Οδηγός |
 
 ---
 
-*Grand Kavala Hotel System — Πτυχιακή Εργασία*
+*Grand Kavala Hotel System*
