@@ -1,0 +1,22 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Εκτέλεση κάθε 12 ώρες (πιο συχνά για σιγουριά)
+    
+
+    cron: '0 /12 * *'
+    workflow_dispatch:
+
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      
+
+    name: Ping Supabase Database
+          run: |# Καλεί τον πίνακα 'public' για να προκαλέσει δραστηριότητα# Αντικατάστησε το 'your_table_name' με τον πίνακα που έχεις ήδη στη βάση
+            curl -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/CUSTOMER?select=id&limit=1" \-H "apikey: ${{ secrets.SUPABASE_KEY }}" \-H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \-H "Content-Type: application/json" \-H "Prefer: return=minimal"
+
+    
